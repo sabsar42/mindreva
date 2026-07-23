@@ -13,7 +13,7 @@ Voice journaling and notetaking app. Dark mint / white / minimal / premium theme
 ## Current phase
 
 Phase: 2
-Completed: Phase 1 (Monorepo Bootstrap & Dev Environment)
+Completed: Phase 1 (Monorepo Bootstrap and Dev Environment)
 (update these two lines yourself at the end of every phase)
 
 ## Non-negotiable rules, apply in every phase from here on
