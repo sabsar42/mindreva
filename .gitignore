@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# next.js
+.next/
+out/
+
+# turborepo
+.turbo/
+
+# build output
+dist/
+build/
+
+# misc
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# design reference screenshots (kept local only)
+docs/design-reference
