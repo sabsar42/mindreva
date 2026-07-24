@@ -1,0 +1,28 @@
+{
+  "name": "@mindreva/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./middleware": "./src/middleware.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "echo \"no tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.8"
+  },
+  "peerDependencies": {
+    "next": "^15"
+  },
+  "devDependencies": {
+    "@mindreva/config": "workspace:*",
+    "eslint": "^9",
+    "next": "^15",
+    "typescript": "^5"
+  }
+}

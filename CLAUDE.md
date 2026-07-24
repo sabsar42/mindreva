@@ -12,8 +12,8 @@ Voice journaling and notetaking app. Dark mint / white / minimal / premium theme
 
 ## Current phase
 
-Phase: 2
-Completed: Phase 1 (Monorepo Bootstrap and Dev Environment)
+Phase: 4
+Completed: Phase 1 (Monorepo Bootstrap and Dev Environment), Phase 2 (Design System), Phase 3 (Database, Auth and Backend Foundations — verified live against a real Supabase project: migrations applied, RLS cross-user isolation proven with db:rls-check, sign-up/onboarding/account working end-to-end)
 (update these two lines yourself at the end of every phase)
 
 ## Non-negotiable rules, apply in every phase from here on

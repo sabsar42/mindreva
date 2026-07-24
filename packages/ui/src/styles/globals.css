@@ -1,0 +1,22 @@
+/**
+ * Standalone entry for the Mindreva design system. Consumers (apps/web) can
+ * import this single file to pull in Tailwind, the design tokens, and the base
+ * layer in one line. The @source directive makes Tailwind scan this package's
+ * component classes when built from within another app.
+ */
+@import "tailwindcss";
+@import "./tokens.css";
+@source "../";
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

@@ -17,6 +17,8 @@
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.6.0",
+    "@mindreva/config": "workspace:*",
+    "eslint": "^9",
     "husky": "^9.1.7",
     "lint-staged": "^15.3.0",
     "prettier": "^3.4.2",
@@ -26,10 +28,10 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
-      "eslint --fix"
+      "pnpm exec eslint --fix"
     ],
     "*.{ts,tsx,js,jsx,md,json,css}": [
-      "prettier --write"
+      "pnpm exec prettier --write"
     ]
   },
   "pnpm": {

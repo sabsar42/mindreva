@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@mindreva/types"],
+  transpilePackages: [
+    "@mindreva/types",
+    "@mindreva/ui",
+    "@mindreva/auth",
+    "@mindreva/database",
+  ],
 };
 
 export default nextConfig;

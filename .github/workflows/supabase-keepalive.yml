@@ -1,0 +1,25 @@
+name: Supabase keep-alive
+
+# Supabase pauses free-tier projects after ~7 days of inactivity. This pings the
+# database every 3 days so the project never auto-pauses (and you never discover
+# it mid-demo). Add the DATABASE_URL secret in the repo settings.
+
+on:
+  schedule:
+    - cron: "0 6 */3 * *" # 06:00 UTC every 3rd day
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep the database awake
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret is not set; skipping."
+            exit 0
+          fi
+          # psql ships on the ubuntu-latest runner.
+          psql "$DATABASE_URL" -c "select 1 as keepalive;"

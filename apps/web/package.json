@@ -10,7 +10,11 @@
     "test": "echo \"no tests yet\" && exit 0"
   },
   "dependencies": {
+    "@mindreva/auth": "workspace:*",
+    "@mindreva/database": "workspace:*",
     "@mindreva/types": "workspace:*",
+    "@mindreva/ui": "workspace:*",
+    "lucide-react": "^0.469.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "next": "15.5.21"
