@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     "@mindreva/ui",
     "@mindreva/auth",
     "@mindreva/database",
+    "@mindreva/asr",
   ],
 };
 

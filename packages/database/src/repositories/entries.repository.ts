@@ -2,10 +2,14 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import {
   entries,
+  recordings,
+  transcripts,
   type Entry,
   type EntrySource,
   type EntryType,
   type NewEntry,
+  type Recording,
+  type Transcript,
 } from "../schema";
 
 export interface ListEntriesOptions {
@@ -114,5 +118,52 @@ export const EntriesRepository = {
       .where(and(eq(entries.id, id), eq(entries.userId, userId)))
       .returning();
     return rows[0] ?? null;
+  },
+
+  /**
+   * Creates the entry, its recording, and a pending transcript row together in
+   * one Postgres transaction — either all three exist or none do. This is the
+   * write path for the record screen (Phase 4).
+   */
+  async createVoiceEntry(input: {
+    userId: string;
+    type: EntryType;
+    storagePath: string;
+    durationMs: number;
+    mimeType: string;
+  }): Promise<{ entry: Entry; recording: Recording; transcript: Transcript }> {
+    return getDb().transaction(async (tx) => {
+      const [entry] = await tx
+        .insert(entries)
+        .values({
+          userId: input.userId,
+          type: input.type,
+          source: "voice",
+        })
+        .returning();
+      if (!entry) throw new Error("Failed to create entry");
+
+      const [recording] = await tx
+        .insert(recordings)
+        .values({
+          entryId: entry.id,
+          storagePath: input.storagePath,
+          durationMs: input.durationMs,
+          mimeType: input.mimeType,
+        })
+        .returning();
+      if (!recording) throw new Error("Failed to create recording");
+
+      const [transcript] = await tx
+        .insert(transcripts)
+        .values({
+          entryId: entry.id,
+          status: "pending",
+        })
+        .returning();
+      if (!transcript) throw new Error("Failed to create transcript");
+
+      return { entry, recording, transcript };
+    });
   },
 };

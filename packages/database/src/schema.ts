@@ -48,10 +48,10 @@ export const entries = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    type: text("type").notNull(), // 'journal' | 'note'
+    type: text("type").notNull().$type<EntryType>(),
     title: text("title"),
     entryDate: date("entry_date"),
-    source: text("source").notNull(), // 'voice' | 'text'
+    source: text("source").notNull().$type<EntrySource>(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -93,7 +93,10 @@ export const transcripts = pgTable(
     editedText: text("edited_text"),
     provider: text("provider"),
     language: text("language"),
-    status: text("status").notNull().default("pending"),
+    status: text("status")
+      .notNull()
+      .default("pending")
+      .$type<TranscriptStatus>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -161,7 +164,7 @@ export const chatMessages = pgTable(
     sessionId: uuid("session_id")
       .notNull()
       .references(() => chatSessions.id, { onDelete: "cascade" }),
-    role: text("role").notNull(), // 'user' | 'assistant'
+    role: text("role").notNull().$type<ChatRole>(),
     content: text("content").notNull(),
     // Comma-separated entry ids the assistant actually cited (Phase 6).
     citedEntryIds: text("cited_entry_ids"),

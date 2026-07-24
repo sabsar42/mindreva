@@ -1,0 +1,19 @@
+{
+  "name": "@mindreva/asr",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "echo \"no tests yet\" && exit 0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@mindreva/config": "workspace:*",
+    "eslint": "^9",
+    "typescript": "^5"
+  }
+}

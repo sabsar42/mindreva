@@ -12,8 +12,8 @@ Voice journaling and notetaking app. Dark mint / white / minimal / premium theme
 
 ## Current phase
 
-Phase: 4
-Completed: Phase 1 (Monorepo Bootstrap and Dev Environment), Phase 2 (Design System), Phase 3 (Database, Auth and Backend Foundations — verified live against a real Supabase project: migrations applied, RLS cross-user isolation proven with db:rls-check, sign-up/onboarding/account working end-to-end)
+Phase: 5
+Completed: Phase 1 (Monorepo Bootstrap and Dev Environment), Phase 2 (Design System), Phase 3 (Database, Auth and Backend Foundations — verified live against a real Supabase project: migrations applied, RLS cross-user isolation proven with db:rls-check, sign-up/onboarding/account working end-to-end), Phase 4 (Voice Capture & ASR Abstraction Layer — packages/asr with Groq default + HuggingFace fallback + Nemotron stub, real MediaRecorder + live waveform, transactional entry/recording/transcript writes, RLS-scoped Storage bucket, transcript review/edit screen — verified live with a real microphone recording transcribed correctly via Groq)
 (update these two lines yourself at the end of every phase)
 
 ## Non-negotiable rules, apply in every phase from here on

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Settings } from "lucide-react";
-import { Logo, RecordButton } from "@mindreva/ui";
+import { Logo } from "@mindreva/ui";
 import { getMyProfile } from "@/lib/services/profile.service";
 import { countMyEntries } from "@/lib/services/entries.service";
+import { RecordEntryButton } from "./record-entry-button";
 
 // Placeholder journal home. The real list (NoteCard + FilterPills + calendar)
-// and a working record button arrive in Phases 4-5. This exists now so there's
-// a valid authenticated landing page after sign-in and onboarding.
+// arrives in Phase 5. This exists now so there's a valid authenticated landing
+// page after sign-in and onboarding, and a working entry point to recording.
 export default async function JournalPage() {
   const [profile, count] = await Promise.all([
     getMyProfile(),
@@ -37,10 +38,9 @@ export default async function JournalPage() {
       </div>
 
       <div className="mt-16 flex flex-col items-center gap-4 text-center">
-        <RecordButton state="idle" />
+        <RecordEntryButton />
         <p className="text-muted-foreground max-w-xs text-sm">
-          Recording and your notes list arrive in the next phases. Your account
-          and preferences are ready now.
+          Tap to record. Your notes list arrives in Phase 5.
         </p>
         <Link
           href="/account"

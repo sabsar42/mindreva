@@ -2,7 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@mindreva/auth/middleware";
 
 const AUTH_ROUTES = ["/sign-in", "/sign-up"];
-const PROTECTED_PREFIXES = ["/account", "/record", "/journal", "/chat"];
+const PROTECTED_PREFIXES = [
+  "/account",
+  "/record",
+  "/journal",
+  "/chat",
+  "/entries",
+];
 const ONBOARDING_PREFIX = "/onboarding";
 
 export async function middleware(request: NextRequest) {
