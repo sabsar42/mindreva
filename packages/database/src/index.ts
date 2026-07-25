@@ -8,6 +8,7 @@
 export { ProfilesRepository } from "./repositories/profiles.repository";
 export {
   EntriesRepository,
+  type EntryListItem,
   type ListEntriesOptions,
 } from "./repositories/entries.repository";
 export { RecordingsRepository } from "./repositories/recordings.repository";

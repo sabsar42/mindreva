@@ -13,6 +13,7 @@
     "@mindreva/asr": "workspace:*",
     "@mindreva/auth": "workspace:*",
     "@mindreva/database": "workspace:*",
+    "@mindreva/llm": "workspace:*",
     "@mindreva/types": "workspace:*",
     "@mindreva/ui": "workspace:*",
     "lucide-react": "^0.469.0",

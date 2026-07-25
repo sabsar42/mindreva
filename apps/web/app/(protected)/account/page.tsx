@@ -86,26 +86,28 @@ export default async function AccountPage() {
           />
         </Card>
 
-        {/* Cloud sync + Archived/Trash. TODO(Phase 5): wire Archived and Trash
-            to their real screens; they're inert placeholders for now. */}
         <Card className="divide-border divide-y p-0">
           <SettingsRow
             icon={<RefreshCw />}
             title="Cloud sync"
             description={`${noteCount} ${noteCount === 1 ? "note" : "notes"} kept · Free`}
           />
-          <SettingsRow
-            icon={<Archive />}
-            title="Archived"
-            description="Notes you archive are kept here"
-            chevron
-          />
-          <SettingsRow
-            icon={<Trash2 />}
-            title="Trash"
-            description="Restore or permanently delete notes"
-            chevron
-          />
+          <Link href="/archive">
+            <SettingsRow
+              icon={<Archive />}
+              title="Archived"
+              description="Notes you archive are kept here"
+              chevron
+            />
+          </Link>
+          <Link href="/trash">
+            <SettingsRow
+              icon={<Trash2 />}
+              title="Trash"
+              description="Restore or permanently delete notes"
+              chevron
+            />
+          </Link>
         </Card>
 
         <PreferenceToggles />

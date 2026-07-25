@@ -46,13 +46,19 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid editedText" }, { status: 400 });
   }
 
-  const transcript = await saveMyTranscriptEdit(entryId, editedText);
-  if (!transcript) {
+  const result = await saveMyTranscriptEdit(entryId, editedText);
+  if (!result) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({
-    id: transcript.id,
-    editedText: transcript.editedText,
+    id: result.transcript.id,
+    editedText: result.transcript.editedText,
+    summary: result.summary
+      ? {
+          summaryText: result.summary.summaryText,
+          provider: result.summary.provider,
+        }
+      : null,
   });
 }

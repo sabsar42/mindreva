@@ -6,6 +6,9 @@ const PROTECTED_PREFIXES = [
   "/account",
   "/record",
   "/journal",
+  "/notes",
+  "/archive",
+  "/trash",
   "/chat",
   "/entries",
 ];

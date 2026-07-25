@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../client";
 import { entries, summaries, type Summary } from "../schema";
 
@@ -36,12 +36,17 @@ export const SummariesRepository = {
     return rows[0]!;
   },
 
+  /**
+   * "Regenerate" always inserts a new row rather than overwriting — so we can
+   * tell which entries used an older prompt_version. This returns the latest.
+   */
   async getByEntry(entryId: string, userId: string): Promise<Summary | null> {
     const rows = await getDb()
       .select({ s: summaries })
       .from(summaries)
       .innerJoin(entries, eq(entries.id, summaries.entryId))
       .where(and(eq(summaries.entryId, entryId), eq(entries.userId, userId)))
+      .orderBy(desc(summaries.createdAt))
       .limit(1);
     return rows[0]?.s ?? null;
   },

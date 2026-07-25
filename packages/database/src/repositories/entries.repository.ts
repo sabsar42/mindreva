@@ -1,8 +1,20 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  ilike,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import { getDb } from "../client";
 import {
   entries,
   recordings,
+  summaries,
   transcripts,
   type Entry,
   type EntrySource,
@@ -12,10 +24,33 @@ import {
   type Transcript,
 } from "../schema";
 
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export interface ListEntriesOptions {
   type?: EntryType;
   /** Include archived entries. Default false. */
   includeArchived?: boolean;
+  /** Inclusive entry_date range, "YYYY-MM-DD". */
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+/** Entry plus the two fields NoteCard needs that don't live on `entries`. */
+export interface EntryListItem extends Entry {
+  durationMs: number | null;
+  snippet: string | null;
+}
+
+const snippetExpr = sql<
+  string | null
+>`coalesce(${transcripts.editedText}, ${transcripts.rawText})`;
+
+function withListMeta<
+  T extends { entry: Entry; durationMs: number | null; snippet: string | null },
+>(row: T): EntryListItem {
+  return { ...row.entry, durationMs: row.durationMs, snippet: row.snippet };
 }
 
 /**
@@ -55,16 +90,126 @@ export const EntriesRepository = {
   async listForUser(
     userId: string,
     options: ListEntriesOptions = {},
-  ): Promise<Entry[]> {
+  ): Promise<EntryListItem[]> {
     const conditions = [eq(entries.userId, userId), isNull(entries.deletedAt)];
     if (!options.includeArchived) conditions.push(isNull(entries.archivedAt));
     if (options.type) conditions.push(eq(entries.type, options.type));
+    if (options.dateFrom)
+      conditions.push(gte(entries.entryDate, options.dateFrom));
+    if (options.dateTo) conditions.push(lte(entries.entryDate, options.dateTo));
 
-    return getDb()
-      .select()
+    const rows = await getDb()
+      .select({
+        entry: entries,
+        durationMs: recordings.durationMs,
+        snippet: snippetExpr,
+      })
       .from(entries)
+      .leftJoin(recordings, eq(recordings.entryId, entries.id))
+      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .where(and(...conditions))
       .orderBy(desc(entries.createdAt));
+    return rows.map(withListMeta);
+  },
+
+  /** entry_date of every non-deleted, non-archived entry — for calendar dots. */
+  async listEntryDatesForUser(
+    userId: string,
+    type?: EntryType,
+  ): Promise<string[]> {
+    const conditions = [
+      eq(entries.userId, userId),
+      isNull(entries.deletedAt),
+      isNull(entries.archivedAt),
+      isNotNull(entries.entryDate),
+    ];
+    if (type) conditions.push(eq(entries.type, type));
+
+    const rows = await getDb()
+      .selectDistinct({ entryDate: entries.entryDate })
+      .from(entries)
+      .where(and(...conditions));
+    return rows.map((r) => r.entryDate!).filter(Boolean);
+  },
+
+  async listArchivedForUser(
+    userId: string,
+    type?: EntryType,
+  ): Promise<EntryListItem[]> {
+    const conditions = [
+      eq(entries.userId, userId),
+      isNull(entries.deletedAt),
+      isNotNull(entries.archivedAt),
+    ];
+    if (type) conditions.push(eq(entries.type, type));
+
+    const rows = await getDb()
+      .select({
+        entry: entries,
+        durationMs: recordings.durationMs,
+        snippet: snippetExpr,
+      })
+      .from(entries)
+      .leftJoin(recordings, eq(recordings.entryId, entries.id))
+      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
+      .where(and(...conditions))
+      .orderBy(desc(entries.archivedAt));
+    return rows.map(withListMeta);
+  },
+
+  async listTrashedForUser(userId: string): Promise<EntryListItem[]> {
+    const rows = await getDb()
+      .select({
+        entry: entries,
+        durationMs: recordings.durationMs,
+        snippet: snippetExpr,
+      })
+      .from(entries)
+      .leftJoin(recordings, eq(recordings.entryId, entries.id))
+      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
+      .where(and(eq(entries.userId, userId), isNotNull(entries.deletedAt)))
+      .orderBy(desc(entries.deletedAt));
+    return rows.map(withListMeta);
+  },
+
+  /**
+   * Basic ILIKE search across the entry title, its confirmed transcript text,
+   * and its latest summary — not a full search stack, per Phase 5's scope.
+   */
+  async searchForUser(
+    userId: string,
+    query: string,
+    type?: EntryType,
+  ): Promise<EntryListItem[]> {
+    const pattern = `%${query}%`;
+    const conditions = [
+      eq(entries.userId, userId),
+      isNull(entries.deletedAt),
+      or(
+        ilike(entries.title, pattern),
+        ilike(transcripts.editedText, pattern),
+        ilike(transcripts.rawText, pattern),
+        ilike(summaries.summaryText, pattern),
+      ),
+    ];
+    if (type) conditions.push(eq(entries.type, type));
+
+    const rows = await getDb()
+      .selectDistinctOn([entries.id], {
+        entry: entries,
+        durationMs: recordings.durationMs,
+        snippet: snippetExpr,
+      })
+      .from(entries)
+      .leftJoin(recordings, eq(recordings.entryId, entries.id))
+      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
+      .leftJoin(summaries, eq(summaries.entryId, entries.id))
+      .where(and(...conditions))
+      .orderBy(entries.id, desc(entries.createdAt));
+
+    return rows
+      .map(withListMeta)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   },
 
   async countForUser(userId: string): Promise<number> {
@@ -139,6 +284,7 @@ export const EntriesRepository = {
           userId: input.userId,
           type: input.type,
           source: "voice",
+          entryDate: today(),
         })
         .returning();
       if (!entry) throw new Error("Failed to create entry");
@@ -164,6 +310,43 @@ export const EntriesRepository = {
       if (!transcript) throw new Error("Failed to create transcript");
 
       return { entry, recording, transcript };
+    });
+  },
+
+  /**
+   * Typed (non-voice) entries reuse the transcripts table to hold their body,
+   * with status='done' immediately — no ASR involved — so summarization.service
+   * has exactly one code path regardless of source. See docs/roadmap.md Phase 5.
+   */
+  async createTextEntry(input: {
+    userId: string;
+    type: EntryType;
+    text: string;
+  }): Promise<{ entry: Entry; transcript: Transcript }> {
+    return getDb().transaction(async (tx) => {
+      const [entry] = await tx
+        .insert(entries)
+        .values({
+          userId: input.userId,
+          type: input.type,
+          source: "text",
+          entryDate: today(),
+        })
+        .returning();
+      if (!entry) throw new Error("Failed to create entry");
+
+      const [transcript] = await tx
+        .insert(transcripts)
+        .values({
+          entryId: entry.id,
+          status: "done",
+          rawText: input.text,
+          editedText: input.text,
+        })
+        .returning();
+      if (!transcript) throw new Error("Failed to create transcript");
+
+      return { entry, transcript };
     });
   },
 };

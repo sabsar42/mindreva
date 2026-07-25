@@ -135,8 +135,13 @@ export const embeddings = pgTable(
       .notNull()
       .references(() => entries.id, { onDelete: "cascade" }),
     chunkText: text("chunk_text"),
-    // Gemini embedding dimension. HNSW index added in the SQL migration.
-    embedding: vector("embedding", { dimensions: 768 }),
+    // 2048 matches nvidia/nemotron-3-embed-1b:free's native output dimension
+    // (the current temporary embedding provider — see packages/llm/src/factory.ts
+    // and .env.example). Chosen over truncating to 768 (Gemini's dimension) to
+    // avoid the small retrieval-quality loss documented for Matryoshka
+    // truncation. Revisit this if/when Gemini becomes the active provider
+    // again. HNSW index added in the SQL migration.
+    embedding: vector("embedding", { dimensions: 2048 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

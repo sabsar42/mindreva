@@ -27,6 +27,7 @@ export function TranscriptReview({
   const [status, setStatus] = React.useState<TranscriptStatus>(initialStatus);
   const [text, setText] = React.useState(initialText);
   const [saving, setSaving] = React.useState(false);
+  const [skipping, setSkipping] = React.useState(false);
 
   React.useEffect(() => {
     if (status !== "pending" && status !== "processing") return;
@@ -63,6 +64,20 @@ export function TranscriptReview({
       toast.error("Couldn't save your edits. Please try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Skipping still confirms the transcript as-is (raw text) — it should still
+  // get summarized, just via the same "regenerate" endpoint since no edit is
+  // being saved.
+  async function handleSkip() {
+    setSkipping(true);
+    try {
+      await fetch(`/api/entries/${entryId}/summarize`, { method: "POST" });
+    } catch {
+      // Non-fatal — the entry detail screen offers "Generate summary" too.
+    } finally {
+      router.push("/journal");
     }
   }
 
@@ -117,9 +132,10 @@ export function TranscriptReview({
         <Button
           variant="ghost"
           className="flex-1"
-          onClick={() => router.push("/journal")}
+          onClick={handleSkip}
+          disabled={skipping}
         >
-          Skip for now
+          {skipping ? "…" : "Skip for now"}
         </Button>
         <Button className="flex-1" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}

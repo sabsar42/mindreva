@@ -11,7 +11,16 @@
         "SUPABASE_ANON_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
         "NEXT_PUBLIC_SUPABASE_URL",
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "ASR_PROVIDER",
+        "GROQ_API_KEY",
+        "HUGGINGFACE_API_KEY",
+        "LLM_PROVIDER",
+        "GEMINI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "OPENROUTER_API_KEY",
+        "OPENROUTER_MODEL",
+        "OPENROUTER_EMBEDDING_MODEL"
       ]
     },
     "dev": {
