@@ -139,7 +139,7 @@ export class OpenRouterLLMProvider implements LLMProvider {
 
     if (values.length !== EXPECTED_EMBEDDING_DIMENSIONS) {
       throw new Error(
-        `OpenRouter embedding model "${model}" returned a ${values.length}-dimension vector, but packages/database/src/schema.ts's embeddings.embedding column expects ${EXPECTED_EMBEDDING_DIMENSIONS} (vector(768)). Not truncating or padding — either pick a model with matching output dimensions, or migrate the column.`,
+        `OpenRouter embedding model "${model}" returned a ${values.length}-dimension vector, but packages/database/src/schema.ts's embeddings.embedding column expects ${EXPECTED_EMBEDDING_DIMENSIONS} (vector(${EXPECTED_EMBEDDING_DIMENSIONS})). Not truncating or padding — either pick a model with matching output dimensions, or migrate the column.`,
       );
     }
 
