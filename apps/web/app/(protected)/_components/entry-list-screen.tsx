@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, Plus, Settings } from "lucide-react";
+import { Search, Plus, Settings, MessageCircle } from "lucide-react";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -60,6 +60,7 @@ export function EntryListScreen({
   entries,
   entryDates,
   newEntryHref,
+  showChatLink,
   floatingAction,
 }: {
   type: EntryType;
@@ -68,6 +69,8 @@ export function EntryListScreen({
   entryDates: string[];
   /** Notes gets a "+" compose button; journal doesn't (recording is separate). */
   newEntryHref?: string;
+  /** Journal's entry point into "chat with past self". */
+  showChatLink?: boolean;
   /** Journal's floating record button. Fixed to the bottom, above the sheet. */
   floatingAction?: React.ReactNode;
 }) {
@@ -167,6 +170,15 @@ export function EntryListScreen({
               className="bg-primary text-primary-foreground shadow-subtle hover:bg-mint-700 flex size-10 items-center justify-center rounded-full transition-colors"
             >
               <Plus className="size-5" />
+            </Link>
+          )}
+          {showChatLink && (
+            <Link
+              href="/chat"
+              aria-label="Chat with your past self"
+              className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
+            >
+              <MessageCircle className="size-5" />
             </Link>
           )}
           <Link

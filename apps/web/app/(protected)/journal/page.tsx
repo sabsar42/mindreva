@@ -17,6 +17,7 @@ export default async function JournalPage() {
       heading="Journal"
       entries={entries}
       entryDates={entryDates}
+      showChatLink
       floatingAction={<RecordEntryButton />}
     />
   );

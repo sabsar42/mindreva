@@ -10,3 +10,8 @@ export {
   resolveSummaryPrompt,
   type SummaryPromptTemplate,
 } from "./prompts/summarize";
+export {
+  buildPersonaChatMessages,
+  PROMPT_VERSION as PERSONA_CHAT_PROMPT_VERSION,
+  type PersonaChatExcerpt,
+} from "./prompts/persona-chat.prompt";

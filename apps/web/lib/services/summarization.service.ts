@@ -1,6 +1,7 @@
 import "server-only";
 import { getLLMProvider, resolveSummaryPrompt } from "@mindreva/llm";
 import {
+  EmbeddingsRepository,
   EntriesRepository,
   ProfilesRepository,
   SummariesRepository,
@@ -57,10 +58,28 @@ export async function summarizeEntry(
     provider: provider.name,
   });
 
-  const entry = await EntriesRepository.getByIdForUser(entryId, userId);
+  let entry = await EntriesRepository.getByIdForUser(entryId, userId);
   if (entry && !entry.title) {
-    await EntriesRepository.update(entryId, userId, {
+    entry = await EntriesRepository.update(entryId, userId, {
       title: deriveTitle(confirmedText),
     });
+  }
+
+  // Embed for Phase 6's past-self retrieval. Never blocks a successful
+  // summary — a failed embed just means this entry won't surface in chat
+  // until the next successful summarize/regenerate.
+  try {
+    const embedInput = entry?.title
+      ? `${entry.title}\n\n${confirmedText}`
+      : confirmedText;
+    const embedding = await provider.embed(embedInput);
+    await EmbeddingsRepository.upsertForEntry({
+      entryId,
+      userId,
+      chunkText: confirmedText,
+      embedding,
+    });
+  } catch (err) {
+    console.error(`Embedding failed for entry ${entryId}:`, err);
   }
 }

@@ -4,6 +4,7 @@ import {
   eq,
   gte,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   lte,
@@ -85,6 +86,15 @@ export const EntriesRepository = {
     const entry = rows[0];
     if (!entry || entry.deletedAt) return null;
     return entry;
+  },
+
+  /** Batch fetch — used to resolve chat citation chips to entry dates. */
+  async listByIds(ids: string[], userId: string): Promise<Entry[]> {
+    if (ids.length === 0) return [];
+    return getDb()
+      .select()
+      .from(entries)
+      .where(and(inArray(entries.id, ids), eq(entries.userId, userId)));
   },
 
   async listForUser(
@@ -212,11 +222,19 @@ export const EntriesRepository = {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   },
 
-  async countForUser(userId: string): Promise<number> {
+  async countForUser(
+    userId: string,
+    options: { dateFrom?: string; dateTo?: string } = {},
+  ): Promise<number> {
+    const conditions = [eq(entries.userId, userId), isNull(entries.deletedAt)];
+    if (options.dateFrom)
+      conditions.push(gte(entries.entryDate, options.dateFrom));
+    if (options.dateTo) conditions.push(lte(entries.entryDate, options.dateTo));
+
     const rows = await getDb()
       .select({ count: sql<number>`count(*)::int` })
       .from(entries)
-      .where(and(eq(entries.userId, userId), isNull(entries.deletedAt)));
+      .where(and(...conditions));
     return rows[0]?.count ?? 0;
   },
 
