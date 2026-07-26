@@ -175,15 +175,20 @@ export async function getMyEntryDetail(id: string): Promise<{
   tasks: EntryTask[];
 } | null> {
   const userId = await requireUserId();
-  const entry = await EntriesRepository.getByIdForUser(id, userId);
-  if (!entry) return null;
 
-  const [transcript, summary, photoRows, tasks] = await Promise.all([
+  // None of these five queries depend on each other's results (only on id/
+  // userId, already known) — run them together instead of in three
+  // sequential round-trip stages, since each one is a real network hop to
+  // Supabase.
+  const [entry, transcript, summary, photoRows, tasks] = await Promise.all([
+    EntriesRepository.getByIdForUser(id, userId),
     TranscriptsRepository.getByEntry(id, userId),
     SummariesRepository.getByEntry(id, userId),
     EntryPhotosRepository.listByEntry(id, userId),
     EntryTasksRepository.listByEntry(id, userId),
   ]);
+  if (!entry) return null;
+
   const photos = await signPhotoUrls(photoRows);
   return { entry, transcript, summary, photos, tasks };
 }

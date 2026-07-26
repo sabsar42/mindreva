@@ -24,6 +24,7 @@ export interface SwipeableRowProps {
 
 const ACTION_WIDTH = 76;
 const OPEN_THRESHOLD = 40;
+const DRAG_THRESHOLD_PX = 4;
 
 /**
  * Wraps a card (NoteCard) so swiping it left reveals one or more actions
@@ -39,6 +40,7 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
   const [dragging, setDragging] = React.useState(false);
   const startXRef = React.useRef(0);
   const startOffsetRef = React.useRef(0);
+  const pointerDownRef = React.useRef(false);
   const draggedRef = React.useRef(false);
   const maxOffset = actions.length * ACTION_WIDTH;
 
@@ -46,23 +48,36 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
     return Math.min(0, Math.max(-maxOffset, value));
   }
 
+  // Pointer-down itself stays free of any state update or DOM API call — a
+  // plain tap (by far the most common interaction) should cost nothing here
+  // beyond recording the start position in refs. Only once real horizontal
+  // movement crosses DRAG_THRESHOLD_PX do we commit to "dragging": that's
+  // the one point we call setPointerCapture and trigger the re-render that
+  // shows the row actually moving.
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (actions.length === 0) return;
     startXRef.current = e.clientX;
     startOffsetRef.current = offset;
+    pointerDownRef.current = true;
     draggedRef.current = false;
-    setDragging(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragging) return;
+    if (!pointerDownRef.current) return;
     const delta = e.clientX - startXRef.current;
-    if (Math.abs(delta) > 4) draggedRef.current = true;
+
+    if (!draggedRef.current) {
+      if (Math.abs(delta) <= DRAG_THRESHOLD_PX) return;
+      draggedRef.current = true;
+      setDragging(true);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+
     setOffset(clamp(startOffsetRef.current + delta));
   }
 
   function handlePointerUp() {
+    pointerDownRef.current = false;
     if (!dragging) return;
     setDragging(false);
     setOffset((current) => (current <= -OPEN_THRESHOLD ? -maxOffset : 0));

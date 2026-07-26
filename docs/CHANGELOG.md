@@ -7,6 +7,67 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-07-27 — Phase 6.6 fix: app-wide lag traced to a barrel-export leak
+
+Reported directly against the running app after the previous hydration fix
+shipped — that fix was real and necessary but not sufficient, since a
+shared-barrel export was quietly undoing its bundle-size benefit for every
+other page in the app.
+
+### Fixed
+
+- Root cause of the app-wide lag (slow taps, slow saves, slow uploads,
+  navigation showing nothing while loading): `RichTextEditor` was still
+  re-exported from `packages/ui/src/index.ts`'s shared barrel, even though
+  `entry-detail.tsx` already imported it via a `next/dynamic` + direct-
+  subpath call. Every one of the ~19 files across `apps/web` that imports
+  anything from `@mindreva/ui` was bundling Lexical's full dependency tree
+  as a result — confirmed with a build comparison: `/journal`, `/notes`,
+  `/archive`, `/trash`, `/account`, and `/entries/[entryId]` dropped from
+  ~275-422kB First Load JS back to their pre-Lexical ~185-189kB baseline
+  once the barrel export was removed.
+- Added `loading.tsx` for the entry detail page and the journal/notes/
+  archive/trash list screens (a shared `EntryListLoading` skeleton), so
+  navigating shows instant feedback instead of a frozen-looking screen —
+  this is what "tapping a note card doesn't show anything" was describing;
+  an `async` Server Component page renders nothing at all until it fully
+  resolves, absent a `loading.tsx`.
+- Caught the same barrel-import trap a second time in those new loading
+  files themselves (they imported `Skeleton` from the shared barrel) before
+  it shipped — both now import `@mindreva/ui/skeleton` directly.
+- Parallelized `getMyEntryDetail`'s five independent Supabase round trips
+  into a single `Promise.all` instead of two sequential stages.
+- Fixed `SwipeableRow` triggering a React re-render and a `setPointerCapture`
+  call on every `pointerdown`, including a plain tap that never moves —
+  both now only fire once real movement crosses the existing drag
+  threshold, so a tap costs nothing extra before reaching the underlying
+  `Link`.
+- Cleared dozens of orphaned `node.exe` processes accumulated from repeated
+  dev-server restarts across the session, which were compounding the
+  perceived lag on top of the bundle issue.
+
+### Verified
+
+- `pnpm build`'s route-by-route First Load JS table confirms every
+  previously-inflated route is back to baseline.
+- `pnpm lint` and `pnpm build` pass across the monorepo.
+- Real `curl` timings against a freshly started, single dev server show
+  only the expected one-time-per-route Turbopack compile cost, not a
+  persistent slowdown.
+
+### Not fixed (inherent to the stack, not a bug)
+
+- Next.js middleware calls `supabase.auth.getUser()` (a real network round
+  trip) on every request per Supabase's documented pattern, and each
+  Server Component's own `getUser()` call is a second, separate round trip
+  for the same check. Removing the duplication needs request-scoped
+  plumbing between middleware and Server Components — out of scope for
+  this fix pass, tracked as a possible future optimization.
+- `addPhotoToEntry`'s three round trips (upload, DB insert, sign) are
+  genuinely sequential — a signed URL can't be created before the object
+  is uploaded. The client's existing `uploading` spinner already covers
+  this correctly; there's no unnecessary latency to remove here.
+
 ## 2026-07-26 — Phase 6.6 fix: Lexical hydration error and slow navigation
 
 Reported directly against the running app right after the Lexical follow-up

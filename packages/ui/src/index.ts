@@ -73,10 +73,13 @@ export {
   type PhotoUploaderPhoto,
   type PhotoUploaderProps,
 } from "./components/photo-uploader";
-export {
-  RichTextEditor,
-  type RichTextEditorProps,
-} from "./components/rich-text-editor";
+// RichTextEditor is deliberately NOT re-exported here. It's the one
+// component in this package that pulls in Lexical's full dependency tree
+// (~90kB+), and every consumer of the shared barrel — nearly every page in
+// apps/web — would otherwise bundle that weight whether or not it actually
+// uses the editor. Import it directly via "@mindreva/ui/rich-text-editor"
+// (see entry-detail.tsx's next/dynamic usage), the same isolation pattern
+// already used for @mindreva/ui/toast.
 export {
   TaskChecklist,
   type TaskChecklistTask,
