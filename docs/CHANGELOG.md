@@ -7,6 +7,59 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-07-26 — Phase 6.5 redesign: photo-forward journal list, calendar, and entry detail
+
+Reworked the journal list, calendar picker, and entry detail layouts to
+match `docs/design-reference/new-journal-list.png`,
+`new-date-picker.png`, and `new-journal-overview-page.png` — matching their
+layout patterns and information hierarchy, not their palette, imagery, or
+page chrome (no photo hero banner, no Media/Map tabs; this app keeps its own
+dark mint identity and header).
+
+### Changed
+
+- `NoteCard` (`packages/ui`): replaced the old "title + mono date/duration
+  line + snippet" stack with a leading date badge (weekday abbreviation over
+  day-of-month, in the accent-mint token), a bold single-line title, a
+  two-line snippet, and a trailing square cover-photo thumbnail — the
+  entry's first photo by `position`, simply omitted (not a blank gray box)
+  when the entry has none.
+- `CalendarPicker` (`packages/ui`): the month grid's `DayButton` is now a
+  custom `react-day-picker` v9 component override that renders each date's
+  cover photo as the cell's own `background-image` when one exists; days
+  without a photo stay a plain neutral `bg-warm-100` cell. Selected/today
+  styling switched to `bg-primary`/`ring-primary` (dark mint) instead of the
+  previous outline treatment, to read clearly against a photo background.
+  The dot indicator for "has an entry" now only shows on dates without a
+  thumbnail, to avoid stacking a dot on top of a photo. Clear/Today actions
+  and the tap-a-date interaction are unchanged.
+- `entry-detail.tsx`: reordered to date → bold headline (from the entry's
+  title) → hero photo → body/transcript text → the existing Summary card
+  below. The Summary card was kept, not removed — the reference app is a
+  plain photo journal with no AI summaries, this one still has them.
+- `PhotoUploader` (`packages/ui`): rebuilt from a flat row of equal
+  thumbnails into a photo-forward layout — the first photo renders as a
+  large `aspect-[4/3]` hero (or a dashed-border "Add a photo" empty state),
+  with additional photos and an "add another" tile in a small strip
+  underneath.
+
+### Added
+
+- `EntryPhotosRepository.getFirstPhotosForEntries` and `getFirstPhotosByDate`:
+  batched (`DISTINCT ON`) queries so a whole list screen or calendar month
+  resolves its cover photos in one query each, not one per row/cell.
+- `listMyDayThumbnails` in `entries.service.ts`, and cover-photo
+  `thumbnailUrl` attachment to `listMyEntries`, `listMyArchivedEntries`,
+  `listMyTrashedEntries`, and `searchMyEntries` — each batch-signs every
+  cover photo for a screen in a single Storage `createSignedUrls` call.
+
+### Verified
+
+- `pnpm lint` and `pnpm build` pass across the monorepo with the redesigned
+  components in place.
+- Manual check against the running dev server (`/dev/components` and the
+  protected list/detail routes) confirmed no rendering or type errors.
+
 ## 2026-07-26 — Phase 6.5: Photo Attachments for Entries
 
 ### Added

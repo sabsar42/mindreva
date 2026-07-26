@@ -13,7 +13,8 @@ import {
   NoteCard,
   type FilterPillOption,
 } from "@mindreva/ui";
-import type { EntryListItem, EntryType } from "@mindreva/database";
+import type { EntryType } from "@mindreva/database";
+import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 
 type FilterValue = "all" | "today" | "week" | "date";
 
@@ -37,13 +38,14 @@ function toDateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatDayLabel(dateKey: string): string {
+function formatWeekday(dateKey: string): string {
   const d = new Date(`${dateKey}T00:00:00`);
-  return d.toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+  return d.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase();
+}
+
+function formatDayOfMonth(dateKey: string): string {
+  const d = new Date(`${dateKey}T00:00:00`);
+  return String(d.getDate());
 }
 
 function formatDuration(ms: number | null): string | undefined {
@@ -59,14 +61,17 @@ export function EntryListScreen({
   heading,
   entries,
   entryDates,
+  dayThumbnails,
   newEntryHref,
   showChatLink,
   floatingAction,
 }: {
   type: EntryType;
   heading: string;
-  entries: EntryListItem[];
+  entries: EntryListItemWithThumbnail[];
   entryDates: string[];
+  /** Signed cover-photo URL per "YYYY-MM-DD", for the calendar day cells. */
+  dayThumbnails: Record<string, string>;
   /** Notes gets a "+" compose button; journal doesn't (recording is separate). */
   newEntryHref?: string;
   /** Journal's entry point into "chat with past self". */
@@ -79,7 +84,7 @@ export function EntryListScreen({
   const [datePickerOpen, setDatePickerOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [searchResults, setSearchResults] = React.useState<
-    EntryListItem[] | null
+    EntryListItemWithThumbnail[] | null
   >(null);
   const [searching, setSearching] = React.useState(false);
 
@@ -127,7 +132,9 @@ export function EntryListScreen({
           `/api/entries?type=${type}&q=${encodeURIComponent(trimmed)}`,
         );
         if (res.ok) {
-          const data = (await res.json()) as { entries: EntryListItem[] };
+          const data = (await res.json()) as {
+            entries: EntryListItemWithThumbnail[];
+          };
           setSearchResults(data.entries);
         }
       } finally {
@@ -231,11 +238,15 @@ export function EntryListScreen({
             <Link key={entry.id} href={`/entries/${entry.id}`}>
               <NoteCard
                 title={entry.title || "Untitled entry"}
-                dateLabel={
-                  entry.entryDate ? formatDayLabel(entry.entryDate) : ""
+                weekdayLabel={
+                  entry.entryDate ? formatWeekday(entry.entryDate) : ""
+                }
+                dayOfMonth={
+                  entry.entryDate ? formatDayOfMonth(entry.entryDate) : ""
                 }
                 durationLabel={formatDuration(entry.durationMs)}
                 snippet={entry.snippet ?? undefined}
+                thumbnailUrl={entry.thumbnailUrl}
               />
             </Link>
           ))}
@@ -255,6 +266,7 @@ export function EntryListScreen({
                 }
               }}
               entryDates={calendarDates}
+              dayThumbnails={dayThumbnails}
               onClear={() => {
                 setSelectedDate(undefined);
                 setFilter("all");

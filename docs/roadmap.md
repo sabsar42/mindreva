@@ -1055,19 +1055,23 @@ packages/database/
 │   ├── 0004_*.sql                          # entry_photos table DDL (drizzle-kit generate)
 │   └── 0005_entry_photos_rls_and_bucket.sql # RLS policy + "photos" Storage bucket + Data API grant (hand-authored)
 └── src/repositories/
-    └── entry-photos.repository.ts          # create (position computed server-side), listByEntry
+    └── entry-photos.repository.ts          # create, listByEntry, getFirstPhotosForEntries, getFirstPhotosByDate
 
 packages/ui/src/components/
-└── photo-uploader.tsx           # thumbnail row + "add photo" tile, presentation-only
+├── note-card.tsx                # redesigned: leading date badge, bold title, snippet, trailing cover thumbnail
+├── calendar-picker.tsx           # redesigned: custom DayButton renders each day's cover photo as its background
+└── photo-uploader.tsx           # redesigned: large hero photo + thumbnail strip + add tile, presentation-only
 
 apps/web/
 ├── app/
 │   ├── api/entries/[entryId]/photos/route.ts   # POST: upload + create entry_photos row
-│   └── (protected)/entries/[entryId]/
-│       ├── review/transcript-review.tsx         # PhotoUploader wired in (attach right after recording)
-│       └── entry-detail.tsx                     # PhotoUploader wired in (add more photos later)
+│   └── (protected)/
+│       ├── _components/entry-list-screen.tsx    # passes thumbnailUrl / dayThumbnails through to NoteCard / CalendarPicker
+│       └── entries/[entryId]/
+│           ├── review/transcript-review.tsx      # PhotoUploader wired in (attach right after recording)
+│           └── entry-detail.tsx                  # reordered: date, headline, hero photo, body, then summary card
 └── lib/services/
-    └── entries.service.ts       # addPhotoToEntry, signPhotoUrls, getMyEntryDetail now returns photos
+    └── entries.service.ts       # addPhotoToEntry, signPhotoUrls, getMyEntryDetail/listMyEntries/listMyDayThumbnails
 ```
 
 ### Task checklist
@@ -1076,26 +1080,38 @@ apps/web/
 - [x] Generate the table migration with `drizzle-kit generate`, then hand-author a second migration for RLS (join through `entries` on `user_id`, same pattern as `recordings`), the Data API grant, and the `photos` Storage bucket + its three per-user-folder policies (select/insert/delete)
 - [x] Apply both migrations to the live Supabase project and verify RLS is enabled, the bucket exists and is private, and the table starts empty
 - [x] Build `EntryPhotosRepository` with `create` (asserts the entry belongs to the caller, computes `position` server-side as the current photo count) and `listByEntry` (ordered by `position`)
-- [x] Build `PhotoUploader` in `packages/ui`: a row of thumbnails plus an "add photo" tile, presentation-only (no API calls inside it — fires `onFilesSelected(files)` and lets the caller handle upload, matching every other data-touching component in the package)
 - [x] Add `addPhotoToEntry` to `entries.service.ts`: uploads to the `photos` bucket via the session-scoped Supabase client (same RLS defense-in-depth as `createVoiceEntry`), then creates the `entry_photos` row
 - [x] Add signed-URL generation for display — a batch `createSignedUrls` call for `getMyEntryDetail` (avoids N round trips), a single `createSignedUrl` call for a fresh upload
 - [x] Update `getMyEntryDetail` to also return the entry's ordered photos (`{id, url}[]`) alongside the existing transcript/summary
-- [x] Add `POST /api/entries/[entryId]/photos` (multipart form, one file per request) and wire `PhotoUploader` into both the transcript review screen and the entry detail screen
+- [x] Add `POST /api/entries/[entryId]/photos` (multipart form, one file per request)
 - [x] Verify live end-to-end against the real Supabase project: user A can upload a photo, insert its `entry_photos` row, and resolve a signed URL for it; user B cannot read the row, list it, download the object, sign a URL for it, or insert a row against user A's entry
+
+**Redesign pass** (same phase, after the reference screenshots `docs/design-reference/new-journal-list.png`, `new-date-picker.png`, and `new-journal-overview-page.png` were provided — the initial cut above bolted the upload control onto the pre-existing layouts rather than matching these):
+
+- [x] Add `EntryPhotosRepository.getFirstPhotosForEntries` (batched, `DISTINCT ON` per entry id) and `getFirstPhotosByDate` (batched, `DISTINCT ON` per `entry_date`) so list rows and calendar cells can each resolve their cover photo in one query, not N
+- [x] Add `listMyDayThumbnails` and thumbnail-attachment to `listMyEntries` / `listMyArchivedEntries` / `listMyTrashedEntries` / `searchMyEntries` in `entries.service.ts`, batch-signing all cover-photo URLs for a screen in a single Storage call
+- [x] Redesign `NoteCard`: a leading date badge (weekday over day-of-month, our accent-mint token, not a plain text line), bold single-line title, two-line snippet, and a trailing square cover-photo thumbnail — omitted entirely (not a blank gray box) when the entry has no photo
+- [x] Redesign `CalendarPicker`: a custom `DayButton` renders that date's cover photo as the cell's background image when one exists; days without a photo stay a plain `bg-warm-100` neutral cell; the "has an entry, no photo" dot only shows when there's no thumbnail to avoid stacking; selected/today styling uses `bg-primary`/`ring-primary` (dark mint), not the reference's blue; Clear/Today actions and the tap-to-select interaction are unchanged
+- [x] Reorder `entry-detail.tsx` to the reference's hierarchy: date, then a bold headline pulled from the entry's title, then the (now hero-sized) `PhotoUploader`, then the body/transcript text, then the existing Summary card below — the summary card was kept, not removed, this app has AI summaries and the reference app doesn't
+- [x] Rebuild `PhotoUploader`: the first photo now renders as a large `aspect-[4/3]` hero (or an inviting dashed-border empty state prompting "Add a photo" when there isn't one yet), with any additional photos plus the "add another" tile in a small thumbnail strip underneath — replacing the old flat row-of-equal-thumbnails layout
+- [x] Re-verify `pnpm lint` and `pnpm build` pass with the redesigned components in place
 
 ### Common mistakes
 
 - Trusting a client-supplied `position` for ordering. A malicious or buggy client could then desync the display order or collide positions across concurrent uploads; compute it server-side from the current count instead.
-- Generating signed URLs one at a time for a list of photos. Supabase's Storage client supports a batch `createSignedUrls`, use it for the entry detail screen's photo list instead of N sequential calls.
+- Generating signed URLs one at a time for a list of photos, or one at a time per list row. Batch it: one `createSignedUrls` call for all of a list screen's cover photos (or the calendar's day thumbnails), not N Storage round trips.
 - Forgetting the Data API grant on the new table. This project has "automatically expose new tables" off, so a table with RLS enabled but no `GRANT ... TO authenticated` fails silently from the client with a permissions error that looks like an RLS bug but isn't one.
 - Using `next/image` for these thumbnails. The `url` is a short-lived, per-request signed URL for a private object, not a stable remote domain `next/image` can allowlist and optimize; a plain `<img>` is the right call here, same reasoning as everywhere else this app touches private Storage objects.
 - Adding an `eslint-disable-next-line` comment for a rule from a plugin the local package's ESLint config doesn't load (e.g. `@next/next/no-img-element` inside `packages/ui`). That's a hard "Definition for rule not found" error, not a no-op — and moot anyway, since `apps/web`'s Next-specific lint rules never scan `packages/ui`'s source in the first place.
+- Copying a design reference's exact palette or chrome instead of its layout. `new-journal-list.png` et al. are structure references (proportions, information hierarchy, grid density) — colors stay dark mint, and app-specific chrome the reference happens to have (a photo hero banner, Media/Map tabs) doesn't get added just because the screenshot has it.
+- Building a calendar day-cell photo treatment as a separate `<img>` layered under the button. `react-day-picker` v9's `components.DayButton` override lets the thumbnail be the button's own `background-image`, which keeps hit-testing, focus, and the existing modifier classes (`selected`, `today`, `outside`) all working unmodified.
 
 ### Best practices
 
 - Mirror the existing `recordings`/`recordings` bucket pattern exactly rather than inventing a new shape for `entry_photos`/`photos` — same join-through-`entries` RLS policy, same per-user-folder Storage path convention, same two-migration split (auto-generated table DDL, then hand-authored RLS/bucket).
 - Keep `PhotoUploader` presentation-only. It never calls `fetch` itself; both places it's used (`transcript-review.tsx`, `entry-detail.tsx`) own their own upload logic and pass it down as a callback.
 - Verify RLS live against the real database, not just via a clean migration exit code — a throwaway two-user script proving cross-user reads/writes/downloads/signed-URLs all fail is worth the few minutes it takes, for a feature this trust-sensitive.
+- When a redesign is requested against reference screenshots, treat "layout, not palette" literally: reuse the app's own tokens (`bg-primary`, `bg-accent`, `shadow-subtle`, `rounded-lg`) for every surface the reference draws in its own colors, and skip any reference-specific chrome (hero banners, extra tabs) that doesn't correspond to a feature this app actually has.
 
 ---
 

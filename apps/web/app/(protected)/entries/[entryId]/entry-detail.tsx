@@ -64,9 +64,9 @@ export function EntryDetail({
 
   const dateLabel = entryDate
     ? new Date(`${entryDate}T00:00:00`).toLocaleDateString(undefined, {
-        weekday: "long",
+        weekday: "short",
         day: "numeric",
-        month: "long",
+        month: "short",
         year: "numeric",
       })
     : null;
@@ -228,16 +228,56 @@ export function EntryDetail({
         </div>
       </header>
 
+      <div className="mt-4 flex items-center gap-2">
+        {dateLabel && (
+          <p className="text-muted-foreground text-sm">{dateLabel}</p>
+        )}
+        {isArchived && <Badge variant="neutral">Archived</Badge>}
+      </div>
+
+      <h1 className="text-foreground mt-1 text-2xl font-bold leading-snug tracking-tight">
+        {title || "Untitled entry"}
+      </h1>
+
       <div className="mt-4">
-        <h1 className="text-foreground text-xl font-bold tracking-tight">
-          {title || "Untitled entry"}
-        </h1>
-        <div className="mt-1 flex items-center gap-2">
-          {dateLabel && (
-            <p className="text-muted-foreground text-sm">{dateLabel}</p>
+        <PhotoUploader
+          photos={photos}
+          onFilesSelected={(files) => void handlePhotosSelected(files)}
+          uploading={uploadingPhoto}
+        />
+      </div>
+
+      <div className="mt-5">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-foreground text-sm font-semibold">
+            {type === "journal" ? "Transcript" : "Note"}
+          </h2>
+          {textDirty && (
+            <Button size="sm" onClick={saveText} disabled={savingText}>
+              {savingText ? "Saving…" : "Save"}
+            </Button>
           )}
-          {isArchived && <Badge variant="neutral">Archived</Badge>}
         </div>
+
+        {status === "pending" || status === "processing" ? (
+          <div className="border-border bg-card text-muted-foreground flex items-center gap-2 rounded-lg border p-5 text-sm">
+            <Loader2 className="size-4 animate-spin" />
+            Transcribing…
+          </div>
+        ) : status === "failed" ? (
+          <div className="border-border bg-card text-muted-foreground rounded-lg border p-5 text-sm">
+            This recording couldn&apos;t be transcribed.
+          </div>
+        ) : (
+          <Textarea
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setTextDirty(true);
+            }}
+            className="min-h-48"
+          />
+        )}
       </div>
 
       <Card className="mt-5 p-5">
@@ -278,48 +318,6 @@ export function EntryDetail({
           </p>
         )}
       </Card>
-
-      <div className="mt-5">
-        <h2 className="text-foreground mb-2 text-sm font-semibold">Photos</h2>
-        <PhotoUploader
-          photos={photos}
-          onFilesSelected={(files) => void handlePhotosSelected(files)}
-          uploading={uploadingPhoto}
-        />
-      </div>
-
-      <div className="mt-5">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-foreground text-sm font-semibold">
-            {type === "journal" ? "Transcript" : "Note"}
-          </h2>
-          {textDirty && (
-            <Button size="sm" onClick={saveText} disabled={savingText}>
-              {savingText ? "Saving…" : "Save"}
-            </Button>
-          )}
-        </div>
-
-        {status === "pending" || status === "processing" ? (
-          <div className="border-border bg-card text-muted-foreground flex items-center gap-2 rounded-lg border p-5 text-sm">
-            <Loader2 className="size-4 animate-spin" />
-            Transcribing…
-          </div>
-        ) : status === "failed" ? (
-          <div className="border-border bg-card text-muted-foreground rounded-lg border p-5 text-sm">
-            This recording couldn&apos;t be transcribed.
-          </div>
-        ) : (
-          <Textarea
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setTextDirty(true);
-            }}
-            className="min-h-48"
-          />
-        )}
-      </div>
     </main>
   );
 }

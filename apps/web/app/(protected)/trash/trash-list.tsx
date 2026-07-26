@@ -5,22 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Undo2 } from "lucide-react";
 import { NoteCard, toast } from "@mindreva/ui";
-import type { EntryListItem } from "@mindreva/database";
+import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 
 // Note: trashed entries are intentionally NOT links to /entries/[id] — the
 // detail route excludes soft-deleted rows (getByIdForUser returns null once
 // deleted_at is set), so a link here would just 404. Restore first, then view.
 
-function formatDayLabel(dateKey: string | null): string {
+function formatWeekday(dateKey: string | null): string {
   if (!dateKey) return "";
-  return new Date(`${dateKey}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+  return new Date(`${dateKey}T00:00:00`)
+    .toLocaleDateString(undefined, { weekday: "short" })
+    .toUpperCase();
 }
 
-export function TrashList({ entries: initial }: { entries: EntryListItem[] }) {
+function formatDayOfMonth(dateKey: string | null): string {
+  if (!dateKey) return "";
+  return String(new Date(`${dateKey}T00:00:00`).getDate());
+}
+
+export function TrashList({
+  entries: initial,
+}: {
+  entries: EntryListItemWithThumbnail[];
+}) {
   const router = useRouter();
   const [entries, setEntries] = React.useState(initial);
 
@@ -62,8 +69,10 @@ export function TrashList({ entries: initial }: { entries: EntryListItem[] }) {
           <div key={entry.id} className="relative">
             <NoteCard
               title={entry.title || "Untitled entry"}
-              dateLabel={formatDayLabel(entry.entryDate)}
+              weekdayLabel={formatWeekday(entry.entryDate)}
+              dayOfMonth={formatDayOfMonth(entry.entryDate)}
               snippet={entry.snippet ?? undefined}
+              thumbnailUrl={entry.thumbnailUrl}
               className="pr-12"
             />
             <button

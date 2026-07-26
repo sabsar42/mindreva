@@ -24,8 +24,11 @@ export interface PhotoUploaderProps {
 }
 
 /**
- * A row of photo thumbnails plus an "add photo" tile. Used on both the
- * record screen (attach while/after recording) and the entry detail screen
+ * Photo-forward attachment control, matching new-journal-overview-page.png's
+ * hierarchy: the first photo renders as a large hero (or an inviting empty
+ * state when there isn't one yet), with any additional photos and the "add
+ * photo" tile in a thumbnail strip underneath. Used both on the transcript
+ * review screen (attach right after recording) and the entry detail screen
  * (add more photos later) — same component, same upload affordance.
  */
 function PhotoUploader({
@@ -37,6 +40,7 @@ function PhotoUploader({
 }: PhotoUploaderProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const canAddMore = photos.length < maxPhotos;
+  const [hero, ...rest] = photos;
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -45,39 +49,69 @@ function PhotoUploader({
     e.target.value = "";
   }
 
+  function openPicker() {
+    if (!uploading) inputRef.current?.click();
+  }
+
   return (
-    <div className={cn("flex flex-wrap gap-2", className)}>
-      {photos.map((photo) => (
+    <div className={cn("w-full", className)}>
+      {hero ? (
         // Plain <img>, deliberately: these are dynamic, per-request signed
         // URLs for private Storage objects — next/image's remote-domain
         // allowlisting and optimization pipeline don't fit that shape well,
         // and this file isn't linted by apps/web's Next-specific ESLint
         // rules anyway (packages/ui has its own, thinner config).
         <img
-          key={photo.id}
-          src={photo.url}
+          src={hero.url}
           alt=""
-          className="border-border size-20 rounded-lg border object-cover"
+          className="border-border aspect-[4/3] w-full rounded-lg border object-cover"
         />
-      ))}
-
-      {canAddMore && (
+      ) : (
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={openPicker}
           disabled={uploading}
           aria-label="Add photo"
-          className="border-border text-muted-foreground hover:bg-warm-100 flex size-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed transition-colors disabled:opacity-50"
+          className="border-border text-muted-foreground hover:bg-warm-100 flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50"
         >
           {uploading ? (
-            <Loader2 className="size-5 animate-spin" />
+            <Loader2 className="size-6 animate-spin" />
           ) : (
-            <ImagePlus className="size-5" />
+            <ImagePlus className="size-6" />
           )}
-          <span className="text-[10px]">
-            {uploading ? "Uploading…" : "Add photo"}
+          <span className="text-sm">
+            {uploading ? "Uploading…" : "Add a photo"}
           </span>
         </button>
+      )}
+
+      {(rest.length > 0 || (hero && canAddMore)) && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {rest.map((photo) => (
+            <img
+              key={photo.id}
+              src={photo.url}
+              alt=""
+              className="border-border size-16 rounded-md border object-cover"
+            />
+          ))}
+
+          {hero && canAddMore && (
+            <button
+              type="button"
+              onClick={openPicker}
+              disabled={uploading}
+              aria-label="Add another photo"
+              className="border-border text-muted-foreground hover:bg-warm-100 flex size-16 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed transition-colors disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
+            </button>
+          )}
+        </div>
       )}
 
       <input

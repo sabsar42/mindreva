@@ -1,13 +1,15 @@
 import {
   listMyEntries,
   listMyEntryDates,
+  listMyDayThumbnails,
 } from "@/lib/services/entries.service";
 import { EntryListScreen } from "../_components/entry-list-screen";
 
 export default async function NotesPage() {
-  const [entries, entryDates] = await Promise.all([
+  const [entries, entryDates, dayThumbnails] = await Promise.all([
     listMyEntries({ type: "note" }),
     listMyEntryDates("note"),
+    listMyDayThumbnails("note"),
   ]);
 
   return (
@@ -16,6 +18,7 @@ export default async function NotesPage() {
       heading="Notes"
       entries={entries}
       entryDates={entryDates}
+      dayThumbnails={dayThumbnails}
       newEntryHref="/notes/new"
     />
   );

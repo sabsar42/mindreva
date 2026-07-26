@@ -40,14 +40,21 @@ export interface EntryPhotoWithUrl {
   url: string;
 }
 
+/** EntryListItem plus a signed URL for its cover photo (first by position),
+ * for NoteCard's trailing thumbnail. Undefined when the entry has no photos. */
+export interface EntryListItemWithThumbnail extends EntryListItem {
+  thumbnailUrl?: string;
+}
+
 export async function listMyEntries(options?: {
   type?: EntryType;
   includeArchived?: boolean;
   dateFrom?: string;
   dateTo?: string;
-}): Promise<EntryListItem[]> {
+}): Promise<EntryListItemWithThumbnail[]> {
   const userId = await requireUserId();
-  return EntriesRepository.listForUser(userId, options ?? {});
+  const entries = await EntriesRepository.listForUser(userId, options ?? {});
+  return attachThumbnails(entries, userId);
 }
 
 /** entry_date of every active entry, for the calendar's dot indicators. */
@@ -56,26 +63,76 @@ export async function listMyEntryDates(type?: EntryType): Promise<string[]> {
   return EntriesRepository.listEntryDatesForUser(userId, type);
 }
 
-export async function listMyArchivedEntries(
+/** Signed cover-photo URL for each date that has one, keyed by "YYYY-MM-DD" —
+ * for the calendar month grid's day-cell thumbnails. */
+export async function listMyDayThumbnails(
   type?: EntryType,
-): Promise<EntryListItem[]> {
+): Promise<Record<string, string>> {
   const userId = await requireUserId();
-  return EntriesRepository.listArchivedForUser(userId, type);
+  const byDate = await EntryPhotosRepository.getFirstPhotosByDate(userId, type);
+  if (byDate.size === 0) return {};
+
+  const rows = Array.from(byDate.entries()).map(([date, photo]) => ({
+    date,
+    ...photo,
+  }));
+  const signed = await signPhotoUrls(rows);
+  const urlById = new Map(signed.map((s) => [s.id, s.url]));
+  return Object.fromEntries(rows.map((r) => [r.date, urlById.get(r.id) ?? ""]));
 }
 
-export async function listMyTrashedEntries(): Promise<EntryListItem[]> {
+/** Attaches each entry's cover-photo signed URL (first photo by position),
+ * batched into a single Storage call rather than one per entry. */
+async function attachThumbnails(
+  entries: EntryListItem[],
+  userId: string,
+): Promise<EntryListItemWithThumbnail[]> {
+  const ids = entries.map((e) => e.id);
+  const firstPhotos = await EntryPhotosRepository.getFirstPhotosForEntries(
+    ids,
+    userId,
+  );
+  if (firstPhotos.size === 0) return entries;
+
+  const rows = Array.from(firstPhotos.entries()).map(([entryId, photo]) => ({
+    entryId,
+    ...photo,
+  }));
+  const signed = await signPhotoUrls(rows);
+  const urlById = new Map(signed.map((s) => [s.id, s.url]));
+  const urlByEntryId = new Map(rows.map((r) => [r.entryId, urlById.get(r.id)]));
+
+  return entries.map((e) => ({
+    ...e,
+    thumbnailUrl: urlByEntryId.get(e.id) || undefined,
+  }));
+}
+
+export async function listMyArchivedEntries(
+  type?: EntryType,
+): Promise<EntryListItemWithThumbnail[]> {
   const userId = await requireUserId();
-  return EntriesRepository.listTrashedForUser(userId);
+  const entries = await EntriesRepository.listArchivedForUser(userId, type);
+  return attachThumbnails(entries, userId);
+}
+
+export async function listMyTrashedEntries(): Promise<
+  EntryListItemWithThumbnail[]
+> {
+  const userId = await requireUserId();
+  const entries = await EntriesRepository.listTrashedForUser(userId);
+  return attachThumbnails(entries, userId);
 }
 
 export async function searchMyEntries(
   query: string,
   type?: EntryType,
-): Promise<EntryListItem[]> {
+): Promise<EntryListItemWithThumbnail[]> {
   const userId = await requireUserId();
   const trimmed = query.trim();
   if (!trimmed) return [];
-  return EntriesRepository.searchForUser(userId, trimmed, type);
+  const entries = await EntriesRepository.searchForUser(userId, trimmed, type);
+  return attachThumbnails(entries, userId);
 }
 
 export async function countMyEntries(): Promise<number> {

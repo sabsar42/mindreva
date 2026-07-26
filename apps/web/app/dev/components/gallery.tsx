@@ -243,14 +243,17 @@ export function ComponentsGallery() {
         <div className="space-y-3">
           <NoteCard
             title="And so I was wondering what happened when I sleep and wake up in the morning."
-            dateLabel="Wed 22 Jul"
+            weekdayLabel="Wed"
+            dayOfMonth="22"
             durationLabel="37 s"
             snippet="when I sleep and wake up Do you understand what I'm saying about the mornings…"
+            thumbnailUrl="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&h=200&fit=crop"
             onClick={() => {}}
           />
           <NoteCard
             title="Um, hey, what's up?"
-            dateLabel="Tue 21 Jul"
+            weekdayLabel="Tue"
+            dayOfMonth="21"
             durationLabel="3 s"
             snippet="Um, hey, what's up?"
             onClick={() => {}}

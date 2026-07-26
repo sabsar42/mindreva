@@ -5,21 +5,24 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArchiveRestore } from "lucide-react";
 import { NoteCard, toast } from "@mindreva/ui";
-import type { EntryListItem } from "@mindreva/database";
+import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 
-function formatDayLabel(dateKey: string | null): string {
+function formatWeekday(dateKey: string | null): string {
   if (!dateKey) return "";
-  return new Date(`${dateKey}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+  return new Date(`${dateKey}T00:00:00`)
+    .toLocaleDateString(undefined, { weekday: "short" })
+    .toUpperCase();
+}
+
+function formatDayOfMonth(dateKey: string | null): string {
+  if (!dateKey) return "";
+  return String(new Date(`${dateKey}T00:00:00`).getDate());
 }
 
 export function ArchiveList({
   entries: initial,
 }: {
-  entries: EntryListItem[];
+  entries: EntryListItemWithThumbnail[];
 }) {
   const router = useRouter();
   const [entries, setEntries] = React.useState(initial);
@@ -62,8 +65,10 @@ export function ArchiveList({
             <Link href={`/entries/${entry.id}`}>
               <NoteCard
                 title={entry.title || "Untitled entry"}
-                dateLabel={formatDayLabel(entry.entryDate)}
+                weekdayLabel={formatWeekday(entry.entryDate)}
+                dayOfMonth={formatDayOfMonth(entry.entryDate)}
                 snippet={entry.snippet ?? undefined}
+                thumbnailUrl={entry.thumbnailUrl}
                 className="pr-12"
               />
             </Link>
