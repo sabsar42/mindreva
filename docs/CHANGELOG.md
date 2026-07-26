@@ -7,6 +7,35 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-07-26 — Phase 6.6 fix: Lexical hydration error and slow navigation
+
+Reported directly against the running app right after the Lexical follow-up
+shipped — exactly the gap flagged as "not independently verified" in that
+entry.
+
+### Fixed
+
+- Hydration error on the entry detail page: Lexical's `ContentEditable`
+  renders different DOM server-side (a non-interactive `aria-hidden` shim)
+  than once hydrated client-side, a known Lexical/Next.js SSR mismatch.
+  `RichTextEditor` is now loaded via `next/dynamic(..., { ssr: false })` in
+  `entry-detail.tsx`, imported through `@mindreva/ui`'s existing `./*`
+  subpath export (`@mindreva/ui/rich-text-editor`, the same pattern already
+  used for `@mindreva/ui/toast`) rather than the shared barrel, with a
+  skeleton loading placeholder shown until it mounts on the client.
+- Slow-feeling navigation when tapping a NoteCard: the same `ssr: false`
+  dynamic import code-splits Lexical's bundle into its own chunk, fetched
+  only once the entry detail page actually mounts, instead of shipping as
+  part of that page's initial JS.
+
+### Verified
+
+- `pnpm lint` and `pnpm build` pass.
+- Live check against a real authenticated request: the server-rendered HTML
+  for `/entries/[entryId]` now contains no `contenteditable` element and no
+  Lexical DOM at all, only the dynamic import's loading placeholder —
+  confirming there's nothing left for the client to mismatch against.
+
 ## 2026-07-26 — Phase 6.6 follow-up: swipe actions, sharper radius, Lexical editor, clearer persona icon
 
 Direct feedback on the running app after the initial Phase 6.6 build. Colors

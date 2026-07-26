@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -14,13 +15,29 @@ import {
   Badge,
   Button,
   PhotoUploader,
-  RichTextEditor,
   TaskChecklist,
   toast,
   type PhotoUploaderPhoto,
   type TaskChecklistTask,
 } from "@mindreva/ui";
 import type { EntryType, TranscriptStatus } from "@mindreva/database";
+
+// Lexical is a client-only interactive widget — its SSR output for the
+// contentEditable div doesn't match what it renders once hydrated (a known
+// Lexical/Next.js mismatch), and its ~90kB+ bundle has no business loading
+// on every page that merely imports @mindreva/ui. ssr: false skips the
+// server render entirely (fixing the hydration error) and code-splits the
+// editor into its own chunk, fetched only when this page actually mounts —
+// note-card taps elsewhere in the app no longer wait on Lexical to parse.
+const RichTextEditor = dynamic(
+  () => import("@mindreva/ui/rich-text-editor").then((m) => m.RichTextEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-warm-100 h-48 w-full animate-pulse rounded-md" />
+    ),
+  },
+);
 
 const POLL_INTERVAL_MS = 2000;
 
