@@ -14,9 +14,11 @@ import {
   Badge,
   Button,
   PhotoUploader,
-  Textarea,
+  RichTextEditor,
+  TaskChecklist,
   toast,
   type PhotoUploaderPhoto,
+  type TaskChecklistTask,
 } from "@mindreva/ui";
 import type { EntryType, TranscriptStatus } from "@mindreva/database";
 
@@ -33,6 +35,7 @@ export function EntryDetail({
   summaryText,
   summaryProvider,
   initialPhotos,
+  initialTasks,
 }: {
   entryId: string;
   type: EntryType;
@@ -44,6 +47,7 @@ export function EntryDetail({
   summaryText: string | null;
   summaryProvider: string | null;
   initialPhotos: PhotoUploaderPhoto[];
+  initialTasks: TaskChecklistTask[];
 }) {
   const router = useRouter();
   const [status, setStatus] = React.useState<TranscriptStatus | null>(
@@ -60,6 +64,7 @@ export function EntryDetail({
   const [photos, setPhotos] =
     React.useState<PhotoUploaderPhoto[]>(initialPhotos);
   const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
+  const [tasks, setTasks] = React.useState<TaskChecklistTask[]>(initialTasks);
 
   const dateLabel = entryDate
     ? new Date(`${entryDate}T00:00:00`).toLocaleDateString(undefined, {
@@ -101,12 +106,14 @@ export function EntryDetail({
       if (!res.ok) throw new Error("Save failed");
       const data = (await res.json()) as {
         summary: { summaryText: string; provider: string | null } | null;
+        tasks: TaskChecklistTask[];
       };
       setTextDirty(false);
       if (data.summary) {
         setSummary(data.summary.summaryText);
         setProvider(data.summary.provider);
       }
+      setTasks(data.tasks);
       toast.success("Saved");
     } catch {
       toast.error("Couldn't save. Please try again.");
@@ -125,10 +132,12 @@ export function EntryDetail({
       if (!res.ok) throw new Error("Failed");
       const data = (await res.json()) as {
         summary: { summaryText: string; provider: string | null } | null;
+        tasks: TaskChecklistTask[];
       };
       if (data.summary) {
         setSummary(data.summary.summaryText);
         setProvider(data.summary.provider);
+        setTasks(data.tasks);
         toast.success(
           hadSummaryBefore ? "Summary regenerated" : "Summary generated",
         );
@@ -165,6 +174,25 @@ export function EntryDetail({
     } catch {
       toast.error("Couldn't move to Trash.");
       setTrashing(false);
+    }
+  }
+
+  async function toggleTask(taskId: string, isDone: boolean) {
+    // Optimistic — a checklist toggle should feel instant, and a failure
+    // here is low-stakes enough to just revert on error.
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, isDone } : t)),
+    );
+    const res = await fetch(`/api/entries/${entryId}/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isDone }),
+    });
+    if (!res.ok) {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, isDone: !isDone } : t)),
+      );
+      toast.error("Couldn't update that task.");
     }
   }
 
@@ -277,6 +305,14 @@ export function EntryDetail({
         </p>
       )}
 
+      {tasks.length > 0 && (
+        <TaskChecklist
+          tasks={tasks}
+          onToggle={(taskId, isDone) => void toggleTask(taskId, isDone)}
+          className="mt-4"
+        />
+      )}
+
       <div className="mt-5">
         <PhotoUploader
           photos={photos}
@@ -304,14 +340,14 @@ export function EntryDetail({
             This recording couldn&apos;t be transcribed.
           </p>
         ) : (
-          <Textarea
+          <RichTextEditor
             value={text}
-            onChange={(e) => {
-              setText(e.target.value);
+            onChange={(value) => {
+              setText(value);
               setTextDirty(true);
             }}
             placeholder={type === "journal" ? "Your transcript…" : "Your note…"}
-            className="min-h-48 resize-none border-0 bg-transparent p-0 text-base leading-relaxed shadow-none focus-visible:ring-0"
+            textareaClassName="min-h-48"
           />
         )}
       </div>

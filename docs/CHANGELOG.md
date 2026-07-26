@@ -7,6 +7,62 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-07-26 — Phase 6.6: Rich Text Editing & Task Extraction
+
+### Added
+
+- `RichTextEditor` in `packages/ui`: a plain textarea plus a Bold/Italic
+  toolbar wrapping the current selection with `**`/`*` Markdown markers —
+  no other formatting, no WYSIWYG rendering, Markdown syntax stays visible
+  in the editing surface. Wired into the entry detail page's transcript/body
+  editing area, replacing the plain `Textarea` that was there.
+- `stripFormatting()` in `packages/types`: converts RichTextEditor's
+  bold/italic Markdown to plain text. Wired into every place formatted text
+  reaches an LLM (`summarization.service.ts`'s `complete()` and `embed()`
+  calls) or a plain-text display context (list/search snippet text).
+- `entry_tasks` table (`id`, `entry_id` FK -> `entries.id` cascade delete,
+  `text`, `is_done`, `created_at`), RLS-scoped via a join through `entries`
+  on `user_id`, same shape as `entry_photos`.
+- `TASK_EXTRACTION_RULE` appended to every summary style's prompt in
+  `packages/llm/src/prompts/summarize/`: after the summary, the model emits
+  a `===TASKS===` marker followed by any genuine action items, or omits the
+  block entirely when there are none. Parsed out of the same `complete()`
+  response via `parseTaskBlock()` — no second LLM call. The `meetings` style
+  no longer inlines an "Action items:" section in the summary body; those
+  now go through the task block instead.
+- `EntryTasksRepository.replaceForEntry`: every summarize/regenerate deletes
+  and re-inserts the entry's task list, so tasks always reflect the current
+  confirmed text — the same semantics as `summary_text` itself. Confirmed
+  directly: a user's checked-off tasks are not preserved across a
+  regenerate.
+- `TaskChecklist` in `packages/ui`: a toggleable action-item list,
+  presentation-only, rendering nothing when there are no tasks. Wired into
+  the entry detail page directly below the summary section, with optimistic
+  toggle via `PATCH /api/entries/[entryId]/tasks/[taskId]`.
+
+### Fixed
+
+- The dev component gallery's Note cards demo (`apps/web/app/dev/components/gallery.tsx`)
+  still used the pre-fix-pass `space-y-3` spacing — bumped to `space-y-4` to
+  match the real journal/notes/archive/trash screens, which were already
+  correct.
+
+### Verified
+
+- Confirmed `CalendarPicker` already fully matched `new-date-picker.png`'s
+  requirements (photo-thumbnail day cells, plain neutral fallback, dark-mint
+  dot fallback, `bg-primary`/`ring-primary` selection, unchanged Clear/Today)
+  from the prior Phase 6.5 fix pass — no changes needed.
+- Live two-user RLS check against the real Supabase project for
+  `entry_tasks`: read/list/toggle/insert all correctly denied for a second
+  user, all correctly allowed for the owning user.
+- Live end-to-end check against the running app and the real LLM provider: a
+  meeting-style entry with Markdown-formatted text produced real extracted
+  tasks with no raw Markdown leaking into the stored summary or the
+  embedding text; a plain non-actionable personal entry correctly produced
+  zero invented tasks; the toggle route persisted `is_done` correctly.
+- `pnpm lint` and `pnpm build` pass across the monorepo.
+
 ## 2026-07-26 — Phase 6.5 fix pass: exact layout match for list and entry detail
 
 A follow-up review against `docs/design-reference/new-journal-list.png` and

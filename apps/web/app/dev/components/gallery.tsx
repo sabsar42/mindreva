@@ -240,7 +240,7 @@ export function ComponentsGallery() {
       </Section>
 
       <Section title="Note cards">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <NoteCard
             title="And so I was wondering what happened when I sleep and wake up in the morning."
             weekdayLabel="Wed"

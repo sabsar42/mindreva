@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   index,
@@ -98,6 +99,22 @@ export const entryPhotos = pgTable(
       .defaultNow(),
   },
   (t) => [index("entry_photos_entry_idx").on(t.entryId, t.position)],
+);
+
+export const entryTasks = pgTable(
+  "entry_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => entries.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    isDone: boolean("is_done").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("entry_tasks_entry_idx").on(t.entryId)],
 );
 
 export const transcripts = pgTable(
@@ -209,6 +226,8 @@ export type Recording = typeof recordings.$inferSelect;
 export type NewRecording = typeof recordings.$inferInsert;
 export type EntryPhoto = typeof entryPhotos.$inferSelect;
 export type NewEntryPhoto = typeof entryPhotos.$inferInsert;
+export type EntryTask = typeof entryTasks.$inferSelect;
+export type NewEntryTask = typeof entryTasks.$inferInsert;
 export type Transcript = typeof transcripts.$inferSelect;
 export type NewTranscript = typeof transcripts.$inferInsert;
 export type Summary = typeof summaries.$inferSelect;

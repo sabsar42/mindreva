@@ -43,6 +43,20 @@
       "when": 1785056196191,
       "tag": "0005_entry_photos_rls_and_bucket",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785068233639,
+      "tag": "0006_talented_hiroim",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785068257399,
+      "tag": "0007_entry_tasks_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,18 @@
 import "server-only";
-import { getLLMProvider, resolveSummaryPrompt } from "@mindreva/llm";
+import {
+  getLLMProvider,
+  resolveSummaryPrompt,
+  parseTaskBlock,
+} from "@mindreva/llm";
 import {
   EmbeddingsRepository,
   EntriesRepository,
+  EntryTasksRepository,
   ProfilesRepository,
   SummariesRepository,
   TranscriptsRepository,
 } from "@mindreva/database";
+import { stripFormatting } from "@mindreva/types";
 
 const MAX_TITLE_LENGTH = 120;
 
@@ -31,24 +37,35 @@ function deriveTitle(text: string): string {
  * owner's chosen summary style, and stores the result. Always inserts a new
  * summaries row (never overwrites) so prompt_version history is preserved —
  * see SummariesRepository.getByEntry. Also auto-derives entries.title when
- * unset. Never called synchronously inside the save that creates the entry;
- * callers trigger this as a fast follow-up and should not let it fail the
- * primary save (see docs/roadmap.md Phase 5 Common mistakes).
+ * unset, and replaces the entry's task checklist with whatever the model
+ * extracted this run (see EntryTasksRepository.replaceForEntry — a regenerate
+ * always reflects the current confirmed text, same as summary_text itself).
+ * Never called synchronously inside the save that creates the entry; callers
+ * trigger this as a fast follow-up and should not let it fail the primary
+ * save (see docs/roadmap.md Phase 5 Common mistakes).
+ *
+ * editedText may contain RichTextEditor's bold/italic Markdown — stripped to
+ * plain text before it reaches the model or the embedding, since neither
+ * should see `**`/`*` syntax (see @mindreva/types#stripFormatting).
  */
 export async function summarizeEntry(
   entryId: string,
   userId: string,
 ): Promise<void> {
   const transcript = await TranscriptsRepository.getByEntry(entryId, userId);
-  const confirmedText = (transcript?.editedText ?? transcript?.rawText)?.trim();
-  if (!confirmedText) return;
+  const rawConfirmedText = (
+    transcript?.editedText ?? transcript?.rawText
+  )?.trim();
+  if (!rawConfirmedText) return;
+  const confirmedText = stripFormatting(rawConfirmedText);
 
   const profile = await ProfilesRepository.getById(userId);
   const template = resolveSummaryPrompt(profile?.summaryStyle ?? "general");
   const messages = template.buildMessages(confirmedText);
 
   const provider = getLLMProvider();
-  const summaryText = await provider.complete(messages);
+  const rawResponse = await provider.complete(messages);
+  const { summaryText, tasks } = parseTaskBlock(rawResponse);
 
   await SummariesRepository.create({
     entryId,
@@ -57,6 +74,12 @@ export async function summarizeEntry(
     promptVersion: template.promptVersion,
     provider: provider.name,
   });
+
+  try {
+    await EntryTasksRepository.replaceForEntry(entryId, userId, tasks);
+  } catch (err) {
+    console.error(`Task extraction failed for entry ${entryId}:`, err);
+  }
 
   let entry = await EntriesRepository.getByIdForUser(entryId, userId);
   if (entry && !entry.title) {

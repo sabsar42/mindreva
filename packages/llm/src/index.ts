@@ -8,6 +8,7 @@ export type {
 export { getLLMProvider } from "./factory";
 export {
   resolveSummaryPrompt,
+  parseTaskBlock,
   type SummaryPromptTemplate,
 } from "./prompts/summarize";
 export {

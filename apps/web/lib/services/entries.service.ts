@@ -2,14 +2,17 @@ import "server-only";
 import {
   EntriesRepository,
   EntryPhotosRepository,
+  EntryTasksRepository,
   SummariesRepository,
   TranscriptsRepository,
   type Entry,
   type EntryListItem,
+  type EntryTask,
   type EntryType,
   type Summary,
   type Transcript,
 } from "@mindreva/database";
+import { stripFormatting } from "@mindreva/types";
 import { getUser, createClient } from "@mindreva/auth/server";
 import { transcribeEntry } from "./transcription.service";
 import { summarizeEntry } from "./summarization.service";
@@ -82,17 +85,24 @@ export async function listMyDayThumbnails(
 }
 
 /** Attaches each entry's cover-photo signed URL (first photo by position),
- * batched into a single Storage call rather than one per entry. */
+ * batched into a single Storage call rather than one per entry, and strips
+ * any RichTextEditor Markdown from the snippet — a list row is a plain-text
+ * display context, never raw `**`/`*` syntax. */
 async function attachThumbnails(
   entries: EntryListItem[],
   userId: string,
 ): Promise<EntryListItemWithThumbnail[]> {
+  const withPlainSnippets = entries.map((e) => ({
+    ...e,
+    snippet: e.snippet ? stripFormatting(e.snippet) : e.snippet,
+  }));
+
   const ids = entries.map((e) => e.id);
   const firstPhotos = await EntryPhotosRepository.getFirstPhotosForEntries(
     ids,
     userId,
   );
-  if (firstPhotos.size === 0) return entries;
+  if (firstPhotos.size === 0) return withPlainSnippets;
 
   const rows = Array.from(firstPhotos.entries()).map(([entryId, photo]) => ({
     entryId,
@@ -102,7 +112,7 @@ async function attachThumbnails(
   const urlById = new Map(signed.map((s) => [s.id, s.url]));
   const urlByEntryId = new Map(rows.map((r) => [r.entryId, urlById.get(r.id)]));
 
-  return entries.map((e) => ({
+  return withPlainSnippets.map((e) => ({
     ...e,
     thumbnailUrl: urlByEntryId.get(e.id) || undefined,
   }));
@@ -155,24 +165,37 @@ export async function getMyEntryDatesByIds(
 }
 
 /** Entry + its transcript (if any) + its latest summary (if any) + its ordered
- * photos, for the detail screen. */
+ * photos + its task checklist (if the summary extracted one), for the detail
+ * screen. */
 export async function getMyEntryDetail(id: string): Promise<{
   entry: Entry;
   transcript: Transcript | null;
   summary: Summary | null;
   photos: EntryPhotoWithUrl[];
+  tasks: EntryTask[];
 } | null> {
   const userId = await requireUserId();
   const entry = await EntriesRepository.getByIdForUser(id, userId);
   if (!entry) return null;
 
-  const [transcript, summary, photoRows] = await Promise.all([
+  const [transcript, summary, photoRows, tasks] = await Promise.all([
     TranscriptsRepository.getByEntry(id, userId),
     SummariesRepository.getByEntry(id, userId),
     EntryPhotosRepository.listByEntry(id, userId),
+    EntryTasksRepository.listByEntry(id, userId),
   ]);
   const photos = await signPhotoUrls(photoRows);
-  return { entry, transcript, summary, photos };
+  return { entry, transcript, summary, photos, tasks };
+}
+
+/** Toggles a single task's done state. Scoped to entries the caller owns via
+ * EntryTasksRepository.setDone's ownership check. */
+export async function toggleMyTask(
+  taskId: string,
+  isDone: boolean,
+): Promise<EntryTask | null> {
+  const userId = await requireUserId();
+  return EntryTasksRepository.setDone(taskId, userId, isDone);
 }
 
 /** Batch-signs storage paths so the detail screen can render <img src> directly
@@ -339,14 +362,19 @@ export async function getMyEntryTranscript(
 /**
  * Save the user's correction and, since this is the "confirm" action for the
  * voice path, kick off summarization on the confirmed text. raw_text is
- * never touched. Returns the fresh summary alongside the transcript so
- * callers can update the UI without a stale re-render (a client component's
- * local state doesn't pick up a router.refresh() on its own).
+ * never touched. Returns the fresh summary and task checklist alongside the
+ * transcript so callers can update the UI without a stale re-render (a
+ * client component's local state doesn't pick up a router.refresh() on its
+ * own).
  */
 export async function saveMyTranscriptEdit(
   entryId: string,
   editedText: string,
-): Promise<{ transcript: Transcript; summary: Summary | null } | null> {
+): Promise<{
+  transcript: Transcript;
+  summary: Summary | null;
+  tasks: EntryTask[];
+} | null> {
   const userId = await requireUserId();
   const transcript = await TranscriptsRepository.getByEntry(entryId, userId);
   if (!transcript) return null;
@@ -362,20 +390,29 @@ export async function saveMyTranscriptEdit(
   } catch {
     // Same reasoning as createTextEntry: don't fail the save.
   }
-  const summary = await SummariesRepository.getByEntry(entryId, userId);
-  return { transcript: updated, summary };
+  const [summary, tasks] = await Promise.all([
+    SummariesRepository.getByEntry(entryId, userId),
+    EntryTasksRepository.listByEntry(entryId, userId),
+  ]);
+  return { transcript: updated, summary, tasks };
 }
 
 /**
  * Manual summarize/regenerate trigger. Also what the transcript review
  * screen's "Skip for now" calls — skipping still confirms the transcript
  * as-is (raw text), so it should still get summarized. Returns the fresh
- * summary for the same reason as saveMyTranscriptEdit above.
+ * summary and task checklist for the same reason as saveMyTranscriptEdit
+ * above.
  */
-export async function summarizeMyEntry(
-  entryId: string,
-): Promise<Summary | null> {
+export async function summarizeMyEntry(entryId: string): Promise<{
+  summary: Summary | null;
+  tasks: EntryTask[];
+}> {
   const userId = await requireUserId();
   await summarizeEntry(entryId, userId);
-  return SummariesRepository.getByEntry(entryId, userId);
+  const [summary, tasks] = await Promise.all([
+    SummariesRepository.getByEntry(entryId, userId),
+    EntryTasksRepository.listByEntry(entryId, userId),
+  ]);
+  return { summary, tasks };
 }

@@ -69,6 +69,15 @@ export {
   type PhotoUploaderProps,
 } from "./components/photo-uploader";
 export {
+  RichTextEditor,
+  type RichTextEditorProps,
+} from "./components/rich-text-editor";
+export {
+  TaskChecklist,
+  type TaskChecklistTask,
+  type TaskChecklistProps,
+} from "./components/task-checklist";
+export {
   Logo,
   LeafMark,
   type LogoProps,

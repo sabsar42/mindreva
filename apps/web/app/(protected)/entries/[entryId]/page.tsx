@@ -25,6 +25,7 @@ export default async function EntryDetailPage({
       summaryText={detail.summary?.summaryText ?? null}
       summaryProvider={detail.summary?.provider ?? null}
       initialPhotos={detail.photos}
+      initialTasks={detail.tasks}
     />
   );
 }

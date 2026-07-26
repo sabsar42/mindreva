@@ -60,5 +60,6 @@ export async function PATCH(
           provider: result.summary.provider,
         }
       : null,
+    tasks: result.tasks,
   });
 }

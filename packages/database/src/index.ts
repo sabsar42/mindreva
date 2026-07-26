@@ -13,6 +13,7 @@ export {
 } from "./repositories/entries.repository";
 export { RecordingsRepository } from "./repositories/recordings.repository";
 export { EntryPhotosRepository } from "./repositories/entry-photos.repository";
+export { EntryTasksRepository } from "./repositories/entry-tasks.repository";
 export { TranscriptsRepository } from "./repositories/transcripts.repository";
 export { SummariesRepository } from "./repositories/summaries.repository";
 export {
@@ -30,6 +31,8 @@ export type {
   NewRecording,
   EntryPhoto,
   NewEntryPhoto,
+  EntryTask,
+  NewEntryTask,
   Transcript,
   NewTranscript,
   Summary,

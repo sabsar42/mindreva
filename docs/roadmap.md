@@ -31,6 +31,7 @@ Last updated: July 23, 2026 (revised after founder-supplied reference screens, s
 | 5     | Journaling, notes & summarization pipeline   | P0       | 4-6 days                     | Phase 4                           |
 | 6     | "Chat with past self" RAG persona engine     | P1       | 5-7 days                     | Phase 5                           |
 | 6.5   | Photo attachments for entries                | P2       | 1-2 days                     | Phase 5                           |
+| 6.6   | Rich text editing & task extraction          | P2       | 1-2 days                     | Phase 5                           |
 | 7     | CI/CD & free-tier deployment                 | P0       | 2-3 days                     | Phase 2 (can run parallel to 3-6) |
 | 8     | PWA + Capacitor mobile wrapper -> Play Store | P1       | 5-8 days                     | Phase 7                           |
 | 9     | Scaling, observability & migration playbook  | P2       | 1-2 days setup, then ongoing | Phase 7                           |
@@ -1124,6 +1125,80 @@ apps/web/
 - Keep `PhotoUploader` presentation-only. It never calls `fetch` itself; both places it's used (`transcript-review.tsx`, `entry-detail.tsx`) own their own upload logic and pass it down as a callback.
 - Verify RLS live against the real database, not just via a clean migration exit code — a throwaway two-user script proving cross-user reads/writes/downloads/signed-URLs all fail is worth the few minutes it takes, for a feature this trust-sensitive.
 - When a redesign is requested against reference screenshots, treat "layout, not palette" literally: reuse the app's own tokens (`bg-primary`, `bg-accent`, `shadow-subtle`, `rounded-lg`) for every surface the reference draws in its own colors, and skip any reference-specific chrome (hero banners, extra tabs) that doesn't correspond to a feature this app actually has.
+
+---
+
+## Phase 6.6: Rich Text Editing & Task Extraction
+
+**Objective:** let a user bold/italicize text in an entry's transcript/body, and let the summarization pipeline optionally surface a short, toggleable task checklist when the content implies concrete action items — most naturally for meeting notes, but available to every summary style.
+
+**Priority:** P2 (an enrichment on top of Phase 5's summarization pipeline, not a blocker for any later phase)
+**Estimated time:** 1-2 days
+**Dependencies:** Phase 5 (summarization pipeline and entry detail screen must already exist)
+
+This was an unplanned addition, not called for in the original roadmap — added mid-build per a direct request, alongside a NoteCard/entry-detail spacing fix and a CalendarPicker verification pass (that component's photo-thumbnail redesign was already complete from Phase 6.5's own fix pass — this request re-specified the same requirements and they were confirmed to already match, no rebuild needed).
+
+### Folder structure added this phase
+
+```
+packages/types/src/
+└── index.ts                     # stripFormatting(): RichTextEditor's bold/italic
+                                  # Markdown -> plain text, used anywhere formatted
+                                  # body text reaches an LLM or a plain-text display
+
+packages/ui/src/components/
+├── rich-text-editor.tsx         # bold/italic toolbar over a plain textarea,
+                                  # Markdown is the storage format, not rendered live
+└── task-checklist.tsx           # toggleable action-item list, presentation-only
+
+packages/database/
+├── migrations/
+│   ├── 0006_*.sql                      # entry_tasks table DDL (drizzle-kit generate)
+│   └── 0007_entry_tasks_rls.sql        # RLS policy + Data API grant (hand-authored)
+└── src/repositories/
+    └── entry-tasks.repository.ts       # listByEntry, replaceForEntry, setDone
+
+packages/llm/src/prompts/summarize/
+└── types.ts                     # TASK_BLOCK_MARKER, TASK_EXTRACTION_RULE,
+                                  # parseTaskBlock() — appended to every style's
+                                  # prompt, parsed out of the same completion call
+
+apps/web/
+├── app/api/entries/[entryId]/tasks/[taskId]/route.ts   # PATCH: toggle is_done
+└── lib/services/
+    ├── summarization.service.ts  # strips Markdown before complete()/embed(),
+    │                              # parses the task block, replaces entry_tasks
+    └── entries.service.ts        # snippet stripped for list/search display,
+                                   # getMyEntryDetail returns tasks, toggleMyTask
+```
+
+### Task checklist
+
+- [x] Build `RichTextEditor` in `packages/ui`: a plain textarea plus a Bold/Italic toolbar that wraps the current selection with `**`/`*` Markdown markers — no other formatting, no WYSIWYG rendering (raw Markdown syntax stays visible in the editing surface, a deliberate choice over pulling in a rich-text library for a two-mark feature set)
+- [x] Add `stripFormatting()` to `packages/types` (not `packages/ui` — it's a pure string transform needed by server-side services, which shouldn't depend on a UI package) and wire it into every place formatted text reaches an LLM (`summarization.service.ts`'s `complete()` and `embed()` calls) or a plain-text display context (list/search snippet text in `entries.service.ts`)
+- [x] Wire `RichTextEditor` into the entry detail page's transcript/body editing area, replacing the plain `Textarea` that was there — scoped to exactly that one location, not the transcript review screen's raw-ASR-confirmation textarea or the notes compose screen
+- [x] Add `entry_tasks` table (`id`, `entry_id` FK -> `entries.id` cascade delete, `text`, `is_done` boolean default false, `created_at`), RLS scoped the same way as `entry_photos` (join through `entries` on `user_id`, explicit Data API grant)
+- [x] Extend every summary prompt template in `packages/llm/src/prompts/summarize/` with a shared `TASK_EXTRACTION_RULE` instruction: after the summary, emit a `===TASKS===` marker followed by `- ` lines for any genuine action items, or omit the block entirely if there are none — parsed out of the single existing `complete()` response rather than a second LLM call
+- [x] Update `EntryTasksRepository.replaceForEntry` to delete and re-insert the entry's task list on every summarize/regenerate, so tasks always reflect the current confirmed text (same semantics as `summary_text` itself) — a deliberate trade-off, confirmed directly: a user's checked-off tasks are not preserved across a regenerate
+- [x] Build `TaskChecklist` in `packages/ui`: a toggleable list of extracted tasks, presentation-only, rendering nothing when there are no tasks
+- [x] Wire `TaskChecklist` into the entry detail page directly below the existing summary section, with optimistic toggle via `PATCH /api/entries/[entryId]/tasks/[taskId]`
+- [x] Verify live end-to-end against the real Supabase project and the real LLM provider: RLS proven with a two-user script (read/list/toggle/insert all denied for a second user), a meeting-style entry with Markdown formatting correctly produced real extracted tasks with no raw Markdown leaking into the summary or the embedding text, and a plain non-actionable personal entry correctly produced zero invented tasks
+
+### Common mistakes
+
+- Reaching for a WYSIWYG library (Tiptap, Slate, etc.) for a bold/italic-only feature. Confirmed directly before building: the ask was for a seamless plain-text editing surface, not literal rendered bold/italic while typing — a small custom selection-wrapping textarea covers it with zero new dependencies.
+- Sending RichTextEditor's Markdown straight to an LLM or a plain-text UI. `**`/`*` syntax in a summarization prompt or a search snippet is noise the model or the reader shouldn't have to parse — strip it at the boundary, every time, not just in the one call site that happened to prompt the feature.
+- Running task extraction as a second LLM call. The existing `complete()` call already returns the summary; appending one more instruction and parsing a marker out of the same response is free, where a second round trip would double LLM cost and latency for every summarize.
+- Merging newly extracted tasks with the previous list instead of replacing it. Without a real reason to preserve history, a merge silently accumulates duplicates every time an entry is regenerated with a slightly reworded transcript.
+- Skipping the negative-case check. A task-extraction feature that never gets verified against non-actionable content can silently start inventing tasks (the exact failure the grounding rule exists to prevent) and nobody would notice until a user's checklist filled up with nonsense.
+- Re-implementing something already built because a request re-states its requirements in full. Check the current state of the code first — this phase's CalendarPicker requirements were a verbatim re-specification of Phase 6.5's fix pass, already shipped; re-verifying against the reference and the running code took minutes, a from-scratch rebuild would have wasted much more.
+
+### Best practices
+
+- Keep `stripFormatting()` in `packages/types`, not `packages/ui` — server-side business logic (`apps/web/lib/services`) shouldn't need to depend on a React component package just to reach a pure string transform.
+- Treat the task-extraction instruction as one more shared rule appended to every summary style's prompt, the same way `GROUNDING_RULE` already is — consistent behavior across styles beats a special-cased "meetings-only" branch, and the model is explicitly told which content styles this is "most common" for without being hard-restricted to them.
+- Keep `TaskChecklist` presentation-only and its toggle optimistic. A checklist that waits on a network round trip before showing the check feels laggy for something this low-stakes; revert on failure instead.
+- When a request bundles a quick visual fix with a large feature addition, verify the quick fix's actual root cause before touching styling that already looks correct in the code — a screenshot can be from a stale demo page (the dev component gallery, in this case) rather than the real screen.
 
 ---
 

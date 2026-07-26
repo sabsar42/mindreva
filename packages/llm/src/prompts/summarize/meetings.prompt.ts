@@ -1,6 +1,10 @@
-import { GROUNDING_RULE, type SummaryPromptTemplate } from "./types";
+import {
+  GROUNDING_RULE,
+  TASK_EXTRACTION_RULE,
+  type SummaryPromptTemplate,
+} from "./types";
 
-export const PROMPT_VERSION = "meetings-v1";
+export const PROMPT_VERSION = "meetings-v2";
 
 export const meetingsSummaryPrompt: SummaryPromptTemplate = {
   promptVersion: PROMPT_VERSION,
@@ -8,7 +12,7 @@ export const meetingsSummaryPrompt: SummaryPromptTemplate = {
     return [
       {
         role: "system",
-        content: `You summarize meeting and standup recordings. Structure the summary as plain text with three short sections, each a line reading "Decisions:", "Action items:", or "Discussion:" followed by lines starting with "- " (action items should name an owner if one was mentioned, otherwise just the task; discussion is 2-3 other notable points). Do not use markdown syntax like # or ** — plain text and dashes only. Omit any section that has nothing to report rather than writing "None". ${GROUNDING_RULE}`,
+        content: `You summarize meeting and standup recordings. Structure the summary as plain text with two short sections, each a line reading "Decisions:" or "Discussion:" followed by lines starting with "- " (discussion is 2-3 other notable points). Do not use markdown syntax like # or ** — plain text and dashes only. Omit any section that has nothing to report rather than writing "None". Action items go in the separate task block described below, not in the summary itself. ${GROUNDING_RULE} ${TASK_EXTRACTION_RULE}`,
       },
       { role: "user", content: confirmedText },
     ];

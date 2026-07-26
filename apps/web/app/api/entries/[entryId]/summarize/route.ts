@@ -15,11 +15,12 @@ export async function POST(
 
   const { entryId } = await params;
   try {
-    const summary = await summarizeMyEntry(entryId);
+    const { summary, tasks } = await summarizeMyEntry(entryId);
     return NextResponse.json({
       summary: summary
         ? { summaryText: summary.summaryText, provider: summary.provider }
         : null,
+      tasks,
     });
   } catch (err) {
     console.error("POST /api/entries/[entryId]/summarize failed:", err);
