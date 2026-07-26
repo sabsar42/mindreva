@@ -10,7 +10,15 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { Badge, Button, Card, Textarea, toast } from "@mindreva/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  PhotoUploader,
+  Textarea,
+  toast,
+  type PhotoUploaderPhoto,
+} from "@mindreva/ui";
 import type { EntryType, TranscriptStatus } from "@mindreva/database";
 
 const POLL_INTERVAL_MS = 2000;
@@ -25,6 +33,7 @@ export function EntryDetail({
   confirmedText,
   summaryText,
   summaryProvider,
+  initialPhotos,
 }: {
   entryId: string;
   type: EntryType;
@@ -35,6 +44,7 @@ export function EntryDetail({
   confirmedText: string;
   summaryText: string | null;
   summaryProvider: string | null;
+  initialPhotos: PhotoUploaderPhoto[];
 }) {
   const router = useRouter();
   const [status, setStatus] = React.useState<TranscriptStatus | null>(
@@ -48,6 +58,9 @@ export function EntryDetail({
   const [regenerating, setRegenerating] = React.useState(false);
   const [isArchived, setIsArchived] = React.useState(archived);
   const [trashing, setTrashing] = React.useState(false);
+  const [photos, setPhotos] =
+    React.useState<PhotoUploaderPhoto[]>(initialPhotos);
+  const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
 
   const dateLabel = entryDate
     ? new Date(`${entryDate}T00:00:00`).toLocaleDateString(undefined, {
@@ -156,6 +169,27 @@ export function EntryDetail({
     }
   }
 
+  async function handlePhotosSelected(files: File[]) {
+    setUploadingPhoto(true);
+    try {
+      for (const file of files) {
+        const form = new FormData();
+        form.set("image", file);
+        const res = await fetch(`/api/entries/${entryId}/photos`, {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const data = (await res.json()) as { photo: PhotoUploaderPhoto };
+        setPhotos((prev) => [...prev, data.photo]);
+      }
+    } catch {
+      toast.error("Couldn't upload that photo. Please try again.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 pb-16 pt-6">
       <header className="flex items-center justify-between gap-2">
@@ -244,6 +278,15 @@ export function EntryDetail({
           </p>
         )}
       </Card>
+
+      <div className="mt-5">
+        <h2 className="text-foreground mb-2 text-sm font-semibold">Photos</h2>
+        <PhotoUploader
+          photos={photos}
+          onFilesSelected={(files) => void handlePhotosSelected(files)}
+          uploading={uploadingPhoto}
+        />
+      </div>
 
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">

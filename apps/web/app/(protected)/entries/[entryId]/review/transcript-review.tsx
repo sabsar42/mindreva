@@ -3,7 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { Button, Textarea, toast } from "@mindreva/ui";
+import {
+  Button,
+  PhotoUploader,
+  Textarea,
+  toast,
+  type PhotoUploaderPhoto,
+} from "@mindreva/ui";
 import type { TranscriptStatus } from "@mindreva/database";
 
 interface TranscriptResponse {
@@ -28,6 +34,8 @@ export function TranscriptReview({
   const [text, setText] = React.useState(initialText);
   const [saving, setSaving] = React.useState(false);
   const [skipping, setSkipping] = React.useState(false);
+  const [photos, setPhotos] = React.useState<PhotoUploaderPhoto[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
 
   React.useEffect(() => {
     if (status !== "pending" && status !== "processing") return;
@@ -81,6 +89,27 @@ export function TranscriptReview({
     }
   }
 
+  async function handlePhotosSelected(files: File[]) {
+    setUploadingPhoto(true);
+    try {
+      for (const file of files) {
+        const form = new FormData();
+        form.set("image", file);
+        const res = await fetch(`/api/entries/${entryId}/photos`, {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const data = (await res.json()) as { photo: PhotoUploaderPhoto };
+        setPhotos((prev) => [...prev, data.photo]);
+      }
+    } catch {
+      toast.error("Couldn't upload that photo. Please try again.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   if (status === "pending" || status === "processing") {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
@@ -127,6 +156,15 @@ export function TranscriptReview({
         className="min-h-64 flex-1"
         placeholder="Your transcript will appear here…"
       />
+
+      <div>
+        <h2 className="text-foreground mb-2 text-sm font-semibold">Photos</h2>
+        <PhotoUploader
+          photos={photos}
+          onFilesSelected={(files) => void handlePhotosSelected(files)}
+          uploading={uploadingPhoto}
+        />
+      </div>
 
       <div className="flex gap-3">
         <Button

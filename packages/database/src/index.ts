@@ -12,6 +12,7 @@ export {
   type ListEntriesOptions,
 } from "./repositories/entries.repository";
 export { RecordingsRepository } from "./repositories/recordings.repository";
+export { EntryPhotosRepository } from "./repositories/entry-photos.repository";
 export { TranscriptsRepository } from "./repositories/transcripts.repository";
 export { SummariesRepository } from "./repositories/summaries.repository";
 export {
@@ -27,6 +28,8 @@ export type {
   NewEntry,
   Recording,
   NewRecording,
+  EntryPhoto,
+  NewEntryPhoto,
   Transcript,
   NewTranscript,
   Summary,

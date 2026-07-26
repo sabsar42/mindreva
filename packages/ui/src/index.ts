@@ -64,6 +64,11 @@ export {
 } from "./components/waveform-visualizer";
 export { OptionCard, type OptionCardProps } from "./components/option-card";
 export {
+  PhotoUploader,
+  type PhotoUploaderPhoto,
+  type PhotoUploaderProps,
+} from "./components/photo-uploader";
+export {
   Logo,
   LeafMark,
   type LogoProps,

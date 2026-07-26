@@ -82,6 +82,24 @@ export const recordings = pgTable("recordings", {
     .defaultNow(),
 });
 
+export const entryPhotos = pgTable(
+  "entry_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => entries.id, { onDelete: "cascade" }),
+    storagePath: text("storage_path").notNull(),
+    // Display order within the entry. Computed server-side as the current
+    // photo count at upload time — see EntryPhotosRepository.create.
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("entry_photos_entry_idx").on(t.entryId, t.position)],
+);
+
 export const transcripts = pgTable(
   "transcripts",
   {
@@ -189,6 +207,8 @@ export type Entry = typeof entries.$inferSelect;
 export type NewEntry = typeof entries.$inferInsert;
 export type Recording = typeof recordings.$inferSelect;
 export type NewRecording = typeof recordings.$inferInsert;
+export type EntryPhoto = typeof entryPhotos.$inferSelect;
+export type NewEntryPhoto = typeof entryPhotos.$inferInsert;
 export type Transcript = typeof transcripts.$inferSelect;
 export type NewTranscript = typeof transcripts.$inferInsert;
 export type Summary = typeof summaries.$inferSelect;

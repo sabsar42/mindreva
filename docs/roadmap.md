@@ -30,6 +30,7 @@ Last updated: July 23, 2026 (revised after founder-supplied reference screens, s
 | 4     | Voice capture & ASR abstraction layer        | P0       | 4-6 days                     | Phase 3                           |
 | 5     | Journaling, notes & summarization pipeline   | P0       | 4-6 days                     | Phase 4                           |
 | 6     | "Chat with past self" RAG persona engine     | P1       | 5-7 days                     | Phase 5                           |
+| 6.5   | Photo attachments for entries                | P2       | 1-2 days                     | Phase 5                           |
 | 7     | CI/CD & free-tier deployment                 | P0       | 2-3 days                     | Phase 2 (can run parallel to 3-6) |
 | 8     | PWA + Capacitor mobile wrapper -> Play Store | P1       | 5-8 days                     | Phase 7                           |
 | 9     | Scaling, observability & migration playbook  | P2       | 1-2 days setup, then ongoing | Phase 7                           |
@@ -632,11 +633,7 @@ flowchart TB
 ```typescript
 // packages/asr/src/types.ts
 export type ASRProviderName =
-  | "groq"
-  | "huggingface"
-  | "openai"
-  | "elevenlabs"
-  | "nemotron-self-hosted";
+  "groq" | "huggingface" | "openai" | "elevenlabs" | "nemotron-self-hosted";
 
 export interface TranscriptSegment {
   text: string;
@@ -1037,6 +1034,68 @@ Continuing in the mindreva monorepo. Build the "chat with past self" feature.
 
 The date-range hard filter in matchEntries must run before, not instead of, the vector similarity ranking. This is a hard requirement.
 ```
+
+---
+
+## Phase 6.5: Photo Attachments for Entries
+
+**Objective:** let a user attach one or more photos to a journal entry or note, either right after recording (on the transcript review screen) or later from the entry detail screen, with the same RLS guarantees as every other piece of entry data.
+
+**Priority:** P2 (a nice-to-have enrichment, not a blocker for any later phase)
+**Estimated time:** 1-2 days
+**Dependencies:** Phase 5 (entries, transcript review, and entry detail screens must already exist)
+
+This was an unplanned addition, not called for in the original roadmap — added mid-build per a direct request, after Phase 6 shipped. See `docs/DECISIONS.md` if a decision worth recording came out of it.
+
+### Folder structure added this phase
+
+```
+packages/database/
+├── migrations/
+│   ├── 0004_*.sql                          # entry_photos table DDL (drizzle-kit generate)
+│   └── 0005_entry_photos_rls_and_bucket.sql # RLS policy + "photos" Storage bucket + Data API grant (hand-authored)
+└── src/repositories/
+    └── entry-photos.repository.ts          # create (position computed server-side), listByEntry
+
+packages/ui/src/components/
+└── photo-uploader.tsx           # thumbnail row + "add photo" tile, presentation-only
+
+apps/web/
+├── app/
+│   ├── api/entries/[entryId]/photos/route.ts   # POST: upload + create entry_photos row
+│   └── (protected)/entries/[entryId]/
+│       ├── review/transcript-review.tsx         # PhotoUploader wired in (attach right after recording)
+│       └── entry-detail.tsx                     # PhotoUploader wired in (add more photos later)
+└── lib/services/
+    └── entries.service.ts       # addPhotoToEntry, signPhotoUrls, getMyEntryDetail now returns photos
+```
+
+### Task checklist
+
+- [x] Add `entry_photos` table to `packages/database/src/schema.ts`: `id` (uuid PK), `entry_id` (FK -> `entries.id`, cascade delete), `storage_path` (text), `position` (integer, default 0), `created_at`
+- [x] Generate the table migration with `drizzle-kit generate`, then hand-author a second migration for RLS (join through `entries` on `user_id`, same pattern as `recordings`), the Data API grant, and the `photos` Storage bucket + its three per-user-folder policies (select/insert/delete)
+- [x] Apply both migrations to the live Supabase project and verify RLS is enabled, the bucket exists and is private, and the table starts empty
+- [x] Build `EntryPhotosRepository` with `create` (asserts the entry belongs to the caller, computes `position` server-side as the current photo count) and `listByEntry` (ordered by `position`)
+- [x] Build `PhotoUploader` in `packages/ui`: a row of thumbnails plus an "add photo" tile, presentation-only (no API calls inside it — fires `onFilesSelected(files)` and lets the caller handle upload, matching every other data-touching component in the package)
+- [x] Add `addPhotoToEntry` to `entries.service.ts`: uploads to the `photos` bucket via the session-scoped Supabase client (same RLS defense-in-depth as `createVoiceEntry`), then creates the `entry_photos` row
+- [x] Add signed-URL generation for display — a batch `createSignedUrls` call for `getMyEntryDetail` (avoids N round trips), a single `createSignedUrl` call for a fresh upload
+- [x] Update `getMyEntryDetail` to also return the entry's ordered photos (`{id, url}[]`) alongside the existing transcript/summary
+- [x] Add `POST /api/entries/[entryId]/photos` (multipart form, one file per request) and wire `PhotoUploader` into both the transcript review screen and the entry detail screen
+- [x] Verify live end-to-end against the real Supabase project: user A can upload a photo, insert its `entry_photos` row, and resolve a signed URL for it; user B cannot read the row, list it, download the object, sign a URL for it, or insert a row against user A's entry
+
+### Common mistakes
+
+- Trusting a client-supplied `position` for ordering. A malicious or buggy client could then desync the display order or collide positions across concurrent uploads; compute it server-side from the current count instead.
+- Generating signed URLs one at a time for a list of photos. Supabase's Storage client supports a batch `createSignedUrls`, use it for the entry detail screen's photo list instead of N sequential calls.
+- Forgetting the Data API grant on the new table. This project has "automatically expose new tables" off, so a table with RLS enabled but no `GRANT ... TO authenticated` fails silently from the client with a permissions error that looks like an RLS bug but isn't one.
+- Using `next/image` for these thumbnails. The `url` is a short-lived, per-request signed URL for a private object, not a stable remote domain `next/image` can allowlist and optimize; a plain `<img>` is the right call here, same reasoning as everywhere else this app touches private Storage objects.
+- Adding an `eslint-disable-next-line` comment for a rule from a plugin the local package's ESLint config doesn't load (e.g. `@next/next/no-img-element` inside `packages/ui`). That's a hard "Definition for rule not found" error, not a no-op — and moot anyway, since `apps/web`'s Next-specific lint rules never scan `packages/ui`'s source in the first place.
+
+### Best practices
+
+- Mirror the existing `recordings`/`recordings` bucket pattern exactly rather than inventing a new shape for `entry_photos`/`photos` — same join-through-`entries` RLS policy, same per-user-folder Storage path convention, same two-migration split (auto-generated table DDL, then hand-authored RLS/bucket).
+- Keep `PhotoUploader` presentation-only. It never calls `fetch` itself; both places it's used (`transcript-review.tsx`, `entry-detail.tsx`) own their own upload logic and pass it down as a callback.
+- Verify RLS live against the real database, not just via a clean migration exit code — a throwaway two-user script proving cross-user reads/writes/downloads/signed-URLs all fail is worth the few minutes it takes, for a feature this trust-sensitive.
 
 ---
 

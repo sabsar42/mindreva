@@ -7,6 +7,38 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-07-26 — Phase 6.5: Photo Attachments for Entries
+
+### Added
+
+- `entry_photos` table (`id`, `entry_id` FK -> `entries.id` cascade delete,
+  `storage_path`, `position`, `created_at`), RLS-scoped via a join through
+  `entries` on `user_id`, same shape as the existing `recordings` policy.
+- A private `photos` Storage bucket, per-user-folder path scoping
+  (`{userId}/{entryId}/...`), mirroring the `recordings` bucket's RLS
+  policies (select/insert/delete, all folder-scoped to `auth.uid()`).
+- `EntryPhotosRepository`: `create` (asserts entry ownership, computes
+  `position` server-side as the current photo count — never client-supplied)
+  and `listByEntry` (ordered by `position`).
+- `PhotoUploader` in `packages/ui`: presentation-only thumbnail row + "add
+  photo" tile, used both on the transcript review screen (attach right after
+  recording) and the entry detail screen (add more photos later).
+- `POST /api/entries/[entryId]/photos` and `addPhotoToEntry` in
+  `entries.service.ts`: uploads via the session-scoped Supabase client (same
+  RLS defense-in-depth pattern as voice recording uploads), then creates the
+  `entry_photos` row and returns a signed URL.
+- `getMyEntryDetail` now also returns the entry's ordered photos with signed
+  URLs (batch-signed via `createSignedUrls` to avoid a round trip per photo).
+
+### Verified
+
+- Live two-user RLS check against the real Supabase project: user A can
+  upload a photo, insert its `entry_photos` row, and resolve a signed URL for
+  it; user B cannot read the row, list it, download the Storage object, sign
+  a URL for it, or insert an `entry_photos` row against user A's entry.
+- `pnpm lint` and `pnpm build` pass across the monorepo with the new table,
+  repository, component, service functions, and API route in place.
+
 ## 2026-07-26 — Phase 6: Chat with Past Self
 
 ### Added

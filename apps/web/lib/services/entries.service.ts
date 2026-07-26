@@ -1,6 +1,7 @@
 import "server-only";
 import {
   EntriesRepository,
+  EntryPhotosRepository,
   SummariesRepository,
   TranscriptsRepository,
   type Entry,
@@ -27,6 +28,16 @@ async function requireUserId(): Promise<string> {
 function extensionFromMimeType(mimeType: string): string {
   const subtype = mimeType.split(";")[0]?.split("/")[1];
   return subtype ?? "webm";
+}
+
+// Signed URLs let the browser load a private Storage object directly without
+// proxying bytes through our own server. An hour comfortably covers a single
+// page view; a fresh one is generated on every request, never cached long-term.
+const PHOTO_SIGNED_URL_EXPIRY_SECONDS = 60 * 60;
+
+export interface EntryPhotoWithUrl {
+  id: string;
+  url: string;
 }
 
 export async function listMyEntries(options?: {
@@ -86,21 +97,85 @@ export async function getMyEntryDatesByIds(
   return Object.fromEntries(found.map((e) => [e.id, e.entryDate]));
 }
 
-/** Entry + its transcript (if any) + its latest summary (if any), for the detail screen. */
+/** Entry + its transcript (if any) + its latest summary (if any) + its ordered
+ * photos, for the detail screen. */
 export async function getMyEntryDetail(id: string): Promise<{
   entry: Entry;
   transcript: Transcript | null;
   summary: Summary | null;
+  photos: EntryPhotoWithUrl[];
 } | null> {
   const userId = await requireUserId();
   const entry = await EntriesRepository.getByIdForUser(id, userId);
   if (!entry) return null;
 
-  const [transcript, summary] = await Promise.all([
+  const [transcript, summary, photoRows] = await Promise.all([
     TranscriptsRepository.getByEntry(id, userId),
     SummariesRepository.getByEntry(id, userId),
+    EntryPhotosRepository.listByEntry(id, userId),
   ]);
-  return { entry, transcript, summary };
+  const photos = await signPhotoUrls(photoRows);
+  return { entry, transcript, summary, photos };
+}
+
+/** Batch-signs storage paths so the detail screen can render <img src> directly
+ * without a per-photo round trip. Order is preserved from the input rows. */
+async function signPhotoUrls(
+  rows: { id: string; storagePath: string }[],
+): Promise<EntryPhotoWithUrl[]> {
+  if (rows.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from("photos")
+    .createSignedUrls(
+      rows.map((r) => r.storagePath),
+      PHOTO_SIGNED_URL_EXPIRY_SECONDS,
+    );
+  if (error) throw new Error(`Failed to sign photo URLs: ${error.message}`);
+
+  const urlByPath = new Map(data.map((d) => [d.path, d.signedUrl]));
+  return rows.map((r) => ({
+    id: r.id,
+    url: urlByPath.get(r.storagePath) ?? "",
+  }));
+}
+
+/**
+ * Adds a photo to an existing entry: uploads to the private "photos" bucket
+ * (session-scoped client, same RLS defense-in-depth as createVoiceEntry),
+ * then creates the entry_photos row. position is computed server-side by the
+ * repository. Used both right after recording and from the entry edit screen.
+ */
+export async function addPhotoToEntry(
+  entryId: string,
+  input: { image: Buffer; mimeType: string },
+): Promise<EntryPhotoWithUrl> {
+  const user = await getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const objectPath = `${user.id}/${entryId}/${crypto.randomUUID()}.${extensionFromMimeType(input.mimeType)}`;
+
+  const supabase = await createClient();
+  const { error: uploadError } = await supabase.storage
+    .from("photos")
+    .upload(objectPath, input.image, { contentType: input.mimeType });
+  if (uploadError) {
+    throw new Error(`Photo upload failed: ${uploadError.message}`);
+  }
+
+  const photo = await EntryPhotosRepository.create({
+    entryId,
+    userId: user.id,
+    storagePath: objectPath,
+  });
+
+  const { data, error: signError } = await supabase.storage
+    .from("photos")
+    .createSignedUrl(objectPath, PHOTO_SIGNED_URL_EXPIRY_SECONDS);
+  if (signError)
+    throw new Error(`Failed to sign photo URL: ${signError.message}`);
+
+  return { id: photo.id, url: data.signedUrl };
 }
 
 /** Trash an entry (soft delete). Never a hard delete. */
