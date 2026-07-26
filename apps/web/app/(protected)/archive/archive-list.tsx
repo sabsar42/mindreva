@@ -3,8 +3,19 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArchiveRestore } from "lucide-react";
-import { NoteCard, toast } from "@mindreva/ui";
+import { ArrowLeft, ArchiveRestore, Trash2 } from "lucide-react";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  NoteCard,
+  SwipeableRow,
+  toast,
+} from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 
 function formatWeekday(dateKey: string | null): string {
@@ -26,6 +37,9 @@ export function ArchiveList({
 }) {
   const router = useRouter();
   const [entries, setEntries] = React.useState(initial);
+  const [confirmTrashId, setConfirmTrashId] = React.useState<string | null>(
+    null,
+  );
 
   async function unarchive(id: string) {
     const res = await fetch(`/api/entries/${id}/archive`, { method: "DELETE" });
@@ -35,6 +49,17 @@ export function ArchiveList({
     }
     setEntries((prev) => prev.filter((e) => e.id !== id));
     toast.success("Unarchived");
+    router.refresh();
+  }
+
+  async function trash(id: string) {
+    const res = await fetch(`/api/entries/${id}/trash`, { method: "POST" });
+    if (!res.ok) {
+      toast.error("Something went wrong.");
+      return;
+    }
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+    toast.success("Moved to Trash");
     router.refresh();
   }
 
@@ -61,7 +86,25 @@ export function ArchiveList({
         )}
 
         {entries.map((entry) => (
-          <div key={entry.id} className="relative">
+          <SwipeableRow
+            key={entry.id}
+            actions={[
+              {
+                key: "unarchive",
+                label: "Unarchive",
+                icon: <ArchiveRestore className="size-5" />,
+                onClick: () => void unarchive(entry.id),
+                className: "bg-orange-100 text-orange-700",
+              },
+              {
+                key: "trash",
+                label: "Trash",
+                icon: <Trash2 className="size-5" />,
+                onClick: () => setConfirmTrashId(entry.id),
+                className: "bg-red-100 text-red-700",
+              },
+            ]}
+          >
             <Link href={`/entries/${entry.id}`}>
               <NoteCard
                 title={entry.title || "Untitled entry"}
@@ -69,20 +112,40 @@ export function ArchiveList({
                 dayOfMonth={formatDayOfMonth(entry.entryDate)}
                 snippet={entry.snippet ?? undefined}
                 thumbnailUrl={entry.thumbnailUrl}
-                className="pr-12"
               />
             </Link>
-            <button
-              type="button"
-              onClick={() => unarchive(entry.id)}
-              aria-label="Unarchive"
-              className="text-muted-foreground hover:bg-warm-100 hover:text-foreground bg-card shadow-subtle absolute right-3 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full transition-colors"
-            >
-              <ArchiveRestore className="size-4" />
-            </button>
-          </div>
+          </SwipeableRow>
         ))}
       </div>
+
+      <Dialog
+        open={confirmTrashId !== null}
+        onOpenChange={(open) => !open && setConfirmTrashId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move to Trash?</DialogTitle>
+            <DialogDescription>
+              You can restore it from Trash later — nothing is permanently
+              deleted yet.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmTrashId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (confirmTrashId) void trash(confirmTrashId);
+                setConfirmTrashId(null);
+              }}
+            >
+              Move to Trash
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

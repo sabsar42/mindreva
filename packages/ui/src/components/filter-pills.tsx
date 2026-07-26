@@ -42,7 +42,7 @@ function FilterPills({
             aria-selected={selected}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+              "inline-flex items-center gap-1.5 rounded-md border px-4 py-1.5 text-sm font-medium transition-colors",
               "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
               selected
                 ? "border-mint-300 bg-accent text-accent-foreground"

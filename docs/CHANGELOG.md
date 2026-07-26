@@ -7,6 +7,65 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-07-26 — Phase 6.6 follow-up: swipe actions, sharper radius, Lexical editor, clearer persona icon
+
+Direct feedback on the running app after the initial Phase 6.6 build. Colors
+and layout iterated live on localhost; the RichTextEditor's internals were
+swapped for Lexical per explicit request.
+
+### Changed
+
+- `NoteCard`: fill changed from the pale mint tint to the page background
+  (`bg-background`), with a dimmed `border-mint-100` outline instead of a
+  color fill for definition — iterated twice on localhost (first pass used a
+  stronger `border-mint-200`/`p-3`/`h-24`, settled on `border-mint-100`/
+  `p-4`/`h-28` after review).
+- List spacing on the journal/notes list, Archive, and Trash screens went
+  `space-y-4` → `space-y-5` → back to `space-y-4` after comparing both on
+  localhost.
+- Sharpened the app-wide radius scale from a pill/14px mix to a single 10px
+  rectangle for every card, chip, badge, tab, and button (`--radius-lg`
+  lowered to match `--radius-md`; `Badge`, `FilterPills`, `Tabs`, `Button`,
+  and the toast buttons switched off `rounded-full`). Genuinely circular
+  elements (`Avatar`, `RecordButton`, `Switch`, round icon-only buttons, the
+  NoteCard date-badge circle) were deliberately left alone.
+- `RichTextEditor` rebuilt on real Lexical (`lexical` + `@lexical/react` +
+  `@lexical/markdown`) instead of the hand-rolled textarea-plus-toolbar —
+  bold/italic now render styled while typing rather than showing literal
+  `**`/`*` markers. The public `value`/`onChange` contract and the Markdown
+  storage format are unchanged, so every call site and `stripFormatting()`
+  needed zero changes.
+- Swapped the generic `MessageCircle` icon for `History` everywhere the
+  "chat with your past self" entry point appears (journal header link,
+  past-conversations list rows) — a plain chat bubble didn't communicate the
+  time-travel framing that's this feature's identity.
+
+### Added
+
+- `SwipeableRow` in `packages/ui`: a reusable swipe-left-to-reveal-actions
+  wrapper built on native Pointer Events (no new gesture-library
+  dependency). Wired into every list screen: Archive (muted orange) + Trash
+  (muted red) on the journal/notes list, Unarchive + Trash on the Archive
+  screen, Restore on the Trash screen — replacing the old single leading
+  icon-button pattern on Archive/Trash.
+- A confirmation `Dialog` before any swipe-triggered Trash action ("Move to
+  Trash?" / Cancel / destructive confirm) on every screen that has it.
+  Archive and Restore stay single-tap since they're non-destructive and
+  already reversible.
+
+### Verified
+
+- `pnpm lint` and `pnpm build` pass across the monorepo.
+- A live check against the real running app and real LLM confirmed the
+  Markdown produced by Lexical's `BOLD_STAR`/`ITALIC_STAR` transformers
+  round-trips through storage and strips cleanly before reaching both the
+  summary and the embedding text — the data pipeline is unaffected by the
+  editor swap.
+- Not independently verified: the Lexical editor's actual in-browser
+  behavior (does bold/italic render styled while typing, do toolbar clicks
+  work correctly) — no browser automation tool was available in this
+  environment. Flagged directly rather than assumed; needs a manual check.
+
 ## 2026-07-26 — Phase 6.6: Rich Text Editing & Task Extraction
 
 ### Added

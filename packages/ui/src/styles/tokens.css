@@ -50,8 +50,8 @@
 
   /* ---- Radius scale --------------------------------------------------- */
   --radius-sm: 0.375rem; /* 6px  */
-  --radius-md: 0.625rem; /* 10px */
-  --radius-lg: 0.875rem; /* 14px — cards */
+  --radius-md: 0.625rem; /* 10px — cards, chips, buttons: sharp rectangle, not a pill */
+  --radius-lg: 0.625rem; /* 10px — kept equal to md; nothing in this app wants a softer card corner */
   --radius-xl: 1.25rem; /* 20px */
   --radius-2xl: 1.75rem; /* 28px — record button / big surfaces */
 

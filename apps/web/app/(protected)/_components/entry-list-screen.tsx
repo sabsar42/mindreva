@@ -2,15 +2,25 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, Plus, Settings, MessageCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Plus, Settings, History, Trash2, Archive } from "lucide-react";
 import {
   BottomSheet,
   BottomSheetContent,
   BottomSheetTitle,
   CalendarPicker,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Button,
   FilterPills,
   Input,
   NoteCard,
+  SwipeableRow,
+  toast,
   type FilterPillOption,
 } from "@mindreva/ui";
 import type { EntryType } from "@mindreva/database";
@@ -79,6 +89,8 @@ export function EntryListScreen({
   /** Journal's floating record button. Fixed to the bottom, above the sheet. */
   floatingAction?: React.ReactNode;
 }) {
+  const router = useRouter();
+  const [localEntries, setLocalEntries] = React.useState(entries);
   const [filter, setFilter] = React.useState<FilterValue>("all");
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>();
   const [datePickerOpen, setDatePickerOpen] = React.useState(false);
@@ -87,6 +99,37 @@ export function EntryListScreen({
     EntryListItemWithThumbnail[] | null
   >(null);
   const [searching, setSearching] = React.useState(false);
+  const [confirmTrashId, setConfirmTrashId] = React.useState<string | null>(
+    null,
+  );
+
+  // Keep local state in sync when the server re-provides entries (e.g. after
+  // router.refresh()) — otherwise a swipe-removed row could reappear stale.
+  React.useEffect(() => {
+    setLocalEntries(entries);
+  }, [entries]);
+
+  async function archiveEntry(id: string) {
+    const res = await fetch(`/api/entries/${id}/archive`, { method: "POST" });
+    if (!res.ok) {
+      toast.error("Something went wrong.");
+      return;
+    }
+    setLocalEntries((prev) => prev.filter((e) => e.id !== id));
+    toast.success("Archived");
+    router.refresh();
+  }
+
+  async function trashEntry(id: string) {
+    const res = await fetch(`/api/entries/${id}/trash`, { method: "POST" });
+    if (!res.ok) {
+      toast.error("Something went wrong.");
+      return;
+    }
+    setLocalEntries((prev) => prev.filter((e) => e.id !== id));
+    toast.success("Moved to Trash");
+    router.refresh();
+  }
 
   const calendarDates = React.useMemo(
     () => entryDates.map((d) => new Date(`${d}T00:00:00`)),
@@ -94,10 +137,10 @@ export function EntryListScreen({
   );
 
   const filtered = React.useMemo(() => {
-    if (filter === "all") return entries;
+    if (filter === "all") return localEntries;
     if (filter === "today") {
       const key = toDateKey(new Date());
-      return entries.filter((e) => e.entryDate === key);
+      return localEntries.filter((e) => e.entryDate === key);
     }
     if (filter === "week") {
       const monday = startOfWeekMonday(new Date());
@@ -105,17 +148,17 @@ export function EntryListScreen({
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
       const sundayKey = toDateKey(sunday);
-      return entries.filter(
+      return localEntries.filter(
         (e) =>
           e.entryDate && e.entryDate >= mondayKey && e.entryDate <= sundayKey,
       );
     }
     if (filter === "date" && selectedDate) {
       const key = toDateKey(selectedDate);
-      return entries.filter((e) => e.entryDate === key);
+      return localEntries.filter((e) => e.entryDate === key);
     }
-    return entries;
-  }, [entries, filter, selectedDate]);
+    return localEntries;
+  }, [localEntries, filter, selectedDate]);
 
   // Debounced live search across title/transcript/summary via the API.
   React.useEffect(() => {
@@ -185,7 +228,7 @@ export function EntryListScreen({
               aria-label="Chat with your past self"
               className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
             >
-              <MessageCircle className="size-5" />
+              <History className="size-5" />
             </Link>
           )}
           <Link
@@ -216,7 +259,7 @@ export function EntryListScreen({
         />
       </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-2">
         {searching && (
           <p className="text-muted-foreground text-sm">Searching…</p>
         )}
@@ -235,20 +278,40 @@ export function EntryListScreen({
 
         {!searching &&
           visible.map((entry) => (
-            <Link key={entry.id} href={`/entries/${entry.id}`}>
-              <NoteCard
-                title={entry.title || "Untitled entry"}
-                weekdayLabel={
-                  entry.entryDate ? formatWeekday(entry.entryDate) : ""
-                }
-                dayOfMonth={
-                  entry.entryDate ? formatDayOfMonth(entry.entryDate) : ""
-                }
-                durationLabel={formatDuration(entry.durationMs)}
-                snippet={entry.snippet ?? undefined}
-                thumbnailUrl={entry.thumbnailUrl}
-              />
-            </Link>
+            <SwipeableRow
+              key={entry.id}
+              actions={[
+                {
+                  key: "archive",
+                  label: "Archive",
+                  icon: <Archive className="size-5" />,
+                  onClick: () => void archiveEntry(entry.id),
+                  className: "bg-orange-100 text-orange-700",
+                },
+                {
+                  key: "trash",
+                  label: "Trash",
+                  icon: <Trash2 className="size-5" />,
+                  onClick: () => setConfirmTrashId(entry.id),
+                  className: "bg-red-100 text-red-700",
+                },
+              ]}
+            >
+              <Link href={`/entries/${entry.id}`}>
+                <NoteCard
+                  title={entry.title || "Untitled entry"}
+                  weekdayLabel={
+                    entry.entryDate ? formatWeekday(entry.entryDate) : ""
+                  }
+                  dayOfMonth={
+                    entry.entryDate ? formatDayOfMonth(entry.entryDate) : ""
+                  }
+                  durationLabel={formatDuration(entry.durationMs)}
+                  snippet={entry.snippet ?? undefined}
+                  thumbnailUrl={entry.thumbnailUrl}
+                />
+              </Link>
+            </SwipeableRow>
           ))}
       </div>
 
@@ -287,6 +350,35 @@ export function EntryListScreen({
           {floatingAction}
         </div>
       )}
+
+      <Dialog
+        open={confirmTrashId !== null}
+        onOpenChange={(open) => !open && setConfirmTrashId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move to Trash?</DialogTitle>
+            <DialogDescription>
+              You can restore it from Trash later — nothing is permanently
+              deleted yet.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmTrashId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (confirmTrashId) void trashEntry(confirmTrashId);
+                setConfirmTrashId(null);
+              }}
+            >
+              Move to Trash
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

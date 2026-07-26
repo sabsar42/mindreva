@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft, History } from "lucide-react";
 import { Button, Card, Input, Logo, OptionCard, toast } from "@mindreva/ui";
 import type { ChatSession } from "@mindreva/database";
 
@@ -149,7 +149,7 @@ export function ChatHome({
             {sessions.map((s) => (
               <Link key={s.id} href={`/chat/${s.id}`}>
                 <Card className="hover:shadow-elevated flex items-center gap-3 p-4 transition-shadow">
-                  <MessageCircle className="text-primary size-5 shrink-0" />
+                  <History className="text-primary size-5 shrink-0" />
                   <span className="text-foreground font-serif text-lg font-semibold">
                     {s.title}
                   </span>

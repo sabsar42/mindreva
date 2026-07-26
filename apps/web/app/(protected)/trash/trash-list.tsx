@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Undo2 } from "lucide-react";
-import { NoteCard, toast } from "@mindreva/ui";
+import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 
 // Note: trashed entries are intentionally NOT links to /entries/[id] — the
@@ -66,24 +66,26 @@ export function TrashList({
         )}
 
         {entries.map((entry) => (
-          <div key={entry.id} className="relative">
+          <SwipeableRow
+            key={entry.id}
+            actions={[
+              {
+                key: "restore",
+                label: "Restore",
+                icon: <Undo2 className="size-5" />,
+                onClick: () => void restore(entry.id),
+                className: "bg-mint-100 text-mint-700",
+              },
+            ]}
+          >
             <NoteCard
               title={entry.title || "Untitled entry"}
               weekdayLabel={formatWeekday(entry.entryDate)}
               dayOfMonth={formatDayOfMonth(entry.entryDate)}
               snippet={entry.snippet ?? undefined}
               thumbnailUrl={entry.thumbnailUrl}
-              className="pr-12"
             />
-            <button
-              type="button"
-              onClick={() => restore(entry.id)}
-              aria-label="Restore"
-              className="text-muted-foreground hover:bg-warm-100 hover:text-foreground bg-card shadow-subtle absolute right-3 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full transition-colors"
-            >
-              <Undo2 className="size-4" />
-            </button>
-          </div>
+          </SwipeableRow>
         ))}
       </div>
     </main>

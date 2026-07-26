@@ -22,7 +22,8 @@ export interface NoteCardProps extends React.ComponentProps<"div"> {
  * ellipsized snippet, and a trailing square cover-photo thumbnail — every
  * card the same fixed height whether or not it has a photo. Matches
  * new-journal-list.png's structure and sizing exactly (our dark mint tokens,
- * not their gray).
+ * not their gray). Card fill matches the page background, not a tinted
+ * surface — a mint border gives it definition instead.
  */
 const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
   (
@@ -47,14 +48,14 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         className={cn(
-          "bg-accent shadow-subtle flex h-24 items-center gap-3 rounded-lg p-3",
+          "bg-background shadow-subtle border-mint-100 flex h-28 items-center gap-3 rounded-lg border p-4",
           interactive &&
-            "hover:shadow-elevated focus-visible:ring-ring cursor-pointer transition-shadow focus-visible:outline-none focus-visible:ring-2",
+            "hover:shadow-elevated hover:border-mint-200 focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2",
           className,
         )}
         {...props}
       >
-        <div className="bg-card text-foreground flex size-12 shrink-0 flex-col items-center justify-center rounded-full">
+        <div className="bg-accent text-accent-foreground flex size-12 shrink-0 flex-col items-center justify-center rounded-full">
           <span className="text-muted-foreground text-[10px] font-semibold uppercase leading-none tracking-wide">
             {weekdayLabel || "—"}
           </span>

@@ -52,6 +52,11 @@ export {
 } from "./components/calendar-picker";
 export { NoteCard, type NoteCardProps } from "./components/note-card";
 export {
+  SwipeableRow,
+  type SwipeableRowAction,
+  type SwipeableRowProps,
+} from "./components/swipeable-row";
+export {
   RecordButton,
   TransportButton,
   type RecordButtonProps,

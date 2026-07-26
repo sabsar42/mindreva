@@ -1147,9 +1147,12 @@ packages/types/src/
                                   # body text reaches an LLM or a plain-text display
 
 packages/ui/src/components/
-├── rich-text-editor.tsx         # bold/italic toolbar over a plain textarea,
-                                  # Markdown is the storage format, not rendered live
-└── task-checklist.tsx           # toggleable action-item list, presentation-only
+├── rich-text-editor.tsx         # Lexical-based WYSIWYG bold/italic editor;
+                                  # Markdown stays the storage format via
+                                  # $convertFromMarkdownString/$convertToMarkdownString
+├── task-checklist.tsx           # toggleable action-item list, presentation-only
+└── swipeable-row.tsx            # swipe-left-to-reveal actions wrapper, used by
+                                  # every list screen (Pointer Events, no gesture lib)
 
 packages/database/
 ├── migrations/
@@ -1184,6 +1187,16 @@ apps/web/
 - [x] Wire `TaskChecklist` into the entry detail page directly below the existing summary section, with optimistic toggle via `PATCH /api/entries/[entryId]/tasks/[taskId]`
 - [x] Verify live end-to-end against the real Supabase project and the real LLM provider: RLS proven with a two-user script (read/list/toggle/insert all denied for a second user), a meeting-style entry with Markdown formatting correctly produced real extracted tasks with no raw Markdown leaking into the summary or the embedding text, and a plain non-actionable personal entry correctly produced zero invented tasks
 
+**Follow-up pass** (same phase, after direct feedback on the running app):
+
+- [x] Restyled `NoteCard`: fill changed from the pale mint `bg-accent` tint to `bg-background` (matching the page), with a dimmed `border-mint-100` outline for definition instead of a color fill — iterated twice on localhost per direct feedback (first pass used `border-mint-200`/`p-3`/`h-24`, dialed down to `border-mint-100`/`p-4`/`h-28` after review)
+- [x] Increased then re-tuned inter-card list spacing (`space-y-4` → `space-y-5` → back to `space-y-4` after seeing both on localhost) across the journal/notes list, Archive, and Trash screens
+- [x] Added a reusable `SwipeableRow` component (`packages/ui`, built on native Pointer Events, no new gesture-library dependency) wrapping every list row: swipe left reveals Archive (muted `orange-100`/`orange-700`) + Trash (muted `red-100`/`red-700`) on the journal/notes list, Unarchive + Trash on the Archive screen, and Restore on the Trash screen — replacing the old single leading icon-button pattern on Archive/Trash
+- [x] Trash is never immediate: swiping Trash opens a confirmation `Dialog` ("Move to Trash?" / Cancel / destructive "Move to Trash") on every screen that has the action; Archive and Restore stay single-tap since they're non-destructive and already reversible
+- [x] Sharpened the app-wide radius scale from a mix of pill (`rounded-full`) chips/buttons/tabs and a 14px card corner down to a single 10px rectangle everywhere a card, chip, badge, tab, or button appears (`--radius-lg` lowered to match `--radius-md` in `packages/ui/src/styles/tokens.css`; `Badge`, `FilterPills`, `Tabs`, `Button`'s base variant, and the toast action/cancel buttons individually switched off `rounded-full`) — genuinely circular elements (`Avatar`, `RecordButton`, `Switch`, round icon-only buttons, the date-badge circle) were deliberately left alone, since "chip/card" and "circular tap target" are different affordances
+- [x] Replaced `RichTextEditor`'s internals with a real Lexical-based WYSIWYG (`lexical` + `@lexical/react` + `@lexical/markdown`, added to `packages/ui`) — bold/italic now render styled while typing instead of showing literal `**`/`*` markers. `$convertFromMarkdownString`/`$convertToMarkdownString` with a restricted `[BOLD_STAR, ITALIC_STAR]` transformer list keep the storage format (Markdown in `transcripts.edited_text`) and the public `value`/`onChange` contract byte-for-byte identical to before, so `stripFormatting()` and every downstream consumer needed zero changes
+- [x] Swapped the generic `MessageCircle` icon for `History` everywhere the "chat with your past self" entry point appears (the journal header link and the past-conversations list rows in `chat-home.tsx`) — a plain chat-bubble icon didn't communicate the time-travel framing that's this feature's whole identity
+
 ### Common mistakes
 
 - Reaching for a WYSIWYG library (Tiptap, Slate, etc.) for a bold/italic-only feature. Confirmed directly before building: the ask was for a seamless plain-text editing surface, not literal rendered bold/italic while typing — a small custom selection-wrapping textarea covers it with zero new dependencies.
@@ -1192,6 +1205,10 @@ apps/web/
 - Merging newly extracted tasks with the previous list instead of replacing it. Without a real reason to preserve history, a merge silently accumulates duplicates every time an entry is regenerated with a slightly reworded transcript.
 - Skipping the negative-case check. A task-extraction feature that never gets verified against non-actionable content can silently start inventing tasks (the exact failure the grounding rule exists to prevent) and nobody would notice until a user's checklist filled up with nonsense.
 - Re-implementing something already built because a request re-states its requirements in full. Check the current state of the code first — this phase's CalendarPicker requirements were a verbatim re-specification of Phase 6.5's fix pass, already shipped; re-verifying against the reference and the running code took minutes, a from-scratch rebuild would have wasted much more.
+- Guessing at an ambiguous color/token request instead of asking. "Keep the primary color as background" was ambiguous between the literal `--primary` token (dark mint-600, meant for buttons) and "our mint brand color" loosely — a wrong guess here would have shipped an unreadable dark card. Confirming first ("card bg shall be same as the whole app's bg and border will be of mint") took one question and avoided a highly visible mistake.
+- Applying a global token change (the radius scale) without checking every `rounded-full` usage individually first. Several — `Avatar`, `RecordButton`, `Switch`, the calendar nav buttons, the date-badge circle — are circular by _function_, not a "chip" or "card" that happened to be rounded; blindly rewriting every `rounded-full` to `rounded-md` would have broken those affordances.
+- Treating a request to swap in a specific library (Lexical) as optional just because a lighter alternative already works. The user asked for Lexical specifically after being shown the lightweight version — that's new information overriding an earlier choice, not a reason to keep arguing for the simpler approach.
+- Claiming full end-to-end verification of a WYSIWYG editor's in-browser behavior without a browser automation tool available. Build passing and a real data-pipeline check (Markdown round-trips and strips correctly) are real signal, but they don't prove the editor visually renders bold/italic or that toolbar clicks work while typing — say so explicitly and ask the user to confirm in-browser, rather than implying full coverage.
 
 ### Best practices
 
@@ -1199,6 +1216,9 @@ apps/web/
 - Treat the task-extraction instruction as one more shared rule appended to every summary style's prompt, the same way `GROUNDING_RULE` already is — consistent behavior across styles beats a special-cased "meetings-only" branch, and the model is explicitly told which content styles this is "most common" for without being hard-restricted to them.
 - Keep `TaskChecklist` presentation-only and its toggle optimistic. A checklist that waits on a network round trip before showing the check feels laggy for something this low-stakes; revert on failure instead.
 - When a request bundles a quick visual fix with a large feature addition, verify the quick fix's actual root cause before touching styling that already looks correct in the code — a screenshot can be from a stale demo page (the dev component gallery, in this case) rather than the real screen.
+- Iterate visual/spacing changes on the running dev server rather than guessing the final numbers in one shot. Both the card border/padding and the list gap went through two rounds (an initial change, direct feedback, a second adjustment) — showing the result on localhost before finalizing caught things a code review alone wouldn't have (e.g. the border being too strong against the new background).
+- When swapping a component's underlying implementation (textarea → Lexical) but keeping its public props identical, that's the whole point — every call site (`entry-detail.tsx`) needed zero changes, and `stripFormatting()` kept working unmodified because it only ever cared about the Markdown string shape, never which editor produced it.
+- Prefer a well-known semantic icon (`History`) over a generic one (`MessageCircle`) for a feature whose entire identity is a specific metaphor (talking to your past self) — the icon should reinforce what's different about this feature, not read as an interchangeable chat icon.
 
 ---
 

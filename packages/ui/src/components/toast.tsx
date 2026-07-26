@@ -18,8 +18,8 @@ function Toaster(props: ToasterProps) {
           toast:
             "!rounded-lg !border !border-border !bg-card !text-card-foreground !shadow-elevated !font-sans",
           description: "!text-muted-foreground",
-          actionButton: "!bg-primary !text-primary-foreground !rounded-full",
-          cancelButton: "!bg-warm-100 !text-foreground !rounded-full",
+          actionButton: "!bg-primary !text-primary-foreground !rounded-md",
+          cancelButton: "!bg-warm-100 !text-foreground !rounded-md",
           error: "!text-destructive",
           success: "!text-success",
         },
