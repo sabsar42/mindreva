@@ -1,0 +1,154 @@
+# Changelog
+
+All notable changes to this project are documented here, most recent first.
+Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+adapted to phase-based entries (this project doesn't use semver releases).
+
+See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
+unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
+
+## 2026-07-26 — Phase 6: Chat with Past Self
+
+### Added
+
+- `packages/llm/src/prompts/persona-chat.prompt.ts`: the grounded persona
+  prompt (hard rules against inventing facts, an explicit "I don't have a
+  journal entry from this period about that" instruction, first-person voice,
+  no diagnosis or therapy-style advice).
+- `persona-chat.service.ts`: embeds the question, retrieves top-k excerpts
+  hard-filtered to the session's date range (filtered **before** ranking by
+  similarity), builds the grounded prompt, and stores citations.
+- Automatic embedding generation after every summarize (initial, edit, or
+  regenerate) — `title + confirmed text`, upserted so repeated summarization
+  never leaves duplicate embedding rows per entry.
+- Chat UI: a session start screen (pick a year or custom range), and the
+  conversation screen with the year/range shown large in the serif logotype
+  typeface, past-self replies also set in serif, and citations rendered as
+  tappable pill chips linking to the source entry.
+- A 40-message-per-session cap to bound LLM usage per conversation.
+
+### Fixed
+
+- `matchEntries` wasn't casting the query vector to `::halfvec(2048)`, so it
+  silently ignored the halfvec HNSW index added in Phase 5 and fell back to a
+  full sequential scan on every chat message.
+- `EmbeddingsRepository` had no upsert semantics — repeated summarization
+  would have left duplicate embedding rows per entry, skewing retrieval
+  toward whichever entries were re-summarized most.
+
+### Verified
+
+- Live 4-fixture manual eval across two years with deliberately similar
+  topics but different facts: the date-range hard filter never let a fact
+  from one year leak into an answer scoped to the other, in either direction.
+  The model honestly declined to answer a question about a topic never
+  journaled about instead of inventing one. A genuinely empty date range
+  correctly returned zero citations.
+
+## 2026-07-26 — Phase 5: Journaling, Notes & Summarization Pipeline
+
+### Added
+
+- `packages/llm`: `LLMProvider` interface, `GeminiLLMProvider` (long-term
+  default), `GroqLLMProvider` (fast fallback, no embeddings),
+  `ClaudeLLMProvider` (premium, explicit opt-in), and `OpenRouterLLMProvider`
+  (temporary default — see Decisions log).
+- Five versioned summary prompt templates (general, meetings, interviews,
+  lectures, personal), resolved by the user's onboarding `summary_style`.
+- `summarization.service.ts`: summarizes confirmed text (never raw ASR
+  output), auto-derives `entries.title` from the first line/sentence when
+  unset.
+- Real journal and notes list screens (FilterPills, CalendarPicker, live
+  search across title/transcript/summary).
+- A typed-note compose screen (`/notes/new`).
+- The shared entry detail screen: transcript edit, summary, regenerate,
+  archive/trash actions.
+- Archive and Trash screens, wired into the account page's Phase-3 rows.
+- Full CRUD API routes for summarize/archive/trash/restore (all soft-delete
+  only).
+
+### Changed
+
+- `embeddings.embedding` migrated from `vector(768)` to `vector(2048)` to
+  match the active embedding model's native output dimension (see Decisions
+  log). Its HNSW index was rebuilt as a `halfvec` expression index, since
+  pgvector's HNSW index caps out at 2000 dimensions.
+- `LLM_PROVIDER` default set to `openrouter` (temporary — see Decisions log).
+
+### Fixed
+
+- `SummariesRepository.getByEntry` had no `ORDER BY`, so it could return a
+  non-deterministic row once "regenerate summary" could create more than one
+  summary row per entry.
+- The transcript review screen's "Skip for now" never actually triggered
+  summarization, despite the intent documented in code comments.
+- A stale `vector(768)` reference in `OpenRouterLLMProvider`'s
+  dimension-mismatch error message (the constant had been updated to 2048,
+  the message text hadn't).
+
+## 2026-07-24 — Phase 4: Voice Capture & ASR Abstraction Layer
+
+### Added
+
+- `packages/asr`: `ASRProvider` interface, `GroqASRProvider` (default,
+  Whisper large-v3-turbo), `HuggingFaceASRProvider` (documented fallback),
+  `SelfHostedNemotronProvider` (stub for Phase 9).
+- The recording screen: real `MediaRecorder` capture with a live waveform
+  driven by a Web Audio `AnalyserNode`, accurate pause/resume timing, a
+  5-minute soft warning and 10-minute hard stop (enforced client- and
+  server-side), a `beforeunload` guard, and cancel-discards-everything.
+- A private, RLS-scoped Supabase Storage bucket for recordings.
+- Entry + recording + transcript created transactionally in one Postgres
+  transaction.
+- The transcript review/edit screen (saves to `edited_text`, `raw_text`
+  never touched).
+
+### Fixed
+
+- `status`/`type`/`source`/`role` columns in the schema were typed as bare
+  `string` instead of their proper literal unions — patched with Drizzle's
+  `.$type<T>()` across all four.
+- `turbo.json` didn't declare the Supabase/provider environment variables
+  used at build time, which Vercel flagged as an unknown-env-var cache-key
+  warning.
+
+## 2026-07-24 — Phase 2 & 3: Design System, Database, Auth & Backend
+
+### Added
+
+- `packages/ui`: the dark mint / warm neutral design token system
+  (Tailwind v4 CSS-first `@theme`), Fraunces serif logotype + Geist sans,
+  and the full owned component library (Button, Input, Textarea, Card,
+  Avatar, Dialog, BottomSheet, Tabs, Badge, Skeleton, Switch, Toast,
+  ProgressBar, SettingsRow, FilterPills, CalendarPicker, NoteCard,
+  RecordButton, WaveformVisualizer, Logo, OptionCard), built on Radix + CVA.
+- A `/dev/components` visual QA gallery and a placeholder landing page.
+- `packages/database`: Drizzle schema for all 8 tables (profiles, entries,
+  recordings, transcripts, summaries, embeddings, chat_sessions,
+  chat_messages), with Row Level Security policies on every table.
+- The repository layer — the only code allowed to import Drizzle directly,
+  enforced by an ESLint rule.
+- Supabase Auth: sign-in/sign-up (Google + email/password), onboarding
+  (language selection, use-case/summary-style selection), account settings
+  scaffold.
+- Session-refreshing middleware with route protection.
+- A GitHub Actions workflow pinging Supabase every 3 days to prevent
+  free-tier auto-pause.
+
+### Verified
+
+- RLS cross-user isolation proven live with a scripted test creating two
+  throwaway users and confirming one cannot read the other's data.
+
+## 2026-07-23 — Phase 1: Monorepo Bootstrap & Dev Environment
+
+### Added
+
+- Turborepo + pnpm workspace monorepo (`apps/web`, `packages/config`,
+  `packages/types`).
+- `apps/web`: Next.js 15 (App Router, TypeScript, Tailwind) scaffold.
+- `packages/config`: shared ESLint flat config, base `tsconfig.json`.
+- Husky pre-commit hook (lint-staged) and commitlint (conventional commits).
+- A documented `.env.example` covering every provider planned across the
+  whole roadmap, not just what Phase 1 uses.
+- GitHub repository and Vercel deployment connected.

@@ -9,6 +9,18 @@ Voice journaling and notetaking app. Dark mint / white / minimal / premium theme
 3. Follow that phase's checklist, folder structure, common mistakes, and best
    practices exactly. Don't skip "Common mistakes", several of them are
    data-loss or trust-loss risks, not just style preferences.
+4. Check docs/CHANGELOG.md, docs/DECISIONS.md, and docs/KNOWN-ISSUES.md for
+   relevant context before starting work on a phase — prior unplanned
+   decisions and open issues often affect what a later phase should do.
+
+At the end of each phase — or whenever an unplanned decision gets made or a
+new open issue is found, not just at phase boundaries — update all three of
+those docs, not only the "Current phase" lines below:
+
+- docs/CHANGELOG.md: add a dated entry for what was actually built.
+- docs/DECISIONS.md: add an entry for anything decided that wasn't already
+  called for in the roadmap (what happened, why, what was decided).
+- docs/KNOWN-ISSUES.md: add or update entries for anything left open.
 
 ## Current phase
 
