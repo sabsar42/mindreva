@@ -1096,6 +1096,14 @@ apps/web/
 - [x] Rebuild `PhotoUploader`: the first photo now renders as a large `aspect-[4/3]` hero (or an inviting dashed-border empty state prompting "Add a photo" when there isn't one yet), with any additional photos plus the "add another" tile in a small thumbnail strip underneath — replacing the old flat row-of-equal-thumbnails layout
 - [x] Re-verify `pnpm lint` and `pnpm build` pass with the redesigned components in place
 
+**Fix pass** (same phase, after a follow-up review against the reference images found the first redesign pass close but not exact):
+
+- [x] Fix `NoteCard`'s date badge not rendering: rebuilt it as a plain round badge (white circle on the card's mint fill, weekday small on top / day-of-month large below) instead of the previous pale-mint-badge-on-white-card combination, which was visually near-invisible against the card background — the data was always there, the contrast wasn't
+- [x] Give every `NoteCard` a fixed height (`h-24`) regardless of whether it has a cover photo, so list rows are uniformly sized exactly as in `new-journal-list.png`, instead of the previous auto-height row that shrank for photo-less entries
+- [x] Increase list spacing from `space-y-3` to `space-y-4` across the journal/notes list, Archive, and Trash screens — cards were reading as too tight together
+- [x] Rework `entry-detail.tsx` into one seamless page matching `new-journal-overview-page.png`: removed the bordered `Textarea` box and the `Card`-wrapped Summary section entirely; content now flows top to bottom as plain page content — title, then summary text, then the photo, then the transcript (still a real, editable `Textarea`, but restyled with no border/background/shadow so it reads as flowing body text, not a boxed form field) — instead of the previous layout's visually separated, individually-bordered blocks
+- [x] Re-verify `pnpm lint` and `pnpm build` pass with the fix pass in place
+
 ### Common mistakes
 
 - Trusting a client-supplied `position` for ordering. A malicious or buggy client could then desync the display order or collide positions across concurrent uploads; compute it server-side from the current count instead.
@@ -1105,6 +1113,10 @@ apps/web/
 - Adding an `eslint-disable-next-line` comment for a rule from a plugin the local package's ESLint config doesn't load (e.g. `@next/next/no-img-element` inside `packages/ui`). That's a hard "Definition for rule not found" error, not a no-op — and moot anyway, since `apps/web`'s Next-specific lint rules never scan `packages/ui`'s source in the first place.
 - Copying a design reference's exact palette or chrome instead of its layout. `new-journal-list.png` et al. are structure references (proportions, information hierarchy, grid density) — colors stay dark mint, and app-specific chrome the reference happens to have (a photo hero banner, Media/Map tabs) doesn't get added just because the screenshot has it.
 - Building a calendar day-cell photo treatment as a separate `<img>` layered under the button. `react-day-picker` v9's `components.DayButton` override lets the thumbnail be the button's own `background-image`, which keeps hit-testing, focus, and the existing modifier classes (`selected`, `today`, `outside`) all working unmodified.
+- Low-contrast badges: a pale tint-on-tint combination (light mint text/fill on a light card) can pass code review and even render correctly in the DOM while being effectively invisible to the eye. When a reference shows a small badge or label, check it against the actual background it sits on, not just that the markup exists.
+- Variable-height list rows when the reference shows uniform ones. A trailing thumbnail that only sometimes renders will silently shrink the row for entries without one, unless the row's height is set explicitly rather than left to content.
+- "Editable as rich text" doesn't automatically mean pull in a WYSIWYG editor library. Confirm scope before adding a dependency — here it meant "no visible box/border around the editable text, so it reads as body copy," not actual bold/italic/list formatting; the existing plain-text `Textarea` covers that once restyled.
+- Leaving a `Card`/bordered wrapper around a section after the user asked for a "seamless" page. Removing the divider means removing the surface too (background, border, shadow, padding-as-box) — restyling only the border and leaving the distinct background/shadow still reads as a separate block.
 
 ### Best practices
 

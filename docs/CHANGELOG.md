@@ -7,6 +7,42 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-07-26 — Phase 6.5 fix pass: exact layout match for list and entry detail
+
+A follow-up review against `docs/design-reference/new-journal-list.png` and
+`new-journal-overview-page.png` found the prior redesign pass close but not
+exact. This pass fixes those gaps; colors remain our own dark mint, only
+layout/structure changed.
+
+### Fixed
+
+- `NoteCard`'s date badge wasn't visibly showing — the markup was correct,
+  but a pale-mint badge on a white card was too low-contrast to read.
+  Rebuilt as a plain white circle sitting on the card's mint fill (weekday
+  small on top, day-of-month large below), matching the reference exactly.
+- `NoteCard` rows are now a fixed height (`h-24`) regardless of whether the
+  entry has a cover photo, so every card in a list is the same size —
+  previously a photo-less entry's row was visibly shorter.
+- List spacing increased from `space-y-3` to `space-y-4` on the journal/notes
+  list, Archive, and Trash screens; cards were reading as too tight together.
+
+### Changed
+
+- `entry-detail.tsx` reworked into one seamless, undivided page matching
+  `new-journal-overview-page.png`: removed the bordered transcript box and
+  the `Card`-wrapped Summary section. Content now reads top to bottom as
+  plain page flow — title, summary text, the photo, then the transcript —
+  with no visible section dividers. The transcript is still a real, editable
+  text field, just restyled with no border/background/shadow so it reads as
+  flowing body text rather than a boxed form control.
+
+### Verified
+
+- `pnpm lint` and `pnpm build` pass across the monorepo with the fix pass in
+  place.
+- Confirmed via the running dev server that `NoteCard`'s new accent
+  background and fixed-height class render as expected in the HTML output.
+
 ## 2026-07-26 — Phase 6.5 redesign: photo-forward journal list, calendar, and entry detail
 
 Reworked the journal list, calendar picker, and entry detail layouts to

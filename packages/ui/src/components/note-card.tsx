@@ -17,10 +17,12 @@ export interface NoteCardProps extends React.ComponentProps<"div"> {
 }
 
 /**
- * Journal / note list item: a leading date badge, bold title, ellipsized
- * snippet, and a trailing square cover-photo thumbnail when the entry has
- * one. Matches new-journal-list.png's layout (our own tokens/colors, not
- * theirs).
+ * Journal / note list item: a leading round date badge (weekday over
+ * day-of-month, floating outside the card fill, not boxed), bold title,
+ * ellipsized snippet, and a trailing square cover-photo thumbnail — every
+ * card the same fixed height whether or not it has a photo. Matches
+ * new-journal-list.png's structure and sizing exactly (our dark mint tokens,
+ * not their gray).
  */
 const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
   (
@@ -45,19 +47,19 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         className={cn(
-          "border-border bg-card shadow-subtle flex items-center gap-3 rounded-lg border p-3",
+          "bg-accent shadow-subtle flex h-24 items-center gap-3 rounded-lg p-3",
           interactive &&
             "hover:shadow-elevated focus-visible:ring-ring cursor-pointer transition-shadow focus-visible:outline-none focus-visible:ring-2",
           className,
         )}
         {...props}
       >
-        <div className="bg-accent text-accent-foreground flex size-12 shrink-0 flex-col items-center justify-center rounded-md">
-          <span className="text-[10px] font-semibold uppercase leading-none tracking-wide">
-            {weekdayLabel}
+        <div className="bg-card text-foreground flex size-12 shrink-0 flex-col items-center justify-center rounded-full">
+          <span className="text-muted-foreground text-[10px] font-semibold uppercase leading-none tracking-wide">
+            {weekdayLabel || "—"}
           </span>
-          <span className="mt-0.5 text-base font-bold leading-none">
-            {dayOfMonth}
+          <span className="mt-1 text-base font-bold leading-none">
+            {dayOfMonth || "–"}
           </span>
         </div>
 
@@ -83,7 +85,7 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
           <img
             src={thumbnailUrl}
             alt=""
-            className="border-border size-14 shrink-0 rounded-md border object-cover"
+            className="size-16 shrink-0 rounded-md object-cover"
           />
         )}
       </div>

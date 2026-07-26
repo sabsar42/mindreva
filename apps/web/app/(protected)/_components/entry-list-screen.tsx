@@ -216,7 +216,7 @@ export function EntryListScreen({
         />
       </div>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 space-y-4">
         {searching && (
           <p className="text-muted-foreground text-sm">Searching…</p>
         )}

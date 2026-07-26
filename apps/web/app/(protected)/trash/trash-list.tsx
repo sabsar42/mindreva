@@ -58,7 +58,7 @@ export function TrashList({
         Restore a note, or leave it here — nothing is permanently deleted yet.
       </p>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 space-y-4">
         {entries.length === 0 && (
           <div className="border-border rounded-lg border border-dashed py-12 text-center">
             <p className="text-muted-foreground text-sm">Trash is empty.</p>
@@ -79,7 +79,7 @@ export function TrashList({
               type="button"
               onClick={() => restore(entry.id)}
               aria-label="Restore"
-              className="text-muted-foreground hover:bg-warm-100 hover:text-foreground absolute right-3 top-3 flex size-8 items-center justify-center rounded-full transition-colors"
+              className="text-muted-foreground hover:bg-warm-100 hover:text-foreground bg-card shadow-subtle absolute right-3 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full transition-colors"
             >
               <Undo2 className="size-4" />
             </button>
