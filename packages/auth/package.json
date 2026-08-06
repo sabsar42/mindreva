@@ -10,6 +10,7 @@
   },
   "scripts": {
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "echo \"no tests yet\" && exit 0"
   },
   "dependencies": {
@@ -17,12 +18,15 @@
     "@supabase/supabase-js": "^2.110.8"
   },
   "peerDependencies": {
-    "next": "^15"
+    "next": "^15",
+    "react": "^19"
   },
   "devDependencies": {
     "@mindreva/config": "workspace:*",
+    "@types/react": "^19",
     "eslint": "^9",
     "next": "^15",
+    "react": "^19",
     "typescript": "^5"
   }
 }

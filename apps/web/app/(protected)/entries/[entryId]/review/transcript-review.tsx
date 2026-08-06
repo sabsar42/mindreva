@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import {
   Button,
   PhotoUploader,
+  PhotoThumbnailStrip,
   Textarea,
   toast,
   type PhotoUploaderPhoto,
@@ -77,34 +78,48 @@ export function TranscriptReview({
 
   // Skipping still confirms the transcript as-is (raw text) — it should still
   // get summarized, just via the same "regenerate" endpoint since no edit is
-  // being saved.
-  async function handleSkip() {
+  // being saved. Deliberately not awaited: summarizing is an LLM call that
+  // can take several seconds, and navigating away shouldn't wait on it — the
+  // entry detail screen offers "Generate summary" if it hasn't finished by
+  // the time the user lands there.
+  function handleSkip() {
     setSkipping(true);
-    try {
-      await fetch(`/api/entries/${entryId}/summarize`, { method: "POST" });
-    } catch {
+    fetch(`/api/entries/${entryId}/summarize`, { method: "POST" }).catch(() => {
       // Non-fatal — the entry detail screen offers "Generate summary" too.
-    } finally {
-      router.push("/journal");
-    }
+    });
+    router.push("/journal");
   }
 
   async function handlePhotosSelected(files: File[]) {
     setUploadingPhoto(true);
     try {
-      for (const file of files) {
-        const form = new FormData();
-        form.set("image", file);
-        const res = await fetch(`/api/entries/${entryId}/photos`, {
-          method: "POST",
-          body: form,
-        });
-        if (!res.ok) throw new Error("Upload failed");
-        const data = (await res.json()) as { photo: PhotoUploaderPhoto };
-        setPhotos((prev) => [...prev, data.photo]);
+      // Parallel, not one-at-a-time — see entry-detail.tsx's identical fix
+      // for why.
+      const results = await Promise.allSettled(
+        files.map(async (file) => {
+          const form = new FormData();
+          form.set("image", file);
+          const res = await fetch(`/api/entries/${entryId}/photos`, {
+            method: "POST",
+            body: form,
+          });
+          if (!res.ok) throw new Error("Upload failed");
+          const data = (await res.json()) as { photo: PhotoUploaderPhoto };
+          return data.photo;
+        }),
+      );
+      const uploaded = results
+        .filter(
+          (r): r is PromiseFulfilledResult<PhotoUploaderPhoto> =>
+            r.status === "fulfilled",
+        )
+        .map((r) => r.value);
+      if (uploaded.length > 0) {
+        setPhotos((prev) => [...prev, ...uploaded]);
       }
-    } catch {
-      toast.error("Couldn't upload that photo. Please try again.");
+      if (uploaded.length < files.length) {
+        toast.error("Couldn't upload one or more photos. Please try again.");
+      }
     } finally {
       setUploadingPhoto(false);
     }
@@ -157,14 +172,15 @@ export function TranscriptReview({
         placeholder="Your transcript will appear here…"
       />
 
-      <div>
-        <h2 className="text-foreground mb-2 text-sm font-semibold">Photos</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-foreground text-sm font-semibold">Photos</h2>
         <PhotoUploader
           photos={photos}
           onFilesSelected={(files) => void handlePhotosSelected(files)}
           uploading={uploadingPhoto}
         />
       </div>
+      <PhotoThumbnailStrip photos={photos} />
 
       <div className="flex gap-3">
         <Button

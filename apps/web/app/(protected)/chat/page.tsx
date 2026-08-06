@@ -8,9 +8,24 @@ export default async function ChatHomePage() {
     listMyEntryDates(),
   ]);
 
-  const years = [...new Set(entryDates.map((d) => Number(d.slice(0, 4))))].sort(
-    (a, b) => b - a,
-  );
+  // Entries per year, so each year chip can show how much there is to draw on
+  // — picking a year with 2 entries should feel different from one with 40.
+  const countsByYear = new Map<number, number>();
+  for (const d of entryDates) {
+    const year = Number(d.slice(0, 4));
+    countsByYear.set(year, (countsByYear.get(year) ?? 0) + 1);
+  }
+  const years = [...countsByYear.keys()].sort((a, b) => b - a);
 
-  return <ChatHome sessions={sessions} availableYears={years} />;
+  return (
+    <ChatHome
+      sessions={sessions.map((s) => ({
+        id: s.id,
+        title: s.title,
+        createdAt: s.createdAt.toISOString(),
+      }))}
+      availableYears={years}
+      entryCountsByYear={Object.fromEntries(countsByYear)}
+    />
+  );
 }

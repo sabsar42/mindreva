@@ -10,6 +10,7 @@ import {
   toast,
   type RecordButtonState,
 } from "@mindreva/ui";
+import { queueTranscriptionWatch } from "@/lib/transcription-watch";
 
 const SOFT_WARNING_MS = 5 * 60 * 1000;
 const HARD_STOP_MS = 10 * 60 * 1000;
@@ -159,7 +160,14 @@ export function RecordFlow() {
         if (!res.ok) throw new Error("Upload failed");
         const data = (await res.json()) as { entryId: string };
         setUploadFailed(false);
-        router.push(`/entries/${data.entryId}/review`);
+        // The upload response returns as soon as the audio is stored and the
+        // entry exists — transcription runs in the background from here on
+        // (see createVoiceEntry's after() call). Don't make the user wait on
+        // a review screen for it: go straight home, and queue this entry for
+        // the journal list's own background poll to toast once it's done.
+        queueTranscriptionWatch(data.entryId);
+        toast.success("Recording saved — transcribing in the background…");
+        router.push("/journal");
       } catch {
         setUploadFailed(true);
         toast.error("Couldn't upload your recording. You can retry below.");

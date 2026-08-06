@@ -21,6 +21,23 @@ export {
   type MatchedEntry,
 } from "./repositories/embeddings.repository";
 export { ChatRepository } from "./repositories/chat.repository";
+export {
+  MindmapRepository,
+  membershipKey,
+  type ClusterWithEntries,
+  type ComputedCluster,
+  type EmbeddedEntry,
+} from "./repositories/mindmap.repository";
+// Pure clustering math (no Drizzle) used by the mindmap service. Exported here
+// rather than from a separate package because it's defined entirely in terms
+// of this package's EmbeddedEntry shape.
+export {
+  clusterCountFor,
+  cosineSimilarity,
+  kMeansCluster,
+  mostRepresentative,
+  type ClusterAssignment,
+} from "./lib/cluster";
 
 export type {
   Profile,
@@ -43,6 +60,10 @@ export type {
   NewChatSession,
   ChatMessage,
   NewChatMessage,
+  MindmapCluster,
+  NewMindmapCluster,
+  MindmapClusterEntry,
+  NewMindmapClusterEntry,
   EntryType,
   EntrySource,
   TranscriptStatus,

@@ -13,6 +13,7 @@ import {
   TranscriptsRepository,
 } from "@mindreva/database";
 import { stripFormatting } from "@mindreva/types";
+import { recomputeMindmapForUser } from "./mindmap.service";
 
 const MAX_TITLE_LENGTH = 120;
 
@@ -91,6 +92,7 @@ export async function summarizeEntry(
   // Embed for Phase 6's past-self retrieval. Never blocks a successful
   // summary — a failed embed just means this entry won't surface in chat
   // until the next successful summarize/regenerate.
+  let embeddingWritten = false;
   try {
     const embedInput = entry?.title
       ? `${entry.title}\n\n${confirmedText}`
@@ -102,7 +104,21 @@ export async function summarizeEntry(
       chunkText: confirmedText,
       embedding,
     });
+    embeddingWritten = true;
   } catch (err) {
     console.error(`Embedding failed for entry ${entryId}:`, err);
+  }
+
+  // Refresh the mindmap now that this entry has a vector to cluster on. Only
+  // worth doing if the embedding actually landed — without it the entry can't
+  // participate in clustering, so a recompute would produce the same map at
+  // the cost of a full relabel. Failure is non-fatal for the same reason as
+  // above: the next summarize retries, and a stale map still renders.
+  if (embeddingWritten) {
+    try {
+      await recomputeMindmapForUser(userId);
+    } catch (err) {
+      console.error(`Mindmap recompute failed for user ${userId}:`, err);
+    }
   }
 }

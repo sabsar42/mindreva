@@ -3,16 +3,36 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, History } from "lucide-react";
-import { Button, Card, Input, Logo, OptionCard, toast } from "@mindreva/ui";
-import type { ChatSession } from "@mindreva/database";
+import { ArrowLeft, ArrowRight, History } from "lucide-react";
+import { Button, Input, cn, toast } from "@mindreva/ui";
+
+interface SessionSummary {
+  id: string;
+  title: string | null;
+  createdAt: string;
+}
+
+function relativeDate(iso: string): string {
+  const then = new Date(iso);
+  const days = Math.floor((Date.now() - then.getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return then.toLocaleDateString(undefined, {
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export function ChatHome({
   sessions,
   availableYears,
+  entryCountsByYear,
 }: {
-  sessions: ChatSession[];
+  sessions: SessionSummary[];
   availableYears: number[];
+  entryCountsByYear: Record<number, number>;
 }) {
   const router = useRouter();
   const [selectedYear, setSelectedYear] = React.useState<number | null>(
@@ -36,7 +56,7 @@ export function ChatHome({
         body: JSON.stringify({ yearStart, yearEnd }),
       });
       if (!res.ok) throw new Error("Failed to start");
-      const data = (await res.json()) as { session: ChatSession };
+      const data = (await res.json()) as { session: { id: string } };
       router.push(`/chat/${data.session.id}`);
     } catch {
       toast.error("Couldn't start a new chat. Please try again.");
@@ -58,8 +78,12 @@ export function ChatHome({
     }
   }
 
+  const selectedCount = selectedYear
+    ? (entryCountsByYear[selectedYear] ?? 0)
+    : 0;
+
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 py-6">
+    <main className="mx-auto min-h-screen max-w-md px-5 pb-24 pt-6">
       <header className="flex items-center gap-3">
         <Link
           href="/journal"
@@ -68,96 +92,165 @@ export function ChatHome({
         >
           <ArrowLeft className="size-5" />
         </Link>
-        <Logo size="sm" />
       </header>
 
-      <h1 className="text-foreground mt-4 text-2xl font-bold tracking-tight">
+      <h1 className="text-foreground mt-4 font-serif text-3xl font-bold leading-tight tracking-tight">
         Chat with your past self
       </h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        Pick a year and ask what you were thinking, grounded only in what you
-        actually wrote.
+      <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+        Pick a period and ask what you were thinking. Every answer is grounded
+        only in what you actually wrote.
       </p>
 
       {availableYears.length === 0 ? (
-        <Card className="mt-6 p-5 text-center">
-          <p className="text-muted-foreground text-sm">
-            You don&apos;t have any journal entries yet. Record or write a few,
-            then come back to chat with your past self.
+        <div className="border-border bg-card mt-8 rounded-lg border p-6 text-center">
+          <History className="text-muted-foreground mx-auto size-6" />
+          <p className="text-foreground mt-3 text-sm font-medium">
+            Nothing to look back on yet
           </p>
-        </Card>
-      ) : (
-        <div className="mt-6 space-y-3">
-          <div className="space-y-2.5" role="radiogroup">
-            {availableYears.map((year) => (
-              <OptionCard
-                key={year}
-                title={String(year)}
-                selected={!customRange && selectedYear === year}
-                onSelect={() => {
-                  setCustomRange(false);
-                  setSelectedYear(year);
-                }}
-              />
-            ))}
-            <OptionCard
-              title="Custom range"
-              description={
-                customRange ? undefined : "Pick your own start and end year"
-              }
-              selected={customRange}
-              onSelect={() => setCustomRange(true)}
-            />
-          </div>
-
-          {customRange && (
-            <div className="border-border bg-card flex items-center gap-3 rounded-lg border p-4">
-              <Input
-                type="number"
-                value={rangeStart}
-                onChange={(e) => setRangeStart(e.target.value)}
-                className="text-center"
-                aria-label="Start year"
-              />
-              <span className="text-muted-foreground">to</span>
-              <Input
-                type="number"
-                value={rangeEnd}
-                onChange={(e) => setRangeEnd(e.target.value)}
-                className="text-center"
-                aria-label="End year"
-              />
-            </div>
-          )}
-
-          <Button
-            className="w-full"
-            onClick={handleStart}
-            disabled={starting || (!customRange && !selectedYear)}
-          >
-            {starting ? "Starting…" : "Start chat"}
+          <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+            Record or write a few entries, and they&apos;ll show up here as
+            periods you can talk to.
+          </p>
+          <Button asChild variant="secondary" className="mt-4">
+            <Link href="/record">Record your first entry</Link>
           </Button>
         </div>
-      )}
+      ) : (
+        <>
+          <section className="mt-7">
+            <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+              Choose a period
+            </h2>
 
-      {sessions.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-            Past conversations
-          </h2>
-          <div className="mt-3 space-y-2">
-            {sessions.map((s) => (
-              <Link key={s.id} href={`/chat/${s.id}`}>
-                <Card className="hover:shadow-elevated flex items-center gap-3 p-4 transition-shadow">
-                  <History className="text-primary size-5 shrink-0" />
-                  <span className="text-foreground font-serif text-lg font-semibold">
-                    {s.title}
-                  </span>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
+            {/* A compact grid rather than stacked full-width cards: with several
+                years the old list ran past the fold before reaching the button,
+                and the entry count per year is the thing that actually informs
+                the choice. */}
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {availableYears.map((year) => {
+                const count = entryCountsByYear[year] ?? 0;
+                const isSelected = !customRange && selectedYear === year;
+                return (
+                  <button
+                    key={year}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      setCustomRange(false);
+                      setSelectedYear(year);
+                    }}
+                    className={cn(
+                      "focus-visible:ring-ring flex flex-col items-center gap-0.5 rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2",
+                      isSelected
+                        ? "border-primary bg-accent text-accent-foreground"
+                        : "border-border bg-card text-foreground hover:bg-warm-50",
+                    )}
+                  >
+                    <span className="font-serif text-xl font-bold leading-none">
+                      {year}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[11px] leading-none",
+                        isSelected
+                          ? "text-accent-foreground/70"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {count} {count === 1 ? "entry" : "entries"}
+                    </span>
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                aria-pressed={customRange}
+                onClick={() => setCustomRange(true)}
+                className={cn(
+                  "focus-visible:ring-ring flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2",
+                  customRange
+                    ? "border-primary bg-accent text-accent-foreground"
+                    : "border-border bg-card text-muted-foreground hover:bg-warm-50",
+                )}
+              >
+                <span className="text-sm font-medium leading-tight">
+                  Custom
+                </span>
+                <span className="text-[11px] leading-none">range</span>
+              </button>
+            </div>
+
+            {customRange && (
+              <div className="border-border bg-card mt-2 flex items-center gap-3 rounded-lg border p-4">
+                <Input
+                  type="number"
+                  value={rangeStart}
+                  onChange={(e) => setRangeStart(e.target.value)}
+                  className="text-center"
+                  aria-label="Start year"
+                />
+                <span className="text-muted-foreground text-sm">to</span>
+                <Input
+                  type="number"
+                  value={rangeEnd}
+                  onChange={(e) => setRangeEnd(e.target.value)}
+                  className="text-center"
+                  aria-label="End year"
+                />
+              </div>
+            )}
+
+            {!customRange && selectedYear !== null && selectedCount < 5 && (
+              <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                {selectedCount === 0
+                  ? `There's nothing written from ${selectedYear} yet — you can still ask, but there won't be much to draw on.`
+                  : `Only ${selectedCount} ${selectedCount === 1 ? "entry" : "entries"} from ${selectedYear}, so there may not be much to go on.`}
+              </p>
+            )}
+
+            <Button
+              className="mt-4 w-full"
+              size="lg"
+              onClick={handleStart}
+              disabled={starting || (!customRange && !selectedYear)}
+            >
+              {starting ? "Starting…" : "Start chat"}
+              {!starting && <ArrowRight className="size-4" />}
+            </Button>
+          </section>
+
+          {sessions.length > 0 && (
+            <section className="mt-9">
+              <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                Past conversations
+              </h2>
+              <div className="mt-3 space-y-2">
+                {sessions.map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/chat/${s.id}`}
+                    className="border-border bg-card hover:bg-warm-50 flex items-center gap-3 rounded-lg border p-3.5 transition-colors"
+                  >
+                    <span className="bg-accent flex size-9 shrink-0 items-center justify-center rounded-full">
+                      <History className="text-primary size-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="text-foreground block font-serif text-lg font-semibold leading-tight">
+                        {s.title ?? "Chat"}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {relativeDate(s.createdAt)}
+                      </span>
+                    </span>
+                    <ArrowRight className="text-muted-foreground size-4 shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </main>
   );

@@ -1,0 +1,87 @@
+name: CI
+
+# Runs on every PR and on pushes to main: install, lint, typecheck, test, build
+# — in that order, failing fast, so a broken change never reaches a deploy.
+# See docs/roadmap.md Phase 7.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same PR cancels the previous run rather than queueing
+# behind it — the older result is already stale by then.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Turborepo prints a hyperlinked TUI locally; CI wants plain output.
+      TURBO_TELEMETRY_DISABLED: 1
+      DO_NOT_TRACK: 1
+      # Placeholder values so `next build` is deterministic in CI.
+      #
+      # These are NOT secrets and must never be real ones: NEXT_PUBLIC_* values
+      # are inlined into the client bundle at build time, so a real key here
+      # would be baked into every CI artifact. CI only proves the app COMPILES;
+      # the real values are injected by the deploy platform at its own build
+      # time. Nothing built here is ever deployed.
+      #
+      # DATABASE_URL is deliberately absent: getDb() is lazy (see
+      # packages/database/src/client.ts), so a build that never opens a
+      # connection must not need one. If a build ever starts failing without
+      # it, that's a real regression worth knowing about, not something to
+      # paper over by adding a dummy value here.
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Must come before setup-node: `cache: pnpm` needs pnpm on PATH to
+      # resolve the store path. Version comes from package.json's
+      # packageManager field, so it can't drift from local development.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Turborepo's local cache. Keyed by commit SHA so each run writes a
+      # fresh entry, with restore-keys falling back to the most recent cache
+      # on this branch, then any branch — unchanged packages replay instead of
+      # re-running.
+      - name: Restore Turborepo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ github.ref_name }}-
+            turbo-${{ runner.os }}-
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Integration tests that need real Supabase credentials self-skip when
+      # they're absent (see apps/web/lib/services/transcription.service.test.ts
+      # — describe.skipIf on missing env). That means this step currently
+      # proves very little; it's wired up so it starts protecting the repo the
+      # moment real tests land. Tracked in docs/KNOWN-ISSUES.md.
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

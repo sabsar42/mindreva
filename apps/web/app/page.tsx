@@ -1,31 +1,58 @@
 import Link from "next/link";
-import { Button, Logo } from "@mindreva/ui";
+import { ArrowRight } from "lucide-react";
+import { LeafMark } from "@mindreva/ui";
 
-// Placeholder landing page (Phase 2). Intentionally minimal — to be redesigned
-// once the real app is live. See docs/roadmap.md, Phase 2.
+// First-run landing screen. Organic blob-and-mascot layout (see the design
+// discussion in docs/CHANGELOG.md's 2026-08-04 entry) rebuilt with
+// Mindreva's own brand mark and dark-mint/warm palette instead of borrowing
+// another app's colors or characters.
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-8 px-6 py-16 text-center">
-      <Logo size="lg" />
+    <main className="relative flex min-h-screen flex-col items-center overflow-hidden px-6 py-12 text-center">
+      <div
+        aria-hidden
+        className="bg-mint-100 absolute -left-24 -top-24 size-72 rounded-full blur-2xl"
+      />
+      <div
+        aria-hidden
+        className="bg-mint-100 absolute -bottom-32 -right-20 size-80 rounded-full blur-2xl"
+      />
 
-      <p className="text-muted-foreground text-balance text-lg leading-relaxed">
-        Tap the leaf, Mindreva listens, and the conversation is kept as a
-        readable note — in English, বাংলা, اردو, and more.
-      </p>
+      <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-10">
+        <span className="text-foreground font-serif text-2xl font-bold tracking-tight">
+          Mindreva
+        </span>
 
-      <div className="flex w-full flex-col gap-3">
-        <Button asChild size="lg" className="w-full">
-          <Link href="/sign-up">Get started</Link>
-        </Button>
-        <Button asChild variant="ghost" size="lg" className="w-full">
-          <Link href="/sign-in">I already have an account</Link>
-        </Button>
+        <div className="bg-mint-50 flex size-56 items-center justify-center rounded-full">
+          <LeafMark className="text-primary size-32" />
+        </div>
+
+        <div className="flex flex-col items-center gap-3">
+          <h1 className="text-foreground text-balance font-serif text-3xl font-bold leading-tight tracking-tight">
+            Say it once, keep it forever
+          </h1>
+          <p className="text-muted-foreground text-balance leading-relaxed">
+            Talk it out and Mindreva turns it into a readable journal entry — in
+            English, বাংলা, اردو, and more.
+          </p>
+        </div>
       </div>
 
-      <p className="text-muted-foreground text-xs">
-        Recording works best in the Mindreva mobile app — the web can&apos;t
-        record with the screen locked.
-      </p>
+      <div className="relative flex w-full max-w-md flex-col gap-3">
+        <Link
+          href="/sign-up"
+          className="bg-primary text-primary-foreground shadow-elevated flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-semibold transition-transform active:scale-95"
+        >
+          Continue
+          <ArrowRight className="size-5" />
+        </Link>
+        <Link
+          href="/sign-in"
+          className="text-foreground py-2 text-sm font-medium"
+        >
+          I already have an account
+        </Link>
+      </div>
     </main>
   );
 }

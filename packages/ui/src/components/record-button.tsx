@@ -20,14 +20,22 @@ export interface RecordButtonProps extends Omit<
 
 const sizeMap = {
   md: "size-16",
-  lg: "size-20",
+  lg: "size-24",
+} as const;
+
+const iconSizeMap = {
+  md: "size-9",
+  lg: "size-14",
 } as const;
 
 /**
- * The core voice-capture control. Its appearance and affordance change with
- * state: a green leaf to start, a calm spinner while the mic warms up or the
- * transcript processes, a pulsing stop while recording, a resume glyph when
- * paused. `preparing` and `processing` are non-interactive.
+ * The core voice-capture control. No circular chrome — it's the logo itself
+ * at a large tappable size, with a generous invisible hit area so it still
+ * behaves like a button without looking like one. Its appearance changes
+ * with state: primary-colored leaf to start, a pulsing leaf while recording,
+ * a calm spinner while the mic warms up or the transcript processes, a
+ * resume glyph when paused. `preparing` and `processing` are
+ * non-interactive.
  */
 const RecordButton = React.forwardRef<HTMLButtonElement, RecordButtonProps>(
   (
@@ -51,7 +59,7 @@ const RecordButton = React.forwardRef<HTMLButtonElement, RecordButtonProps>(
           {isRecording && (
             <span
               aria-hidden
-              className="bg-primary animate-mic-pulse absolute inset-0 rounded-full"
+              className="bg-primary/20 animate-mic-pulse absolute inset-0 rounded-full"
             />
           )}
           <button
@@ -62,21 +70,24 @@ const RecordButton = React.forwardRef<HTMLButtonElement, RecordButtonProps>(
             className={cn(
               "focus-visible:ring-ring focus-visible:ring-offset-background relative flex items-center justify-center rounded-full transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 disabled:cursor-default",
               sizeMap[size],
-              state === "idle" &&
-                "bg-primary text-primary-foreground shadow-elevated hover:scale-105 active:scale-95",
-              isRecording &&
-                "bg-primary text-primary-foreground shadow-elevated active:scale-95",
-              state === "paused" &&
-                "bg-primary text-primary-foreground shadow-elevated hover:scale-105 active:scale-95",
-              busy && "border-border bg-card text-primary shadow-subtle border",
+              (state === "idle" || state === "paused") &&
+                "text-primary hover:scale-105 active:scale-95",
+              isRecording && "text-primary active:scale-95",
+              busy && "text-muted-foreground",
               className,
             )}
             {...props}
           >
-            {state === "idle" && <LeafMark className="size-7" />}
-            {isRecording && <Square className="size-7 fill-current" />}
-            {state === "paused" && <Play className="size-7 fill-current" />}
-            {busy && <Loader2 className="size-7 animate-spin" />}
+            {state === "idle" && <LeafMark className={iconSizeMap[size]} />}
+            {isRecording && (
+              <LeafMark className={cn(iconSizeMap[size], "animate-pulse")} />
+            )}
+            {state === "paused" && (
+              <Play className={cn(iconSizeMap[size], "fill-current")} />
+            )}
+            {busy && (
+              <Loader2 className={cn(iconSizeMap[size], "animate-spin")} />
+            )}
           </button>
         </div>
         {(label ?? defaultLabel[state]) && (

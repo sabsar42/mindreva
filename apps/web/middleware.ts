@@ -11,6 +11,7 @@ const PROTECTED_PREFIXES = [
   "/trash",
   "/chat",
   "/entries",
+  "/mindmap",
 ];
 const ONBOARDING_PREFIX = "/onboarding";
 

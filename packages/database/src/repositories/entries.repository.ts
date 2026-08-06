@@ -238,6 +238,74 @@ export const EntriesRepository = {
     return rows[0]?.count ?? 0;
   },
 
+  /**
+   * Distinct entry_dates inside an inclusive range — the persona chat's
+   * monthly timeline needs to know which months of the selected period the
+   * user actually wrote in. Matches listEntryDatesForUser's filters (active
+   * entries only) so the two never disagree about what "has an entry" means.
+   */
+  async listEntryDatesInRange(
+    userId: string,
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<string[]> {
+    const rows = await getDb()
+      .selectDistinct({ entryDate: entries.entryDate })
+      .from(entries)
+      .where(
+        and(
+          eq(entries.userId, userId),
+          isNull(entries.deletedAt),
+          isNull(entries.archivedAt),
+          isNotNull(entries.entryDate),
+          gte(entries.entryDate, dateFrom),
+          lte(entries.entryDate, dateTo),
+        ),
+      );
+    return rows.map((r) => r.entryDate!).filter(Boolean);
+  },
+
+  /**
+   * The earliest active entry in a range, with its transcript text — the
+   * persona chat opens the conversation with this entry's real first line
+   * rather than a fabricated greeting, so the opening must come from actual
+   * stored text. Ordered by entry_date (then createdAt to break same-day
+   * ties deterministically).
+   */
+  async getEarliestInRange(
+    userId: string,
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<{
+    id: string;
+    entryDate: string | null;
+    title: string | null;
+    text: string | null;
+  } | null> {
+    const rows = await getDb()
+      .select({
+        id: entries.id,
+        entryDate: entries.entryDate,
+        title: entries.title,
+        text: snippetExpr,
+      })
+      .from(entries)
+      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
+      .where(
+        and(
+          eq(entries.userId, userId),
+          isNull(entries.deletedAt),
+          isNull(entries.archivedAt),
+          isNotNull(entries.entryDate),
+          gte(entries.entryDate, dateFrom),
+          lte(entries.entryDate, dateTo),
+        ),
+      )
+      .orderBy(entries.entryDate, entries.createdAt)
+      .limit(1);
+    return rows[0] ?? null;
+  },
+
   async update(
     id: string,
     userId: string,

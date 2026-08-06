@@ -9,6 +9,9 @@ node_modules/
 
 # next.js
 .next/
+
+# typescript incremental build info
+*.tsbuildinfo
 out/
 
 # turborepo

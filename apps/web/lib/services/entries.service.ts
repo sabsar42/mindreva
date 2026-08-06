@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import {
   EntriesRepository,
   EntryPhotosRepository,
@@ -60,7 +61,25 @@ export async function listMyEntries(options?: {
   return attachThumbnails(entries, userId);
 }
 
-/** entry_date of every active entry, for the calendar's dot indicators. */
+/** entry_date of every active entry, for the calendar's dot indicators.
+ * Derived from an already-fetched entries list rather than a separate DB
+ * round trip — `listMyEntries({ type })` already excludes archived entries
+ * the same way this used to, so the date set is identical. Prefer this over
+ * `listMyEntryDates` whenever the caller is already fetching entries
+ * (journal/notes list pages); use `listMyEntryDates` only when dates are the
+ * *only* thing needed (e.g. the chat screen's "which years have entries"). */
+export function entryDatesFrom(
+  entries: { entryDate: string | null }[],
+): string[] {
+  return Array.from(
+    new Set(entries.map((e) => e.entryDate).filter((d): d is string => !!d)),
+  );
+}
+
+/** entry_date of every active entry, for callers that don't already have a
+ * full entries list to derive dates from (e.g. chat/page.tsx's "available
+ * years" — it never fetches entries otherwise, so a dedicated query is
+ * cheaper than fetching every entry just to read its date). */
 export async function listMyEntryDates(type?: EntryType): Promise<string[]> {
   const userId = await requireUserId();
   return EntriesRepository.listEntryDatesForUser(userId, type);
@@ -321,18 +340,28 @@ export async function createVoiceEntry(input: {
     mimeType: input.mimeType,
   });
 
-  try {
-    await transcribeEntry(entry.id, user.id);
-  } catch {
-    // transcribeEntry already persisted status='failed'; the review screen
-    // will surface it. Entry creation itself still succeeded.
-  }
+  // Transcription is a real ASR API call and can take several seconds for a
+  // longer recording — the upload response shouldn't block on it. The
+  // recording screen returns the user home as soon as this resolves and
+  // polls the entry's transcript status client-side, toasting once it's
+  // done (see record-flow.tsx). transcribeEntry persists status='failed'
+  // itself on error, so a background failure is still visible to the user.
+  after(async () => {
+    try {
+      await transcribeEntry(entry.id, user.id);
+    } catch (err) {
+      console.error(`Background transcribe failed for entry ${entry.id}:`, err);
+    }
+  });
 
   return { entryId: entry.id };
 }
 
-/** The typed-note write path (source='text'). Confirmed immediately — the
- * user wrote and submitted the final text, so summarization runs right away. */
+/** The typed-note write path (source='text'). The entry is created and
+ * returned immediately — summarization (an LLM call) runs in the background
+ * after the response via after(), so "Save note" isn't blocked on it. The
+ * detail screen shows no summary yet with "Generate" available if the user
+ * lands on it before the background job finishes. */
 export async function createTextEntry(input: {
   text: string;
   type?: EntryType;
@@ -347,12 +376,13 @@ export async function createTextEntry(input: {
     text,
   });
 
-  try {
-    await summarizeEntry(entry.id, userId);
-  } catch {
-    // Summarization failure shouldn't fail entry creation; the detail screen
-    // will simply show no summary yet, with "Regenerate" available.
-  }
+  after(async () => {
+    try {
+      await summarizeEntry(entry.id, userId);
+    } catch (err) {
+      console.error(`Background summarize failed for entry ${entry.id}:`, err);
+    }
+  });
 
   return { entryId: entry.id };
 }
@@ -390,11 +420,20 @@ export async function saveMyTranscriptEdit(
   );
   if (!updated) return null;
 
-  try {
-    await summarizeEntry(entryId, userId);
-  } catch {
-    // Same reasoning as createTextEntry: don't fail the save.
-  }
+  // Re-summarizing runs an LLM call that can take several seconds — saving
+  // the user's edited text should never block on that. Respond with the
+  // text write confirmed and the PREVIOUS summary/tasks immediately, and
+  // run summarization after the response is sent via next/server's after().
+  // The client polls briefly afterward to pick up the fresh result (same
+  // pattern already used for transcript-processing status).
+  after(async () => {
+    try {
+      await summarizeEntry(entryId, userId);
+    } catch (err) {
+      console.error(`Background summarize failed for entry ${entryId}:`, err);
+    }
+  });
+
   const [summary, tasks] = await Promise.all([
     SummariesRepository.getByEntry(entryId, userId),
     EntryTasksRepository.listByEntry(entryId, userId),
@@ -415,6 +454,21 @@ export async function summarizeMyEntry(entryId: string): Promise<{
 }> {
   const userId = await requireUserId();
   await summarizeEntry(entryId, userId);
+  const [summary, tasks] = await Promise.all([
+    SummariesRepository.getByEntry(entryId, userId),
+    EntryTasksRepository.listByEntry(entryId, userId),
+  ]);
+  return { summary, tasks };
+}
+
+/** Read-only current summary + tasks, without triggering summarization —
+ * used by the entry detail page's short poll after a save, to pick up a
+ * background re-summarize's result (see saveMyTranscriptEdit's after()). */
+export async function getMySummaryAndTasks(entryId: string): Promise<{
+  summary: Summary | null;
+  tasks: EntryTask[];
+}> {
+  const userId = await requireUserId();
   const [summary, tasks] = await Promise.all([
     SummariesRepository.getByEntry(entryId, userId),
     EntryTasksRepository.listByEntry(entryId, userId),

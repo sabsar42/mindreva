@@ -35,3 +35,153 @@ change (`LLM_PROVIDER=gemini`), not a code change.
   project.
 - Or contact Google Cloud support directly, per the error message's own
   suggestion.
+
+---
+
+## New logo/landing-page/RecordButton visuals not independently verified in a browser
+
+**Status:** Open.
+
+**What's wrong:** The 2026-08-04 logo/RecordButton/landing-page redesign
+(see docs/CHANGELOG.md) was verified via `sharp`-rasterized PNGs (for the
+traced logo's legibility at various sizes), `tsc`/`eslint`/`next build`,
+and `curl` against a real production server for the landing page's SSR
+output — but no browser screenshot tool was available in this environment,
+so none of it has been visually confirmed by a human or automated
+screenshot at the actual pixel/layout level (blob placement, spacing,
+RecordButton hit-area feel on a real touch device).
+
+**Current workaround:** None needed unless a manual check turns up a real
+issue — flagging so this isn't silently assumed correct.
+
+**To revisit when there's time to chase it:** open the app in a real
+browser (`pnpm dev`, visit `/`, `/record`) and confirm the landing page
+layout and RecordButton states look and feel right, especially on an
+actual phone screen per this same phase's own "test the palette in
+daylight, not just your dev monitor" guidance.
+
+---
+
+## Persona chat's new visuals not independently verified in a browser
+
+**Status:** Open.
+
+**What's wrong:** The 2026-08-06 persona chat character pass (see
+docs/CHANGELOG.md) was verified through the real LLM, the real streaming
+protocol, an 8-case opening-line check, a live end-to-end run, and build
+output — but not visually. The monthly timeline dots, the progress bar
+toward 5 entries, the softer `text-muted-foreground italic` treatment on
+"I don't have a journal entry…" replies, and the three loading messages
+rotating in sequence have not been seen rendered.
+
+**Current workaround:** None needed unless a manual check turns up an
+issue — flagging so it isn't silently assumed correct.
+
+**To revisit when there's time to chase it:** open a chat session in a
+real browser against both a sparse date range (to see the timeline and
+progress bar) and a well-populated one (to see the grounded opening line),
+and send a question the entries can't answer (to see the softened
+no-record styling).
+
+---
+
+## CI's test step is near-vacuous (placeholder tests + self-skipping suite)
+
+**Status:** Open. The pipeline is correct; the tests behind it aren't there yet.
+
+**What's wrong:** `.github/workflows/ci.yml` runs `pnpm test`, but five of the
+seven workspace packages define `"test": "echo \"no tests yet\" && exit 0"`,
+and the only real suite
+(`apps/web/lib/services/transcription.service.test.ts`) wraps everything in
+`describe.skipIf(missingEnv.length > 0)` against `DATABASE_URL`,
+`SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` — none of which are set in CI.
+So the test step reliably goes green while asserting almost nothing.
+
+**Current workaround:** None. The step is wired up deliberately so real tests
+start being enforced the moment they exist, rather than having to remember to
+add the step later. Lint, typecheck and build in the same workflow do provide
+real signal today.
+
+**To revisit when there's time to chase it:** either add unit tests that need
+no credentials (the clustering math in `packages/database/src/lib/cluster.ts`
+and `parseThemeLabel`/`stripFormatting` are pure functions and obvious first
+candidates), or give CI a dedicated throwaway Supabase project so the
+integration suite actually runs — which overlaps with the Preview/Production
+project-separation decision.
+
+---
+
+## Preview/staging and Production share one Supabase project
+
+**Status:** Open. A deliberate deferral, not an oversight.
+
+**What's wrong:** A repo-wide audit found exactly one Supabase project ref
+(`mvzjqlddkkdwjphcrjsk`) across `DATABASE_URL`, `SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_URL`, and no staging-specific env file or naming
+convention (`.env.example` declares one flat, unprefixed set of names).
+Environment separation is therefore entirely a function of what values the
+deploy platform injects — nothing in the code selects between environments.
+docs/roadmap.md's own Phase 7 checklist says **"never point Preview at the
+same Supabase project as Production"** once real user data exists.
+
+The sharper risk is writes, not reads: `packages/database/drizzle.config.ts`
+resolves `DATABASE_URL` from the same unprefixed name, so a staging
+environment that runs migrations would alter production schema. The same
+applies to `db:rls-check`, which creates and deletes throwaway users.
+
+**Current workaround:** None. Acceptable only while there's no real user data.
+
+**To revisit when there's time to chase it:** provision a second Supabase
+project for Preview, apply all migrations to it, re-run `db:rls-check`
+against it, and set the Preview environment's variables separately in the
+deploy platform.
+
+---
+
+## OpenRouter free tier's 50-requests-per-day cap is easy to exhaust
+
+**Status:** Open. An account/plan limit, not a code defect.
+
+**What's wrong:** `LLM_PROVIDER=openrouter` (the standing temporary default,
+see the Gemini entry above) is on the free tier, which allows 50 model
+requests per day. Every entry costs at least one call to summarize, and the
+Phase 6.7 mindmap adds a theme-labeling call per new or changed cluster. A
+session of testing with a handful of entries can hit the cap, after which
+`summarizeEntry` fails with
+`429 Rate limit exceeded: free-models-per-day` and, because embeddings are
+generated inside that same flow, no new entries become chat- or
+mindmap-eligible until the daily reset.
+
+**Current workaround:** Failures degrade gracefully rather than breaking
+anything — summarization logs and leaves the entry intact, theme labeling
+falls back to a generic "Other" that a later recompute retries, and the
+mindmap keeps rendering whatever was last computed. The cap resets daily.
+Mindmap label reuse (added in the same phase) keeps steady-state cost to
+roughly one call per genuinely-new cluster rather than a full relabel per
+entry.
+
+**To revisit when there's time to chase it:** add credits to the OpenRouter
+account to raise the cap, or resolve the Gemini account issue above and
+switch back via the one-line `LLM_PROVIDER` change. Verifying anything
+LLM-dependent is worth doing early in a session, before the day's quota is
+spent.
+
+---
+
+## Mindmap visuals not independently verified in a browser
+
+**Status:** Open.
+
+**What's wrong:** The Phase 6.7 mindmap (see docs/CHANGELOG.md) was verified
+through a two-user RLS script, 19 clustering-correctness checks, an
+end-to-end run against the real LLM, and build output — but not visually.
+The SVG node layout, the mint tints, the area-proportional node sizing, the
+gentle fade-in on newly-formed clusters, and the cluster bottom sheet have
+not been seen rendered.
+
+**Current workaround:** None needed unless a manual check turns up an issue.
+
+**To revisit when there's time to chase it:** open `/mindmap` in a real
+browser for an account with entries across at least two months, tap a node
+to confirm the sheet lists its entries, and add a new entry on a fresh topic
+to watch a new node fade in on the next visit.

@@ -34,27 +34,50 @@ export async function POST(
     return NextResponse.json({ error: "Invalid question" }, { status: 400 });
   }
 
-  try {
-    const { reply, citedEntries } = await sendPersonaChatMessage(
-      sessionId,
-      question.trim(),
-    );
-    return NextResponse.json({
-      reply: {
-        id: reply.id,
-        content: reply.content,
-        createdAt: reply.createdAt,
-      },
-      citedEntries,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Something went wrong";
-    // The message-cap error is meant to be shown to the user verbatim; other
-    // failures get a generic message.
-    const isCapError = message.includes("message limit");
-    return NextResponse.json(
-      { error: isCapError ? message : "Failed to send message" },
-      { status: isCapError ? 429 : 500 },
-    );
-  }
+  // Streamed as newline-delimited JSON so the client can show which pipeline
+  // step is genuinely running (embedding -> retrieving -> generating) rather
+  // than a timed fake sequence. Each line is one event: {stage} while work is
+  // in progress, then a final {reply, citedEntries} or {error}.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: unknown) => {
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      };
+      try {
+        const { reply, citedEntries } = await sendPersonaChatMessage(
+          sessionId,
+          question.trim(),
+          (stage) => send({ stage }),
+        );
+        send({
+          reply: {
+            id: reply.id,
+            content: reply.content,
+            createdAt: reply.createdAt,
+          },
+          citedEntries,
+        });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Something went wrong";
+        // The message-cap error is meant to be shown to the user verbatim;
+        // other failures get a generic message.
+        send({
+          error: message.includes("message limit")
+            ? message
+            : "Failed to send message",
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-store",
+    },
+  });
 }

@@ -15,6 +15,7 @@ import {
   Badge,
   Button,
   PhotoUploader,
+  PhotoThumbnailStrip,
   TaskChecklist,
   toast,
   type PhotoUploaderPhoto,
@@ -82,6 +83,12 @@ export function EntryDetail({
     React.useState<PhotoUploaderPhoto[]>(initialPhotos);
   const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
   const [tasks, setTasks] = React.useState<TaskChecklistTask[]>(initialTasks);
+  // True while a save's background re-summarize (kicked off via
+  // next/server's after()) is still in flight — the save itself already
+  // completed and returned, this just tracks whether the summary/tasks the
+  // save response returned are the stale pre-edit ones.
+  const [summarizingInBackground, setSummarizingInBackground] =
+    React.useState(false);
 
   const dateLabel = entryDate
     ? new Date(`${entryDate}T00:00:00`).toLocaleDateString(undefined, {
@@ -121,23 +128,54 @@ export function EntryDetail({
         body: JSON.stringify({ editedText: text }),
       });
       if (!res.ok) throw new Error("Save failed");
-      const data = (await res.json()) as {
-        summary: { summaryText: string; provider: string | null } | null;
-        tasks: TaskChecklistTask[];
-      };
+      // The route responds as soon as the text write lands — it does NOT
+      // wait for re-summarization (that runs after the response, via
+      // next/server's after()). Clear dirty state and confirm the save
+      // immediately; the summary/tasks in this response are still the
+      // pre-edit ones, so kick off a short poll to pick up the fresh
+      // result once it's ready, same idiom as the transcript-status poll.
       setTextDirty(false);
-      if (data.summary) {
-        setSummary(data.summary.summaryText);
-        setProvider(data.summary.provider);
-      }
-      setTasks(data.tasks);
       toast.success("Saved");
+      setSummarizingInBackground(true);
     } catch {
       toast.error("Couldn't save. Please try again.");
     } finally {
       setSavingText(false);
     }
   }
+
+  // Polls briefly after a save to pick up the background re-summarize's
+  // result. Stops on its own once the summary/tasks actually change, or
+  // after a reasonable ceiling so a failed background job doesn't poll
+  // forever.
+  React.useEffect(() => {
+    if (!summarizingInBackground) return;
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts += 1;
+      try {
+        const res = await fetch(`/api/entries/${entryId}/summary`);
+        if (res.ok) {
+          const data = (await res.json()) as {
+            summary: { summaryText: string; provider: string | null } | null;
+            tasks: TaskChecklistTask[];
+          };
+          if (data.summary?.summaryText !== summary) {
+            setSummary(data.summary?.summaryText ?? null);
+            setProvider(data.summary?.provider ?? null);
+            setTasks(data.tasks);
+            setSummarizingInBackground(false);
+            return;
+          }
+        }
+      } catch {
+        // Keep polling; a single failed check isn't fatal.
+      }
+      if (attempts >= 10) setSummarizingInBackground(false);
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summarizingInBackground, entryId]);
 
   async function regenerateSummary() {
     setRegenerating(true);
@@ -216,19 +254,34 @@ export function EntryDetail({
   async function handlePhotosSelected(files: File[]) {
     setUploadingPhoto(true);
     try {
-      for (const file of files) {
-        const form = new FormData();
-        form.set("image", file);
-        const res = await fetch(`/api/entries/${entryId}/photos`, {
-          method: "POST",
-          body: form,
-        });
-        if (!res.ok) throw new Error("Upload failed");
-        const data = (await res.json()) as { photo: PhotoUploaderPhoto };
-        setPhotos((prev) => [...prev, data.photo]);
+      // Uploads run in parallel, not one-at-a-time — picking several photos
+      // used to take N times as long as picking one; each upload is fully
+      // independent, so there's no reason to serialize them.
+      const results = await Promise.allSettled(
+        files.map(async (file) => {
+          const form = new FormData();
+          form.set("image", file);
+          const res = await fetch(`/api/entries/${entryId}/photos`, {
+            method: "POST",
+            body: form,
+          });
+          if (!res.ok) throw new Error("Upload failed");
+          const data = (await res.json()) as { photo: PhotoUploaderPhoto };
+          return data.photo;
+        }),
+      );
+      const uploaded = results
+        .filter(
+          (r): r is PromiseFulfilledResult<PhotoUploaderPhoto> =>
+            r.status === "fulfilled",
+        )
+        .map((r) => r.value);
+      if (uploaded.length > 0) {
+        setPhotos((prev) => [...prev, ...uploaded]);
       }
-    } catch {
-      toast.error("Couldn't upload that photo. Please try again.");
+      if (uploaded.length < files.length) {
+        toast.error("Couldn't upload one or more photos. Please try again.");
+      }
     } finally {
       setUploadingPhoto(false);
     }
@@ -284,8 +337,14 @@ export function EntryDetail({
       </h1>
 
       <div className="mt-3 flex items-center justify-between">
-        <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+        <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
           Summary
+          {summarizingInBackground && (
+            <span className="text-muted-foreground/70 flex items-center gap-1 normal-case tracking-normal">
+              <Loader2 className="size-3 animate-spin" />
+              updating…
+            </span>
+          )}
         </p>
         <Button
           variant="ghost"
@@ -331,14 +390,6 @@ export function EntryDetail({
       )}
 
       <div className="mt-5">
-        <PhotoUploader
-          photos={photos}
-          onFilesSelected={(files) => void handlePhotosSelected(files)}
-          uploading={uploadingPhoto}
-        />
-      </div>
-
-      <div className="mt-5">
         {textDirty && (
           <div className="mb-2 flex justify-end">
             <Button size="sm" onClick={saveText} disabled={savingText}>
@@ -357,15 +408,27 @@ export function EntryDetail({
             This recording couldn&apos;t be transcribed.
           </p>
         ) : (
-          <RichTextEditor
-            value={text}
-            onChange={(value) => {
-              setText(value);
-              setTextDirty(true);
-            }}
-            placeholder={type === "journal" ? "Your transcript…" : "Your note…"}
-            textareaClassName="min-h-48"
-          />
+          <>
+            <RichTextEditor
+              value={text}
+              onChange={(value) => {
+                setText(value);
+                setTextDirty(true);
+              }}
+              placeholder={
+                type === "journal" ? "Your transcript…" : "Your note…"
+              }
+              textareaClassName="min-h-48"
+              toolbarEnd={
+                <PhotoUploader
+                  photos={photos}
+                  onFilesSelected={(files) => void handlePhotosSelected(files)}
+                  uploading={uploadingPhoto}
+                />
+              }
+            />
+            <PhotoThumbnailStrip photos={photos} className="mt-3" />
+          </>
         )}
       </div>
     </main>

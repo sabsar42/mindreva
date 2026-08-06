@@ -377,6 +377,10 @@ Theme: dark mint, white, clean, minimal, premium. Look at the reference screensh
 Keep everything in packages/ui. apps/web should only ever import from '@mindreva/ui', never redefine styles locally.
 ```
 
+### Post-launch update (2026-08-04)
+
+The placeholder leaf icon (a hand-authored simple path) used through the phases above has been replaced everywhere with the real brand mark. Source artwork (`packages/ui/src/assets/logo.png`) was a hand-drawn leaf-with-spiral; the accompanying `logo.svg` supplied alongside it turned out to be an unusable bitmap trace (~19,740 characters, ~757 near-pixel path segments), so it was re-traced with `potrace` into a clean single path (~1,900 characters) at the source artwork's native proportions. `LeafMark`/`Logo` (`packages/ui/src/components/logo.tsx`) now render that path via `currentColor`, unchanged contract from before. `RecordButton` (`packages/ui/src/components/record-button.tsx`) had its circular bordered chrome removed for the idle/recording states — it's now the logo itself at a larger tappable size (`size-24`/`size-9`-`size-14` icon), color/pulse-animation signaling state instead of a background circle; `paused`/`processing` keep distinct Play/Loader2 glyphs since those states need unambiguous meaning a color change alone can't carry. `apps/web/app/favicon.ico` was regenerated from the same traced mark at 16/32/48px. Verified legible from 16px up through the large record-button target — no muddiness at small sizes. The placeholder landing page from item 8 above was also redesigned with the new mark: organic mint blob-shape background accents, the leaf mark large and centered, a serif headline, and a pill-shaped primary CTA.
+
 ---
 
 ## Phase 3: Database, Auth & Backend Foundations
@@ -1036,6 +1040,17 @@ Continuing in the mindreva monorepo. Build the "chat with past self" feature.
 The date-range hard filter in matchEntries must run before, not instead of, the vector similarity ranking. This is a hard requirement.
 ```
 
+### Post-launch update (2026-08-06): conversation character pass
+
+The retrieval and grounding machinery above shipped and held. This pass was about how the conversation actually _feels_, not how it retrieves.
+
+- **Prompt bumped to `persona-chat-v2`** (`packages/llm/src/prompts/persona-chat.prompt.ts`), restructured into explicit VOICE and GROUNDING sections. The grounding rules are unchanged in substance; the voice spec is new: speak as the person (not an assistant describing them), let tone/vocabulary/mood be shaped by the excerpts rather than flattened into one generic warm register, short human sentences.
+- Two voice failures were found by running the real provider against fixtures and fixed by tightening the prompt, not by post-processing: the model was slipping into **second person** ("your brother's wedding") and **narrating its own source material** ("The entries I have reference…"), then appending an inventory of what it _did_ have after an honest "I don't have…". Both are now explicitly forbidden, and the no-record reply is specified as the bare sentence alone.
+- **`NO_RECORD_REPLY` is now an exported constant**, so the prompt and the UI's softer styling for those replies match on the same string and can't drift apart. Imported into the client component via a new `@mindreva/llm/persona-chat-prompt` subpath export — _not_ the package barrel, which re-exports `getLLMProvider` and would drag the Anthropic/Google/Groq SDKs into the browser bundle.
+- **Loading states are tied to the real pipeline**, not a timer. `sendPersonaChatMessage` takes an `onStage` callback fired as each step actually begins (`embedding` → `retrieving` → `generating`), and the messages route streams these as newline-delimited JSON ahead of the final reply.
+- **Empty state rebuilt** as `RangeContextPanel`: a 12-dot monthly timeline for single-year sessions (filled where that month has an entry) plus a progress bar toward a suggested 5 entries. Encouragement, not a gate — the composer stays enabled at any count.
+- **Sessions with entries open on real text.** `getSessionRangeContext` pulls the earliest in-range entry's actual first line (Markdown stripped, sentence-bounded, capped at 180 chars) as the opening message, with a citation chip to its source. It returns null rather than inventing an opening when there's no real text to use.
+
 ---
 
 ## Phase 6.5: Photo Attachments for Entries
@@ -1246,6 +1261,95 @@ apps/web/
 
 ---
 
+## Phase 6.7: Mindmap View (Theme Clustering)
+
+**Objective:** turn the embeddings already generated in Phase 6 into a visual map of what the user actually writes about, clustered by theme and by month, so patterns are visible at a glance rather than only reachable by asking a question.
+
+**Priority:** P2 (a second read on data that already exists — nothing else depends on it)
+**Estimated time:** 2-3 days
+**Dependencies:** Phase 6 (needs entry embeddings)
+
+### Architecture diagram
+
+```mermaid
+flowchart TD
+    SUM["summarizeEntry (Phase 5)"] --> EMB["embed + store vector"]
+    EMB --> RECOMP["recomputeMindmapForUser<br/>(background, after embedding lands)"]
+    RECOMP --> GROUP["group entries by month"]
+    GROUP --> KM["k-means per month<br/>(cosine, deterministic seeding)"]
+    KM --> REUSE{"membership<br/>unchanged?"}
+    REUSE -- yes --> KEEP["reuse stored label<br/>(no LLM call)"]
+    REUSE -- no --> LLM["LLMProvider.complete<br/>-> short theme label"]
+    KEEP --> STORE[("mindmap_clusters<br/>+ mindmap_cluster_entries")]
+    LLM --> STORE
+    STORE --> UI["/mindmap — plain read, no compute on load"]
+```
+
+### Why precomputed, not a force simulation
+
+The map is a periodic snapshot, refreshed when an entry is summarized, and stored. Three consequences worth stating explicitly, because they're the difference between this being a calm feature and a heavy one:
+
+- **Opening `/mindmap` is a plain DB read.** No clustering, no LLM calls, no physics loop on page load.
+- **Node positions are deterministic** (months as columns, clusters stacked within a month). A stable layout means the map looks the same each time you open it, which is what makes "watching your own history grow" legible — a force simulation would reshuffle everything on every visit.
+- **Clustering is deterministic too.** k-means seeding starts from a fixed element and then repeatedly picks the furthest point, rather than seeding randomly. Random seeding would reshuffle a user's themes on every recompute even when nothing meaningful changed.
+
+### Visual direction
+
+- **Colors come from the app's own dark mint scale** (`--color-mint-200` through `--color-mint-700`), not a generic categorical palette. A theme keeps its shade across refreshes because the tint index is derived from a hash of the label, not from whatever position it landed in this pass.
+- **New nodes fade in gently** (`--animate-node-emerge`, 1.4s ease-out) rather than popping in. "New" means the cluster's `first_seen_at` is later than the last time this device opened the map. Revisiting after a few months should feel like watching history accumulate, not like a dashboard refreshing.
+- **Node size is area-proportional** to entry count, so a cluster with 4x the entries doesn't read as 4x as wide.
+- **Links between nodes** are drawn where two clusters share an entry — the same writing feeding two themes is exactly the relationship worth seeing.
+
+### Folder structure added this phase
+
+```
+packages/database/src/
+├── lib/cluster.ts                        # pure k-means/cosine math, no Drizzle
+└── repositories/mindmap.repository.ts
+
+packages/llm/src/prompts/
+└── theme-label.prompt.ts                 # versioned, same pattern as the other prompts
+
+apps/web/
+├── app/(protected)/mindmap/
+│   ├── page.tsx                          # plain read of the precomputed map
+│   ├── loading.tsx
+│   ├── mindmap-screen.tsx                # client shell + cluster bottom sheet
+│   └── mindmap-graph.tsx                 # the SVG node graph
+├── app/api/mindmap/
+│   ├── route.ts
+│   └── clusters/[clusterId]/route.ts
+└── lib/services/mindmap.service.ts
+```
+
+### Task checklist
+
+- [x] `mindmap_clusters` + `mindmap_cluster_entries` tables, with RLS on both (migrations 0008/0009)
+- [x] Pure clustering math in `packages/database/src/lib/cluster.ts` — cosine similarity, deterministic k-means, `mostRepresentative` for label sampling
+- [x] Versioned theme-label prompt constrained to 1-3 words, subject-matter not emotion, never diagnostic
+- [x] `recomputeMindmapForUser` wired into `summarizeEntry`, gated on the embedding actually landing
+- [x] Label reuse keyed on exact cluster membership, so unchanged clusters cost no LLM call
+- [x] SVG node graph with mint tints, area-proportional nodes, shared-entry links, and fade-in for new nodes
+- [x] Cluster bottom sheet listing the entries inside a node, each linking to its detail screen
+- [x] Two-user RLS script proving isolation on both new tables
+
+### Common mistakes
+
+- **Recomputing on page load.** The whole point of storing this is that opening the map is free. A recompute is an LLM-cost operation; it belongs in the background job, never in a page render.
+- **Relabeling every cluster on every recompute.** Every new entry triggers a recompute, so labeling unconditionally means N clusters × every entry ever added. This hit a real `429 free-models-per-day` during development. Reuse the stored label whenever a cluster's exact membership is unchanged — but never reuse the failure fallback (`"Other"`), or one transient rate-limit leaves a node permanently misnamed.
+- **Random k-means seeding.** Non-deterministic clustering makes a user's themes reshuffle on every refresh, which destroys the sense that the map reflects something stable about them.
+- **Letting a failed label break the map.** A labeling failure should degrade one node to a generic name, not throw away the whole recompute.
+- **Animating every node on every visit.** Only genuinely-new clusters should fade in. Animating all of them turns a quiet map into a distracting one.
+
+### Best practices
+
+- Keep the clustering math pure and free of Drizzle/LLM imports — it's the part most worth testing directly, and it stays cheap to re-run.
+- Derive the node's tint from a hash of its label so a theme's color is stable across recomputes, independent of iteration order.
+- Store `first_seen_at` and carry it across recomputes for unchanged label+month pairs; it's what lets the UI distinguish "new" from "existing" without a separate diffing pass.
+- Gate the recompute on the embedding write succeeding. Without a vector, the entry can't participate in clustering, so recomputing would produce an identical map at the cost of a full relabel.
+
+---
+
 ## Phase 7: CI/CD & Free-Tier Deployment
 
 **Objective:** automated checks on every PR, safe preview deployments, a live production app on Vercel Hobby, and just enough observability to know when something breaks.
@@ -1281,10 +1385,14 @@ flowchart LR
 DEPLOYMENT.md
 ```
 
+### Prerequisite fixed here (was blocking staging)
+
+The repo had **no root `start` script** and `turbo.json` defined no `start` task, so a host running `pnpm start` at the root found nothing and fell back to `pnpm dev` — i.e. staging was serving `next dev`, with on-demand route compilation, unminified per-file chunks and a live HMR socket. That, not application code, was the dominant cause of the slow preview environment. Added `"start": "pnpm --filter @mindreva/web start"` at the root, which delegates to `apps/web`'s existing `next start`.
+
 ### Task checklist
 
-- [ ] Write `.github/workflows/ci.yml`: on every PR, run install, lint, typecheck, test, and build via Turborepo, in that order, failing fast
-- [ ] Cache the pnpm store and Turborepo remote cache between CI runs to keep pipeline time low
+- [x] Write `.github/workflows/ci.yml`: on every PR, run install, lint, typecheck, test, and build via Turborepo, in that order, failing fast
+- [x] Cache the pnpm store and Turborepo remote cache between CI runs to keep pipeline time low — pnpm store via `setup-node`'s `cache: pnpm`, Turborepo via `actions/cache` on `.turbo` (local cache; **remote** cache still needs a Vercel token if you want cross-runner reuse)
 - [ ] Confirm Vercel's automatic PR preview deployments are enabled (should already work from the Phase 1 connection)
 - [ ] Set environment variables separately for Preview and Production in the Vercel dashboard; **never point Preview at the same Supabase project as Production** once real user data exists
 - [ ] Add branch protection on `main`: require the CI workflow to pass before merge

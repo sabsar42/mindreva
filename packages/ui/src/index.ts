@@ -70,8 +70,10 @@ export {
 export { OptionCard, type OptionCardProps } from "./components/option-card";
 export {
   PhotoUploader,
+  PhotoThumbnailStrip,
   type PhotoUploaderPhoto,
   type PhotoUploaderProps,
+  type PhotoThumbnailStripProps,
 } from "./components/photo-uploader";
 // RichTextEditor is deliberately NOT re-exported here. It's the one
 // component in this package that pulls in Lexical's full dependency tree

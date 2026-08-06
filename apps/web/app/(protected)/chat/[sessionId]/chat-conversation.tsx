@@ -4,14 +4,44 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Send } from "lucide-react";
-import { Button, Input, toast } from "@mindreva/ui";
+import { Button, Input, cn, toast } from "@mindreva/ui";
+// Imported via the direct subpath, NOT the "@mindreva/llm" barrel: the barrel
+// re-exports getLLMProvider, which pulls the Anthropic/Google/Groq SDKs into
+// whatever bundle imports it. This is a client component, so that would ship
+// all three to the browser (the same barrel-leak mistake documented twice in
+// docs/CHANGELOG.md for @mindreva/ui's Lexical export).
+import { NO_RECORD_REPLY } from "@mindreva/llm/persona-chat-prompt";
 import type { ChatRole } from "@mindreva/database";
+import { RangeContextPanel } from "./range-context-panel";
 
 interface Message {
   id: string;
   role: ChatRole;
   content: string;
   citedEntryIds: string[];
+}
+
+/** The real pipeline steps, mirrored from persona-chat.service.ts. */
+type Stage = "embedding" | "retrieving" | "generating";
+
+/**
+ * Warm copy tied to what's genuinely happening in the pipeline — the server
+ * streams each stage as it actually begins, so these aren't on a timer.
+ */
+const STAGE_COPY: Record<Stage, string> = {
+  embedding: "Listening for what you're asking…",
+  retrieving: "Flipping back through the pages…",
+  generating: "Finding the words you used back then…",
+};
+
+/**
+ * A reply that honestly reports having nothing for this period gets a softer
+ * treatment than a normal reply — it's a gentle answer, not an error. Matched
+ * against the exact sentence the prompt instructs the model to use
+ * (NO_RECORD_REPLY), so prompt and UI can't drift apart.
+ */
+function isNoRecordReply(content: string): boolean {
+  return content.trim().toLowerCase().includes(NO_RECORD_REPLY.toLowerCase());
 }
 
 function shortDateLabel(dateKey: string | null | undefined): string {
@@ -47,6 +77,12 @@ function CitationChips({
   );
 }
 
+export interface OpeningLine {
+  entryId: string;
+  entryDate: string | null;
+  text: string;
+}
+
 export function ChatConversation({
   sessionId,
   title,
@@ -55,6 +91,10 @@ export function ChatConversation({
   initialMessages,
   initialEntryDates,
   entryCountInRange,
+  suggestedMinEntries,
+  monthsWithEntries,
+  isSingleYear,
+  openingLine,
 }: {
   sessionId: string;
   title: string;
@@ -63,6 +103,10 @@ export function ChatConversation({
   initialMessages: Message[];
   initialEntryDates: Record<string, string | null>;
   entryCountInRange: number;
+  suggestedMinEntries: number;
+  monthsWithEntries: number[];
+  isSingleYear: boolean;
+  openingLine: OpeningLine | null;
 }) {
   const router = useRouter();
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
@@ -70,6 +114,7 @@ export function ChatConversation({
     React.useState<Record<string, string | null>>(initialEntryDates);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const [stage, setStage] = React.useState<Stage | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   const rangeLabel =
@@ -79,7 +124,7 @@ export function ChatConversation({
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, stage]);
 
   async function handleSend() {
     const question = input.trim();
@@ -101,30 +146,51 @@ export function ChatConversation({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to send");
+      if (!res.ok || !res.body) throw new Error("Failed to send");
 
-      const citedEntryIds = (
-        data.citedEntries as { entryId: string; entryDate: string | null }[]
-      ).map((c) => c.entryId);
+      // Newline-delimited JSON: a {stage} event as each real pipeline step
+      // begins, then a final {reply, citedEntries} or {error}.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let final: {
+        reply?: { id: string; content: string };
+        citedEntries?: { entryId: string; entryDate: string | null }[];
+        error?: string;
+      } | null = null;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.stage) setStage(event.stage as Stage);
+          else final = event;
+        }
+      }
+
+      if (!final || final.error || !final.reply) {
+        throw new Error(final?.error ?? "Failed to send");
+      }
+      const { reply, citedEntries = [] } = final;
+
       setEntryDates((prev) => {
         const next = { ...prev };
-        for (const c of data.citedEntries as {
-          entryId: string;
-          entryDate: string | null;
-        }[]) {
-          next[c.entryId] = c.entryDate;
-        }
+        for (const c of citedEntries) next[c.entryId] = c.entryDate;
         return next;
       });
 
       setMessages((prev) => [
         ...prev,
         {
-          id: data.reply.id,
+          id: reply.id,
           role: "assistant",
-          content: data.reply.content,
-          citedEntryIds,
+          content: reply.content,
+          citedEntryIds: citedEntries.map((c) => c.entryId),
         },
       ]);
     } catch (err) {
@@ -133,6 +199,7 @@ export function ChatConversation({
       setInput(question);
     } finally {
       setSending(false);
+      setStage(null);
     }
   }
 
@@ -155,15 +222,32 @@ export function ChatConversation({
         </div>
       </header>
 
-      {entryCountInRange < 3 && (
-        <div className="border-warning/30 bg-warning/10 text-foreground mt-4 rounded-lg border p-3.5 text-sm">
-          {entryCountInRange === 0
-            ? `There are no entries from this period, so I won't have anything to go on yet.`
-            : `There ${entryCountInRange === 1 ? "is only 1 entry" : `are only ${entryCountInRange} entries`} from this period, so I might not have much to go on yet.`}
-        </div>
+      {entryCountInRange < suggestedMinEntries && (
+        <RangeContextPanel
+          entryCount={entryCountInRange}
+          suggestedMin={suggestedMinEntries}
+          monthsWithEntries={monthsWithEntries}
+          isSingleYear={isSingleYear}
+          year={yearStart}
+        />
       )}
 
       <div className="mt-4 flex-1 space-y-4 overflow-y-auto pb-4">
+        {/* Opens with something the user actually wrote, so the conversation
+            starts from real text rather than a blank box or an invented
+            greeting. Only shown before the first exchange. */}
+        {openingLine && messages.length === 0 && (
+          <div className="flex flex-col items-start">
+            <p className="text-foreground max-w-[90%] font-serif text-base leading-relaxed">
+              {openingLine.text}
+            </p>
+            <CitationChips
+              entryIds={[openingLine.entryId]}
+              entryDates={{ [openingLine.entryId]: openingLine.entryDate }}
+            />
+          </div>
+        )}
+
         {messages.map((m) =>
           m.role === "user" ? (
             <div key={m.id} className="flex justify-end">
@@ -173,7 +257,16 @@ export function ChatConversation({
             </div>
           ) : (
             <div key={m.id} className="flex flex-col items-start">
-              <p className="text-foreground max-w-[90%] font-serif text-base leading-relaxed">
+              <p
+                className={cn(
+                  "max-w-[90%] font-serif text-base leading-relaxed",
+                  // An honest "nothing written about that" is a gentle
+                  // answer, not an error — softer than a normal reply.
+                  isNoRecordReply(m.content)
+                    ? "text-muted-foreground italic"
+                    : "text-foreground",
+                )}
+              >
                 {m.content}
               </p>
               <CitationChips
@@ -183,6 +276,16 @@ export function ChatConversation({
             </div>
           ),
         )}
+
+        {stage && (
+          <p
+            aria-live="polite"
+            className="text-muted-foreground animate-pulse text-sm italic"
+          >
+            {STAGE_COPY[stage]}
+          </p>
+        )}
+
         <div ref={bottomRef} />
       </div>
 

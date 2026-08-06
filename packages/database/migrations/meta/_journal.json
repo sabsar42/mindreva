@@ -57,6 +57,20 @@
       "when": 1785068257399,
       "tag": "0007_entry_tasks_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786012738811,
+      "tag": "0008_real_valeria_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786012738812,
+      "tag": "0009_mindmap_rls",
+      "breakpoints": true
     }
   ]
 }

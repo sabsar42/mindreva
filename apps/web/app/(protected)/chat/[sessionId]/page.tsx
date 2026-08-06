@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import {
-  countEntriesInSessionRange,
   getMyChatSession,
+  getSessionRangeContext,
   listMyChatMessages,
+  SUGGESTED_MIN_ENTRIES,
 } from "@/lib/services/persona-chat.service";
 import { getMyEntryDatesByIds } from "@/lib/services/entries.service";
 import { ChatConversation } from "./chat-conversation";
@@ -16,9 +17,9 @@ export default async function ChatSessionPage({
   const session = await getMyChatSession(sessionId);
   if (!session) notFound();
 
-  const [messages, entryCount] = await Promise.all([
+  const [messages, rangeContext] = await Promise.all([
     listMyChatMessages(sessionId),
-    countEntriesInSessionRange(sessionId),
+    getSessionRangeContext(sessionId),
   ]);
 
   const allCitedIds = [
@@ -43,7 +44,11 @@ export default async function ChatSessionPage({
         citedEntryIds: m.citedEntryIds?.split(",").filter(Boolean) ?? [],
       }))}
       initialEntryDates={entryDates}
-      entryCountInRange={entryCount}
+      entryCountInRange={rangeContext.entryCount}
+      suggestedMinEntries={SUGGESTED_MIN_ENTRIES}
+      monthsWithEntries={rangeContext.monthsWithEntries}
+      isSingleYear={rangeContext.isSingleYear}
+      openingLine={rangeContext.openingLine}
     />
   );
 }

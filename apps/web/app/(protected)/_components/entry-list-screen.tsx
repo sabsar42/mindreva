@@ -3,7 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Settings, History, Trash2, Archive } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Settings,
+  History,
+  Network,
+  Trash2,
+  Archive,
+} from "lucide-react";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -25,6 +33,7 @@ import {
 } from "@mindreva/ui";
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
+import { TranscriptionWatcher } from "./transcription-watcher";
 
 type FilterValue = "all" | "today" | "week" | "date";
 
@@ -71,7 +80,6 @@ export function EntryListScreen({
   heading,
   entries,
   entryDates,
-  dayThumbnails,
   newEntryHref,
   showChatLink,
   floatingAction,
@@ -80,8 +88,6 @@ export function EntryListScreen({
   heading: string;
   entries: EntryListItemWithThumbnail[];
   entryDates: string[];
-  /** Signed cover-photo URL per "YYYY-MM-DD", for the calendar day cells. */
-  dayThumbnails: Record<string, string>;
   /** Notes gets a "+" compose button; journal doesn't (recording is separate). */
   newEntryHref?: string;
   /** Journal's entry point into "chat with past self". */
@@ -102,6 +108,27 @@ export function EntryListScreen({
   const [confirmTrashId, setConfirmTrashId] = React.useState<string | null>(
     null,
   );
+  // Fetched lazily, only once the date-picker sheet is actually opened for
+  // the first time — the calendar's day-cell cover photos are a real
+  // Supabase Storage round trip, and the sheet is closed by default, so
+  // there's no reason to pay that cost on every list-screen navigation.
+  const [dayThumbnails, setDayThumbnails] = React.useState<
+    Record<string, string>
+  >({});
+  const dayThumbnailsLoadedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!datePickerOpen || dayThumbnailsLoadedRef.current) return;
+    dayThumbnailsLoadedRef.current = true;
+    void fetch(`/api/entries/day-thumbnails?type=${type}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { dayThumbnails: Record<string, string> } | null) => {
+        if (data) setDayThumbnails(data.dayThumbnails);
+      })
+      .catch(() => {
+        // Non-fatal — the calendar just falls back to plain dot indicators.
+      });
+  }, [datePickerOpen, type]);
 
   // Keep local state in sync when the server re-provides entries (e.g. after
   // router.refresh()) — otherwise a swipe-removed row could reappear stale.
@@ -205,6 +232,7 @@ export function EntryListScreen({
 
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 pb-24 pt-6">
+      <TranscriptionWatcher />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
@@ -223,13 +251,22 @@ export function EntryListScreen({
             </Link>
           )}
           {showChatLink && (
-            <Link
-              href="/chat"
-              aria-label="Chat with your past self"
-              className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
-            >
-              <History className="size-5" />
-            </Link>
+            <>
+              <Link
+                href="/mindmap"
+                aria-label="Your mindmap"
+                className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
+              >
+                <Network className="size-5" />
+              </Link>
+              <Link
+                href="/chat"
+                aria-label="Chat with your past self"
+                className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
+              >
+                <History className="size-5" />
+              </Link>
+            </>
           )}
           <Link
             href="/account"

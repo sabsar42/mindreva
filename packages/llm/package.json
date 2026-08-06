@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./persona-chat-prompt": "./src/prompts/persona-chat.prompt.ts"
   },
   "scripts": {
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "echo \"no tests yet\" && exit 0"
   },
   "dependencies": {
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@mindreva/config": "workspace:*",
+    "@types/node": "^20",
     "eslint": "^9",
     "typescript": "^5"
   }

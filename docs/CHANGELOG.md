@@ -7,6 +7,459 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-08-07 — Phase 7 (partial): root `start` script and CI pipeline
+
+Prompted by a slow deployed preview environment. A DevTools capture on
+`/journal` showed `turbopack_browser_dev_hmr_client`, a pending `webpack-hmr`
+WebSocket, and unminified per-file chunks (`apps_web_app_layout_tsx_*.js`) —
+all signatures `next build && next start` cannot produce. Diagnosis first, in
+a separate report; this entry is the fix for the two low-risk, deploy-target-
+independent items.
+
+### Fixed
+
+- **The repo had no root `start` script**, and `turbo.json` defined no `start`
+  task — so a host running `pnpm start` at the root found nothing to run and
+  fell back to `pnpm dev`, serving `next dev` in staging. Added
+  `"start": "pnpm --filter @mindreva/web start"` ([package.json](../package.json)),
+  delegating to `apps/web`'s existing `next start`. Deliberately bypasses Turbo:
+  there is no `start` task to run, and adding one would buy nothing.
+- **Three packages declared `"types": ["node"]` in tsconfig without depending
+  on `@types/node`** (`packages/asr`, `packages/database`, `packages/llm`).
+  This never surfaced because those files were only ever typechecked
+  transitively through `apps/web`'s program, which does have it. Standalone
+  typechecking is new here, so the gap is newly visible — added `@types/node`
+  to all three. Found by running the new task before wiring CI around it,
+  which is exactly why that ordering matters.
+
+### Added
+
+- **`typecheck` task**, which the Phase 7 checklist assumed existed but didn't:
+  `"typecheck": "tsc --noEmit"` in all seven packages that have a tsconfig
+  (everything except `packages/config`), a matching `turbo.json` task, and a
+  root passthrough.
+- **`.github/workflows/ci.yml`** — on every PR and push to `main`: install →
+  lint → typecheck → test → build, failing fast. pnpm store cached via
+  `setup-node`'s `cache: pnpm`; Turborepo's local cache via `actions/cache` on
+  `.turbo` with SHA-keyed entries and branch-then-global restore keys. Node
+  pinned from `.nvmrc` (24.16.0), pnpm from `packageManager` (10.33.0), so
+  neither can drift from local development. `concurrency` cancels superseded
+  runs on the same ref.
+
+### Verified
+
+- **The root `start` script actually serves a production build.** Ran
+  `pnpm build && pnpm start` against a clean `.next`: `next start` came up in
+  1010ms and returned 200 in 124ms. The served HTML contains **zero**
+  dev-mode signatures (grepped for `hmr`, `turbopack_browser_dev`,
+  `webpack-hmr`, `_devtools`) and references content-hashed minified chunks
+  (`465c474e50ed7950.js`) rather than the `apps_web_app_layout_tsx_*.js`
+  pattern from the DevTools capture. That is the reported symptom, directly
+  disproven.
+- **The CI build works with no env file and only placeholder public vars** —
+  temporarily moved `apps/web/.env.local` aside (backed up and restored
+  byte-identical, verified with `cmp`) and rebuilt from scratch: exit 0. This
+  confirms the claim that `getDb()`'s laziness
+  ([packages/database/src/client.ts](../packages/database/src/client.ts)) means
+  a build that never opens a connection doesn't need `DATABASE_URL` — worth
+  proving rather than assuming, since it's the difference between CI passing
+  and failing on first push.
+- Every CI step run locally in order: lint 6/6, typecheck 7/7, test 6/6,
+  build clean. `pnpm install --frozen-lockfile` succeeds, so the added
+  dependencies are in the lockfile and CI won't fail on step one.
+
+### Deliberately not done
+
+- The remaining Phase 7 items are dashboard work (Vercel preview deploys,
+  Preview vs Production env vars, branch protection, Sentry, Analytics), the
+  live smoke test, and `DEPLOYMENT.md`. Left open pending the Supabase
+  project-separation decision below.
+- **Preview and Production still share one Supabase project**
+  (`mvzjqlddkkdwjphcrjsk` is the only project ref anywhere in the repo, and
+  there is no staging-specific env file or naming convention). The roadmap's
+  own guidance — _"never point Preview at the same Supabase project as
+  Production"_ — is unresolved and intentionally untouched here, since both
+  changes in this entry are independent of it.
+
+### Note on CI's test step
+
+`pnpm test` currently proves very little: five of seven packages are
+`echo "no tests yet"`, and the one real suite
+(`transcription.service.test.ts`) self-skips without real Supabase
+credentials. It's wired up so it starts protecting the repo the moment real
+tests land, but a green check today is close to vacuous. Logged in
+docs/KNOWN-ISSUES.md.
+
+## 2026-08-06 — Phase 6.7: Mindmap view, and a redesigned chat home
+
+### Added
+
+- **Mindmap view** (`/mindmap`), a new phase added to docs/roadmap.md as
+  Phase 6.7. Clusters the embeddings already generated in Phase 6 by theme and
+  by month, renders them as an SVG node graph, and opens the entries inside a
+  node when it's tapped.
+  - `mindmap_clusters` and `mindmap_cluster_entries` tables (migration 0008)
+    with RLS on both (migration 0009). Two different scoping shapes:
+    `mindmap_clusters` owns `user_id` so it scopes directly like
+    `chat_sessions`; `mindmap_cluster_entries` scopes through a join to its
+    parent cluster, the same pattern as `entry_photos`/`entry_tasks`. Both get
+    an explicit Data API grant since auto-exposure is off.
+  - `packages/database/src/lib/cluster.ts` — cosine similarity and k-means,
+    kept free of Drizzle and LLM imports so it's directly testable. Seeding is
+    deterministic (fixed first pick, then furthest-point) rather than random:
+    the map recomputes on every new entry, and random seeding would reshuffle a
+    user's themes on each refresh even when nothing changed.
+  - `theme-label.prompt.ts`, versioned like the other prompts. Constrained to
+    1-3 words naming the subject matter rather than the emotion ("Job hunting",
+    not "Anxiety about work"), and explicitly never diagnostic — the label is a
+    node on a map, not a claim about the person.
+  - `recomputeMindmapForUser` runs in the background after `summarizeEntry`,
+    gated on the embedding write actually succeeding. Opening `/mindmap` is a
+    plain DB read — no clustering or LLM calls on page load.
+- **`/api/mindmap`** and **`/api/mindmap/clusters/[clusterId]`**.
+- **`--animate-node-emerge`** token (1.4s ease-out) for new nodes.
+
+### Changed
+
+- **Chat home (`/chat`) redesigned.** Years were previously stacked as
+  full-width option cards, which pushed the start button past the fold once a
+  user had a few years of entries, and gave no sense of how much was in each
+  one. Now a compact 3-column grid where each year shows its entry count — the
+  thing that actually informs the choice. Past conversations gained a relative
+  timestamp and a clearer affordance, the empty state suggests recording a
+  first entry instead of dead-ending, and a low-entry-count warning appears
+  before starting rather than only after.
+- **Journal header** gained a mindmap entry point alongside the existing
+  past-self chat link.
+- **`/mindmap` added to the middleware's protected prefixes.**
+
+### Verified
+
+- **RLS on both new tables proven with a two-user script** (11 checks, all
+  pass): user B cannot read A's clusters by id or in a list, cannot read A's
+  membership rows, cannot insert into A's cluster, cannot create a cluster
+  owned by A, and cannot update or delete A's cluster — while A retains full
+  access to its own rows. Postgres rejected the write attempts with explicit
+  `new row violates row-level security policy` errors.
+- **Clustering math checked against inputs with a known-correct answer** (19
+  checks, all pass): cosine similarity identities and magnitude-invariance,
+  the zero-vector guard, cluster-count bounds, correct separation of two
+  obviously-distinct vector groups, determinism across repeated runs, and the
+  edge cases (empty input, single item, k larger than the item count, every
+  item assigned exactly once).
+- **Membership-key logic checked** (5 checks, all pass) — the key that decides
+  whether a label is reused is order-independent, month-sensitive, and changes
+  when a cluster gains a member.
+- **End-to-end against the real server, real Supabase and the real LLM**:
+  six entries on two clearly distinct topics (running, cooking) were clustered
+  into exactly those two groups with correct membership (4 and 2), real
+  generated labels ("Running", "Persistence"), tint indices inside the
+  palette, working cluster-detail responses, and a 404 when a second user
+  requested the same cluster.
+- `pnpm lint`, `tsc --noEmit`, and `next build --turbopack` pass. `/mindmap` is
+  190kB First Load JS, in line with the other routes.
+
+### Fixed during development
+
+- **Labels were being regenerated for every cluster on every recompute**, which
+  exhausted the OpenRouter free tier's 50-requests-per-day cap partway through
+  testing (a real `429 free-models-per-day`). Labels are now reused whenever a
+  cluster's exact entry membership is unchanged, so only genuinely-new or
+  changed clusters cost an LLM call. The failure fallback (`"Other"`) is
+  deliberately never reused, so one transient rate-limit doesn't leave a node
+  permanently misnamed.
+
+### Known limitation at time of writing
+
+- The final end-to-end re-run could not regenerate labels because the
+  OpenRouter free-tier daily quota was fully exhausted by that point —
+  summarization itself was returning 429, so no embeddings were produced and
+  the map was empty. This is an account quota limit, not a code defect:
+  confirmed by tracing every failure to `summarizeEntry`, upstream of
+  clustering, and the earlier run (before the quota ran out) had already
+  demonstrated correct clustering and real labels. Graceful degradation
+  behaved as designed throughout — failures logged, map left intact, no crash.
+
+### Not independently verified
+
+- The mindmap's actual in-browser appearance: node layout and sizing, the mint
+  tints, the fade-in on new nodes, and the cluster bottom sheet. No browser
+  screenshot tool was available; verified through the API responses, the
+  clustering checks, and build output only.
+
+## 2026-08-06 — Phase 6 follow-up: persona chat character, real-pipeline loading states, grounded empty state and opening line
+
+The Phase 6 retrieval and grounding logic (`matchEntries`, the date-range hard
+filter) was already correct and is untouched here. This pass is entirely about
+how the conversation feels.
+
+### Changed
+
+- Persona prompt bumped to `persona-chat-v2`
+  (`packages/llm/src/prompts/persona-chat.prompt.ts`), restructured into
+  explicit VOICE and GROUNDING sections. Grounding rules are unchanged in
+  substance. The voice spec is new: speak in first person as the person
+  themselves rather than an assistant describing them; let tone, vocabulary
+  and mood be shaped by the actual excerpts (anxious excerpts should sound
+  anxious, hopeful ones hopeful) instead of flattening into one generic warm
+  voice; short human sentences, no bullet points or preamble; plain prose with
+  no Markdown, since replies render as plain text.
+- `NO_RECORD_REPLY` exported as a shared constant. The prompt instructs the
+  model to use exactly that sentence, and the chat UI matches on the same
+  constant to give those replies a softer visual treatment
+  (`text-muted-foreground italic` rather than normal `text-foreground` serif)
+  — an honest, gentle answer, not an error state. Sharing the constant means
+  prompt and UI can't drift out of sync.
+- Loading states are now tied to what's genuinely happening.
+  `sendPersonaChatMessage` accepts an `onStage` callback fired as each real
+  pipeline step begins, and `POST /api/chat/[sessionId]/messages` streams
+  those as newline-delimited JSON before the final reply. The UI shows
+  "Listening for what you're asking…" (embedding), "Flipping back through the
+  pages…" (retrieving), "Finding the words you used back then…" (generating).
+  Not a timed fake sequence — measured gaps in a live run were 1.7s / 0.4s /
+  generation.
+- Empty state for sparse ranges rebuilt as `RangeContextPanel`: a 12-dot
+  monthly timeline for single-year sessions (a dot per month, filled where
+  that month has an entry) and a progress bar toward a suggested minimum of 5
+  entries. Deliberately encouragement rather than a gate — the composer stays
+  enabled at any entry count. Replaces the previous plain warning banner.
+- Sessions with at least one in-range entry now open with a real, grounded
+  first line instead of a blank input box. `getSessionRangeContext` pulls the
+  earliest in-range entry's actual first line (Markdown stripped via
+  `stripFormatting`, cut at a sentence boundary, capped at 180 chars) and
+  renders it as the past self's opening message with a citation chip to its
+  source entry. Returns null rather than fabricating an opening when there's
+  no real text.
+
+### Added
+
+- `EntriesRepository.listEntryDatesInRange` and
+  `EntriesRepository.getEarliestInRange` — the timeline dots and the opening
+  line respectively. Both match `listEntryDatesForUser`'s existing active-only
+  filters so "has an entry" means the same thing everywhere.
+- `@mindreva/llm/persona-chat-prompt` subpath export.
+
+### Removed
+
+- `countEntriesInSessionRange` — superseded by `getSessionRangeContext`, which
+  returns the count alongside the timeline and opening-line data in one pass.
+  Confirmed unused before deleting.
+
+### Verified
+
+- Ran the real provider (OpenRouter) against fixture excerpts in two
+  deliberately different emotional registers. Two genuine voice failures were
+  caught and fixed **in the prompt**, not worked around downstream: the model
+  was addressing the user in second person ("your brother's wedding") and
+  narrating its own source material ("The entries I have reference…"), then
+  following an honest "I don't have…" with an inventory of what it did have.
+  Both now explicitly forbidden; the no-record reply is specified as the bare
+  sentence alone. After the fix, eight checks pass: no cross-year fact
+  leakage, bare `NO_RECORD_REPLY` for uncovered/cross-year/empty-range
+  questions, no second-person address, no meta-references to excerpts as
+  documents, no clinical or therapy-advice language, first person throughout.
+- Qualitatively confirmed the voice does shape to the source rather than
+  flattening: the anxious fixture produced a clipped _"I was worried the
+  Kestrel migration cutover would fail on Friday and my name would be tied to
+  it."_, the hopeful one a warmer, more expansive reflection.
+- Opening-line extraction checked against 8 cases including Markdown
+  stripping, leading blank lines, title fallback, long-unpunctuated
+  truncation, and the "nothing real exists" case that must return null.
+- Full end-to-end run against the live dev server, real Supabase and the real
+  LLM: stages streamed in correct pipeline order, retrieval matched both
+  fixture entries, and the reply came back grounded and correctly cited.
+- `pnpm lint`, `tsc --noEmit`, and `next build --turbopack` all pass.
+  `/chat/[sessionId]` First Load JS is 190kB, ~1kB over its prior baseline —
+  confirming the client component's `NO_RECORD_REPLY` import did not drag the
+  provider SDKs into the browser bundle (the barrel-leak failure mode
+  documented twice below).
+
+### Not independently verified
+
+- The chat screen's actual in-browser appearance — the timeline dots, progress
+  bar, softer no-record styling, and the loading copy rotating in sequence.
+  No browser screenshot tool was available; verified through the streaming
+  protocol, bundle output, and build only. Worth a manual look.
+
+## 2026-08-04 — Phase 6.6 fix: eliminated both per-request auth round trips via local JWT verification
+
+Follow-up to the same day's earlier fix pass, which had reduced the
+duplicate-auth-check cost from two network round trips to... still two
+(React `cache()` only dedupes calls within a single request's render tree,
+not across the separate middleware/page request lifecycle boundary — see
+that entry's "Not fixed" section). This closes that gap properly instead of
+architecting around it.
+
+### Fixed
+
+- Discovered the Supabase project's JWT signing key is already asymmetric
+  (ES256/P-256, confirmed by decoding a real session's access token header),
+  not the legacy shared-secret algorithm (HS256) that requires a network
+  call to verify. `supabase.auth.getUser()` (used in both
+  `packages/auth/src/middleware.ts` and `packages/auth/src/server.ts`)
+  always makes that network round trip regardless of signing algorithm.
+  `supabase.auth.getClaims()` doesn't: it verifies the token's signature
+  locally against a JWKS public key fetched once and cached, and only falls
+  back to the old network call if it detects a legacy HS256-signed token —
+  so switching to it is safe regardless of the project's signing algorithm,
+  never slower than before, and faster the moment ES256 is active (which,
+  it turned out, it already was).
+- Both call sites switched to `getClaims()`: `updateSession()`
+  (`packages/auth/src/middleware.ts`) now returns `{ id: string } | null`
+  derived from `claims.sub` instead of the full Supabase `User` object, and
+  `getUser()` (`packages/auth/src/server.ts`, still wrapped in React
+  `cache()`) now returns a normalized `{ id, email } | null`. Confirmed by
+  grep that `.id` and `.email` are the only fields ever read from this
+  helper's result anywhere in the app (21 call sites, all through a handful
+  of `requireUserId()` wrappers or plain truthiness checks) — no call site
+  needed to change.
+
+### Verified
+
+- A throwaway authenticated smoke-test script (deleted after use) against a
+  real production build (`next build` + `next start`) confirms: authenticated
+  requests to `/journal` and `/notes` now land at **21-108ms** (down from
+  578-937ms before this fix — over a 5-10x reduction, since the auth check
+  was previously 2 of maybe 3 round trips on those routes), and an
+  unauthenticated request to a protected route now redirects in **5ms**
+  (previously required a network call just to determine there's no valid
+  session). `/account` and `/api/entries` still take 300ms-1s — confirmed
+  that's real DB query cost for those routes (profile lookup, entry counts),
+  not auth, now that auth itself is no longer the bottleneck.
+- Full monorepo `pnpm lint`, a direct `tsc --noEmit` on `packages/auth`, and
+  `next build --turbopack` all pass with no changes needed at any of the 21
+  consuming call sites.
+- Caught and fixed a bug in the smoke-test script itself during
+  verification, not in the shipped code: an early draft of the test
+  constructed the session cookie as a positional array
+  (`[access_token, refresh_token, null, null, null]`), which is not the
+  format `@supabase/ssr@0.12.3` actually uses (confirmed by reading its
+  installed `cookies.js` directly) — it expects the full JSON-serialized
+  `Session` object, base64url-encoded with a `base64-` prefix. The array
+  format silently produced "not authenticated" redirects that looked like a
+  real regression until traced to the test script, not `getClaims()` itself.
+
+### Not independently verified
+
+- The auth timing figures above were measured with `curl` against a
+  scripted test user, not through an actual signed-in session in a browser.
+  A real sign-in/sign-up flow through the UI has not been manually
+  re-confirmed after this change (though the underlying mechanism —
+  `getClaims()` falling back to the exact same `getUser()` behavior for any
+  non-ES256 token — makes a regression there unlikely).
+
+## 2026-08-04 — Phase 2 follow-up: real brand logo, chrome-free RecordButton, redesigned landing screen
+
+### Added / Changed
+
+- Replaced the placeholder `LeafMark`/`Logo` path (`packages/ui/src/components/logo.tsx`) with the real brand mark, traced from `packages/ui/src/assets/logo.png` via `potrace` after the accompanying `logo.svg` turned out to be an unusable ~19,740-character bitmap trace rather than clean vector artwork. The re-traced path is ~1,900 characters, a single `currentColor` path at the source's native 496x757 proportions — same component contract, no call-site changes needed anywhere it's already used (header/wordmark, chat, onboarding, sign-in/up layouts, `/dev/components` gallery).
+- `apps/web/app/favicon.ico` regenerated from the same traced mark at 16/32/48px.
+- `RecordButton` (`packages/ui/src/components/record-button.tsx`) rebuilt per direct request: the circular bordered chrome around the icon is gone for `idle`/`recording` states — it's now the logo itself at a larger tappable size (`size-24` outer / `size-9`-`size-14` icon depending on the `size` prop), with color and a pulse animation signaling state instead of a background circle and border. `paused` and `processing` keep their distinct `Play`/`Loader2` glyphs rather than also switching to the leaf, since those two states need to be unambiguous at a glance in a way a color change alone doesn't guarantee. `TransportButton` (the separate pause/stop control) is unchanged — it was never the icon this request was about.
+- Landing page (`apps/web/app/page.tsx`) redesigned from a plain centered-logo placeholder to an onboarding-style layout: soft blurred mint blob shapes in two corners, the leaf mark large and centered on a light mint disc, a serif headline ("Say it once, keep it forever"), descriptive subtext, and a pill-shaped primary CTA with a trailing arrow — Mindreva's own palette and mark throughout, not any external reference's colors or characters.
+
+### Verified
+
+- Rasterized the traced SVG at 16px, 32px, and 400px via `sharp` and visually confirmed the leaf silhouette and spiral cutout both stay legible with no muddiness at the smallest (favicon) size, and match the source PNG's proportions almost exactly at large size.
+- `pnpm lint`, a direct `tsc --noEmit` on `packages/ui`, and a full `next build --turbopack` all pass with no new bundle-size regression (First Load JS unchanged, +~1kB from the slightly larger path data).
+- Landing page SSR output verified via `curl` against a real production build (`next start`) to contain the expected headline/branding text.
+
+### Not independently verified
+
+- The landing page and RecordButton's actual in-browser visual appearance — no browser screenshot tool was available in this environment. Flagged for a manual check rather than assumed; the production build compiles and server-renders the expected markup/classes, but pixel-level layout (blob placement, spacing, contrast) has not been visually confirmed by a human or a screenshot tool.
+
+## 2026-08-04 — Phase 6.6 fix pass: deferred auth caching, background AI work, parallel photo uploads, photo-editor toolbar redesign
+
+Reported directly against the running app: navigation still felt slow
+everywhere, saving text blocked on a full LLM re-summarize, and multi-photo
+uploads happened one at a time. The previous barrel-leak fix was necessary
+but addressed bundle size, not request-count or blocking-call latency.
+
+### Fixed
+
+- `getUser()` (`packages/auth/src/server.ts`) is now wrapped in React's
+  `cache()`, so every Server Component and service call within a single
+  request's render tree shares one `supabase.auth.getUser()` network round
+  trip instead of firing a fresh one each. Middleware's own `getUser()` call
+  is a separate request lifecycle and still pays its own round trip —
+  deduplicating across that boundary needs request-scoped plumbing between
+  middleware and the page render, left as a known remaining cost (see
+  Known Issues).
+- Journal/notes list pages no longer fetch calendar day-cell cover-photo
+  thumbnails (`listMyDayThumbnails`, a Storage sign round trip) on every
+  navigation. That data now loads lazily client-side, only the first time
+  the date-picker bottom sheet is actually opened, via a new
+  `/api/entries/day-thumbnails` route.
+- `listMyEntryDates` is no longer called from journal/notes at all — dates
+  for the calendar's dot indicators are now derived synchronously from the
+  entries list already being fetched (`entryDatesFrom`), removing a second
+  DB round trip. `listMyEntryDates` itself is kept for `chat/page.tsx`,
+  which needs available years without fetching a full entries list.
+- Saving edited transcript/note text (`saveMyTranscriptEdit`) and creating a
+  text entry (`createTextEntry`) no longer block the HTTP response on
+  re-summarization. The DB write is confirmed and returned immediately;
+  summarization now runs after the response is sent via `next/server`'s
+  `after()`. The entry detail page shows "Saved" instantly, with a small
+  "updating…" indicator next to the summary while it polls
+  `/api/entries/[entryId]/summary` briefly in the background for the
+  refreshed result.
+- Voice recording (`createVoiceEntry`) no longer blocks on ASR transcription
+  either — transcription now runs via the same `after()` pattern.
+  `record-flow.tsx` uploads, then immediately routes back to `/journal`
+  with a "Recording saved — transcribing in the background…" toast, instead
+  of sending the user to the review screen to wait. A new
+  `TranscriptionWatcher` client component (mounted in `EntryListScreen`,
+  backed by `sessionStorage` via `transcription-watch.ts` so it survives the
+  navigation) polls the entry's transcript status and toasts "Transcription
+  complete" (refreshing the list) once it's done, or a graceful failure
+  toast if it isn't. The review screen at `/entries/[entryId]/review` still
+  exists for manual/direct navigation but is no longer the default
+  post-recording destination.
+- Multi-photo uploads (entry detail and the review screen) now upload in
+  parallel via `Promise.allSettled` instead of a sequential `for...await`
+  loop — picking 3 photos previously took roughly 3x as long as picking 1.
+- Photo upload UI redesigned per direct feedback: the old large "Tap to
+  Upload Photo" box is gone. `PhotoUploader` (`packages/ui`) is now a small
+  camera-icon trigger button rendered inline in `RichTextEditor`'s toolbar
+  row, next to Bold/Italic, via a new `toolbarEnd` slot prop that keeps the
+  editor itself agnostic to what's rendered there. Existing photos render
+  separately below via a new `PhotoThumbnailStrip` component (renders
+  nothing when there are no photos yet).
+
+### Verified
+
+- A throwaway authenticated timing script (deleted after use, per this
+  project's convention of not keeping one-off verification scripts in the
+  repo) against a real **production build** (`next build` + `next start`,
+  not `next dev`) shows consistent 540-830ms server response times across
+  `/journal`, `/notes`, `/entries/[entryId]`, `/archive`, `/trash`, and
+  `/account`, with no first-hit compile penalty.
+- The same script against `next dev` showed no clear improvement and a
+  worse cold number for `/journal` (~32s) than pre-fix — investigated via
+  the dev server's own log output and confirmed to be Turbopack's one-time
+  per-route dev-mode compile cost (`/journal`'s shared-chunk compile
+  absorbing cost that every subsequent route then reused for free), not a
+  regression from these fixes. `next dev` timings are not representative of
+  deployed (Vercel) performance and should not be used to judge this work;
+  a production build is the correct measurement, which is what the
+  540-830ms figures above reflect.
+- `pnpm lint` and `pnpm build` pass across the monorepo.
+
+### Not fixed (inherent to the stack, not a bug) — superseded, see below
+
+- ~~The Supabase project is hosted in ap-northeast-2 (Seoul); every Auth or
+  DB round trip pays a real ~100ms geographic baseline measured directly
+  against the project's Auth health endpoint. The 540-830ms production
+  figures above include several such round trips (middleware auth, page
+  auth, data queries) and won't drop meaningfully further without changing
+  deployment region or the number of round trips per request.~~ The two
+  Auth round trips in that figure were eliminated the same day — see
+  "Phase 6.6 fix: eliminated both per-request auth round trips via local JWT
+  verification" above. The Seoul geographic baseline is still real for
+  whatever DB round trips remain, just no longer compounded by Auth calls
+  on top of them.
+- `addPhotoToEntry`'s three round trips (upload, DB insert, sign) remain
+  genuinely sequential, as noted in the prior fix pass.
+
 ## 2026-07-27 — Phase 6.6 fix: app-wide lag traced to a barrel-export leak
 
 Reported directly against the running app after the previous hydration fix

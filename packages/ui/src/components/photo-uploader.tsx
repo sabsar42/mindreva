@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import { cn } from "../lib/utils";
 
 export interface PhotoUploaderPhoto {
@@ -24,12 +24,14 @@ export interface PhotoUploaderProps {
 }
 
 /**
- * Photo-forward attachment control, matching new-journal-overview-page.png's
- * hierarchy: the first photo renders as a large hero (or an inviting empty
- * state when there isn't one yet), with any additional photos and the "add
- * photo" tile in a thumbnail strip underneath. Used both on the transcript
- * review screen (attach right after recording) and the entry detail screen
- * (add more photos later) — same component, same upload affordance.
+ * A single camera-icon trigger button — no large "tap to upload" box, no
+ * thumbnail strip attached. Meant to sit directly beside a RichTextEditor's
+ * own Bold/Italic toolbar buttons (same row, same size, same affordance
+ * language) via its `toolbarEnd` slot, for a cleaner, more editor-like feel
+ * than a separate photo-forward block. Pair with `PhotoThumbnailStrip` to
+ * show already-added photos elsewhere in the layout — the two are split so
+ * the trigger can live in a toolbar row while the thumbnails live in normal
+ * document flow underneath.
  */
 function PhotoUploader({
   photos,
@@ -40,7 +42,6 @@ function PhotoUploader({
 }: PhotoUploaderProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const canAddMore = photos.length < maxPhotos;
-  const [hero, ...rest] = photos;
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -50,69 +51,24 @@ function PhotoUploader({
   }
 
   function openPicker() {
-    if (!uploading) inputRef.current?.click();
+    if (!uploading && canAddMore) inputRef.current?.click();
   }
 
   return (
-    <div className={cn("w-full", className)}>
-      {hero ? (
-        // Plain <img>, deliberately: these are dynamic, per-request signed
-        // URLs for private Storage objects — next/image's remote-domain
-        // allowlisting and optimization pipeline don't fit that shape well,
-        // and this file isn't linted by apps/web's Next-specific ESLint
-        // rules anyway (packages/ui has its own, thinner config).
-        <img
-          src={hero.url}
-          alt=""
-          className="border-border aspect-[4/3] w-full rounded-lg border object-cover"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={uploading}
-          aria-label="Add photo"
-          className="border-border text-muted-foreground hover:bg-warm-100 flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50"
-        >
-          {uploading ? (
-            <Loader2 className="size-6 animate-spin" />
-          ) : (
-            <ImagePlus className="size-6" />
-          )}
-          <span className="text-sm">
-            {uploading ? "Uploading…" : "Add a photo"}
-          </span>
-        </button>
-      )}
-
-      {(rest.length > 0 || (hero && canAddMore)) && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {rest.map((photo) => (
-            <img
-              key={photo.id}
-              src={photo.url}
-              alt=""
-              className="border-border size-16 rounded-md border object-cover"
-            />
-          ))}
-
-          {hero && canAddMore && (
-            <button
-              type="button"
-              onClick={openPicker}
-              disabled={uploading}
-              aria-label="Add another photo"
-              className="border-border text-muted-foreground hover:bg-warm-100 flex size-16 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed transition-colors disabled:opacity-50"
-            >
-              {uploading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <ImagePlus className="size-4" />
-              )}
-            </button>
-          )}
-        </div>
-      )}
+    <div className={cn("inline-flex", className)}>
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={uploading || !canAddMore}
+        aria-label="Add photo"
+        className="hover:bg-warm-100 hover:text-foreground text-muted-foreground flex size-8 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+      >
+        {uploading ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Camera className="size-4" />
+        )}
+      </button>
 
       <input
         ref={inputRef}
@@ -127,4 +83,33 @@ function PhotoUploader({
   );
 }
 
-export { PhotoUploader };
+export interface PhotoThumbnailStripProps {
+  photos: PhotoUploaderPhoto[];
+  className?: string;
+}
+
+/** Small thumbnail row for photos already attached to an entry. Renders
+ * nothing when there are none — pairs with `PhotoUploader`'s trigger
+ * button, which typically lives elsewhere (e.g. a RichTextEditor toolbar). */
+function PhotoThumbnailStrip({ photos, className }: PhotoThumbnailStripProps) {
+  if (photos.length === 0) return null;
+  return (
+    <div className={cn("flex flex-wrap gap-2", className)}>
+      {photos.map((photo) => (
+        // Plain <img>, deliberately: these are dynamic, per-request signed
+        // URLs for private Storage objects — next/image's remote-domain
+        // allowlisting and optimization pipeline don't fit that shape well,
+        // and this file isn't linted by apps/web's Next-specific ESLint
+        // rules anyway (packages/ui has its own, thinner config).
+        <img
+          key={photo.id}
+          src={photo.url}
+          alt=""
+          className="border-border size-16 rounded-md border object-cover"
+        />
+      ))}
+    </div>
+  );
+}
+
+export { PhotoUploader, PhotoThumbnailStrip };

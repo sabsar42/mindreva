@@ -14,6 +14,7 @@
     "db:studio": "drizzle-kit studio",
     "db:rls-check": "node scripts/rls-check.mjs",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "echo \"no tests yet\" && exit 0"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@mindreva/config": "workspace:*",
     "@supabase/supabase-js": "^2.110.8",
+    "@types/node": "^20",
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
