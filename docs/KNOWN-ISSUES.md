@@ -6,62 +6,46 @@ things still outstanding.
 
 ---
 
-## Every authenticated page load on the live deploy pays a ~700ms DB-connection tax
+## RESOLVED: ~700ms per authenticated page load was sequential Storage round trips, not a DB connection issue
 
-**Status:** Open. Root cause narrowed to "likely no connection reuse across
-requests"; a temporary diagnostic is deployed to confirm the exact mechanism.
+**Status:** Fixed. See docs/CHANGELOG.md's 2026-08-16 entry for the full
+before/after.
 
-**What's wrong:** A live smoke test against the deployed URL (after the
-`start`-script fix and a `CalendarPicker` bundle-size fix, see
-docs/CHANGELOG.md's 2026-08-15 entries) still reported every screen as
-slow/laggy. Measured precisely against the real deploy with a real
-authenticated session:
+**What was wrong (and what it turned out NOT to be):** A live smoke test
+still reported every screen as slow after the `start`-script and
+`CalendarPicker` fixes. Initial investigation found every authenticated page
+load costing a flat 660-800ms and, reasoning from the timing shape alone,
+suspected `getDb()`'s connection singleton wasn't surviving between
+requests on Vercel — that hypothesis was wrong. A temporary diagnostic log
+added to `getDb()` and deployed confirmed `reusedExistingConnection=true`
+consistently, with the same `moduleInstance` persisting across a full
+minute of real navigation. The connection singleton was working correctly
+the whole time.
 
-- Middleware's auth check (`getClaims()`, no DB) is genuinely fast: 72-91ms
-  warm, confirmed with repeated hits.
-- Every authenticated PAGE load (auth + DB queries) costs a flat
-  **660-800ms**, with **no warm-up curve at all** — even 15 rapid hits to
-  the same route, including requests that landed on the exact same
-  `x-vercel-id` instance prefix, all cost roughly the same.
-- Isolated the ~700ms itself: it is NOT the Postgres network round trip
-  (measured directly at ~124-130ms to the same Seoul pooler once a
-  connection is warm) and NOT TCP/TLS setup (~124ms). It matches almost
-  exactly the cost of establishing a **brand-new Postgres/pgbouncer
-  connection** from scratch (738-793ms measured locally, reusing a warm
-  connection drops to ~126ms).
-- `packages/database/src/client.ts`'s `getDb()` already uses a module-level
-  singleton meant to prevent exactly this — verified working correctly in a
-  local production server (repeated calls correctly show
-  `reusedExistingConnection=true` after the first). But the live deploy's
-  flat, no-warm-up timing is NOT consistent with that singleton surviving
-  between requests there.
+**The real cause:** `listMyEntries` (and the archived/trashed/search
+variants) ran three genuinely sequential steps per page load — list
+entries, then look up which have a cover photo, then call Supabase
+**Storage's** `createSignedUrls` API (a separate HTTPS service from
+Postgres, with its own round trip) — each awaiting the previous step's
+result, so none of it could be parallelized with `Promise.all`. That chain,
+not the database connection, was the ~700ms.
 
-**Current workaround:** None yet — root cause not fully confirmed.
+**The fix:** thumbnail signing removed from the initial list-screen server
+render entirely. `listMyEntries`/`listMyArchivedEntries`/
+`listMyTrashedEntries`/`searchMyEntries` now return entries with no
+`thumbnailUrl`; a new `useEntryThumbnails` hook
+(`apps/web/app/(protected)/_components/use-entry-thumbnails.ts`) fetches
+them client-side after the list has already painted, via a new
+`POST /api/entries/thumbnails` batch endpoint — the same "defer to a lazy
+client fetch" pattern already established for the calendar's day-cell
+thumbnails.
 
-**In progress:** Added a temporary diagnostic log to `getDb()`
-(`packages/database/src/client.ts`, clearly marked `TEMPORARY DIAGNOSTIC` in
-a comment) that prints a per-module-load instance id and whether each call
-reused the existing connection. Once deployed, hitting the live URL a few
-times and reading Vercel's function logs will show directly whether: (a) the
-platform is evaluating this module fresh per request (cold start every
-time, singleton can never help), or (b) the module persists but the
-connection itself isn't being reused for some other reason. **Remove this
-diagnostic once that's answered** — it's not meant to ship long-term.
-
-**To revisit when there's time to chase it:** once the mechanism is
-confirmed, likely fixes depending on cause: if it's genuine per-request cold
-starts (plausible on Vercel Hobby without Fluid Compute / reserved
-concurrency at low traffic), consider Supabase's Session pooler instead of
-the Transaction pooler for read-heavy paths, or a connection-caching
-approach designed for serverless (e.g. `@supabase/postgres-js` recommends
-different pooling guidance for edge/serverless than for long-running
-servers — worth re-reading their docs for the current guidance). If it's a
-code-level singleton bug, the fix is smaller and localized. Also worth
-comparing Vercel Function region (`iad1`, confirmed via `x-vercel-id` during
-this investigation) against the Supabase project's region
-(`ap-northeast-2`, Seoul) — the ~700ms figure may include a first-time
-long-haul connection setup cost specifically, distinct from the ~130ms
-steady-state RTT.
+**Verified:** re-measured the exact same steady-state test that showed
+660-800ms before the fix: **723ms avg → 281ms avg locally**, a ~442ms
+reduction matching the removed round trips almost exactly. `pnpm lint` and
+`pnpm typecheck` pass; confirmed the new endpoint returns real signed URLs
+for an entry with photos and a correct empty result for one without,
+end-to-end against a real authenticated session.
 
 ---
 

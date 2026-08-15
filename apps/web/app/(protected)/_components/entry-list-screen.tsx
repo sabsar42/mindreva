@@ -34,6 +34,7 @@ import {
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { TranscriptionWatcher } from "./transcription-watcher";
+import { useEntryThumbnails } from "./use-entry-thumbnails";
 
 // CalendarPicker pulls in react-day-picker (~164kB, confirmed by measuring
 // the real deployed /journal bundle) for a component that sits inside a
@@ -245,6 +246,9 @@ export function EntryListScreen({
     month: "long",
   });
 
+  const visibleIds = React.useMemo(() => visible.map((e) => e.id), [visible]);
+  const entryThumbnails = useEntryThumbnails(visibleIds);
+
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 pb-24 pt-6">
       <TranscriptionWatcher />
@@ -360,7 +364,7 @@ export function EntryListScreen({
                   }
                   durationLabel={formatDuration(entry.durationMs)}
                   snippet={entry.snippet ?? undefined}
-                  thumbnailUrl={entry.thumbnailUrl}
+                  thumbnailUrl={entryThumbnails[entry.id] ?? entry.thumbnailUrl}
                 />
               </Link>
             </SwipeableRow>

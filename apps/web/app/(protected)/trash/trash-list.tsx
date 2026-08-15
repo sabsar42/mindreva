@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Undo2 } from "lucide-react";
 import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
+import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 
 // Note: trashed entries are intentionally NOT links to /entries/[id] — the
 // detail route excludes soft-deleted rows (getByIdForUser returns null once
@@ -30,6 +31,8 @@ export function TrashList({
 }) {
   const router = useRouter();
   const [entries, setEntries] = React.useState(initial);
+  const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
+  const thumbnails = useEntryThumbnails(entryIds);
 
   async function restore(id: string) {
     const res = await fetch(`/api/entries/${id}/restore`, { method: "POST" });
@@ -83,7 +86,7 @@ export function TrashList({
               weekdayLabel={formatWeekday(entry.entryDate)}
               dayOfMonth={formatDayOfMonth(entry.entryDate)}
               snippet={entry.snippet ?? undefined}
-              thumbnailUrl={entry.thumbnailUrl}
+              thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
             />
           </SwipeableRow>
         ))}

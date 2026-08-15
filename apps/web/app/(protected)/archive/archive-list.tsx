@@ -17,6 +17,7 @@ import {
   toast,
 } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
+import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 
 function formatWeekday(dateKey: string | null): string {
   if (!dateKey) return "";
@@ -40,6 +41,8 @@ export function ArchiveList({
   const [confirmTrashId, setConfirmTrashId] = React.useState<string | null>(
     null,
   );
+  const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
+  const thumbnails = useEntryThumbnails(entryIds);
 
   async function unarchive(id: string) {
     const res = await fetch(`/api/entries/${id}/archive`, { method: "DELETE" });
@@ -111,7 +114,7 @@ export function ArchiveList({
                 weekdayLabel={formatWeekday(entry.entryDate)}
                 dayOfMonth={formatDayOfMonth(entry.entryDate)}
                 snippet={entry.snippet ?? undefined}
-                thumbnailUrl={entry.thumbnailUrl}
+                thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
               />
             </Link>
           </SwipeableRow>

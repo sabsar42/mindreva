@@ -50,6 +50,15 @@ export interface EntryListItemWithThumbnail extends EntryListItem {
   thumbnailUrl?: string;
 }
 
+/**
+ * Deliberately does NOT attach cover-photo thumbnails — that used to mean
+ * every list-screen load paid two sequential extra round trips (a Storage
+ * lookup, then a Storage sign call), on top of the entries query itself,
+ * none of them parallelizable since each genuinely needs the previous
+ * step's result. Thumbnails now load lazily client-side after the list
+ * itself has painted, via /api/entries/thumbnails — same pattern already
+ * used for the calendar's day-cell thumbnails (listMyDayThumbnails).
+ */
 export async function listMyEntries(options?: {
   type?: EntryType;
   includeArchived?: boolean;
@@ -58,7 +67,7 @@ export async function listMyEntries(options?: {
 }): Promise<EntryListItemWithThumbnail[]> {
   const userId = await requireUserId();
   const entries = await EntriesRepository.listForUser(userId, options ?? {});
-  return attachThumbnails(entries, userId);
+  return withPlainSnippets(entries);
 }
 
 /** entry_date of every active entry, for the calendar's dot indicators.
@@ -103,25 +112,34 @@ export async function listMyDayThumbnails(
   return Object.fromEntries(rows.map((r) => [r.date, urlById.get(r.id) ?? ""]));
 }
 
-/** Attaches each entry's cover-photo signed URL (first photo by position),
- * batched into a single Storage call rather than one per entry, and strips
- * any RichTextEditor Markdown from the snippet — a list row is a plain-text
- * display context, never raw `**`/`*` syntax. */
-async function attachThumbnails(
+/** Strips any RichTextEditor Markdown from each entry's snippet — a list
+ * row is a plain-text display context, never raw `**`/`*` syntax. Cheap
+ * (no I/O), unlike the photo-thumbnail lookup this used to also do inline. */
+function withPlainSnippets(
   entries: EntryListItem[],
-  userId: string,
-): Promise<EntryListItemWithThumbnail[]> {
-  const withPlainSnippets = entries.map((e) => ({
+): EntryListItemWithThumbnail[] {
+  return entries.map((e) => ({
     ...e,
     snippet: e.snippet ? stripFormatting(e.snippet) : e.snippet,
   }));
+}
 
-  const ids = entries.map((e) => e.id);
+/** Cover-photo thumbnail URLs for a batch of entries, keyed by entry id.
+ * Split out from the list functions above so it can be fetched lazily,
+ * client-side, after the list itself has already rendered — see
+ * /api/entries/thumbnails. Two genuinely sequential Storage calls (can't
+ * sign a URL before knowing which photo it's for), batched across all
+ * requested entries rather than one call per entry. */
+export async function getMyEntryThumbnails(
+  entryIds: string[],
+): Promise<Record<string, string>> {
+  const userId = await requireUserId();
+  if (entryIds.length === 0) return {};
   const firstPhotos = await EntryPhotosRepository.getFirstPhotosForEntries(
-    ids,
+    entryIds,
     userId,
   );
-  if (firstPhotos.size === 0) return withPlainSnippets;
+  if (firstPhotos.size === 0) return {};
 
   const rows = Array.from(firstPhotos.entries()).map(([entryId, photo]) => ({
     entryId,
@@ -129,12 +147,12 @@ async function attachThumbnails(
   }));
   const signed = await signPhotoUrls(rows);
   const urlById = new Map(signed.map((s) => [s.id, s.url]));
-  const urlByEntryId = new Map(rows.map((r) => [r.entryId, urlById.get(r.id)]));
-
-  return withPlainSnippets.map((e) => ({
-    ...e,
-    thumbnailUrl: urlByEntryId.get(e.id) || undefined,
-  }));
+  const result: Record<string, string> = {};
+  for (const r of rows) {
+    const url = urlById.get(r.id);
+    if (url) result[r.entryId] = url;
+  }
+  return result;
 }
 
 export async function listMyArchivedEntries(
@@ -142,7 +160,7 @@ export async function listMyArchivedEntries(
 ): Promise<EntryListItemWithThumbnail[]> {
   const userId = await requireUserId();
   const entries = await EntriesRepository.listArchivedForUser(userId, type);
-  return attachThumbnails(entries, userId);
+  return withPlainSnippets(entries);
 }
 
 export async function listMyTrashedEntries(): Promise<
@@ -150,7 +168,7 @@ export async function listMyTrashedEntries(): Promise<
 > {
   const userId = await requireUserId();
   const entries = await EntriesRepository.listTrashedForUser(userId);
-  return attachThumbnails(entries, userId);
+  return withPlainSnippets(entries);
 }
 
 export async function searchMyEntries(
@@ -161,7 +179,7 @@ export async function searchMyEntries(
   const trimmed = query.trim();
   if (!trimmed) return [];
   const entries = await EntriesRepository.searchForUser(userId, trimmed, type);
-  return attachThumbnails(entries, userId);
+  return withPlainSnippets(entries);
 }
 
 export async function countMyEntries(): Promise<number> {

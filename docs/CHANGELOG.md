@@ -7,6 +7,75 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-08-16 — Perf: found and fixed the real ~700ms-per-page cost (sequential Storage calls, not DB connections)
+
+Follow-up to the 2026-08-15 `CalendarPicker` fix — the deploy still felt
+slow afterward. Investigated end to end against the real deployed URL with
+real authenticated sessions rather than guessing from first principles.
+
+### Investigated and ruled out
+
+- Confirmed middleware's `getClaims()` auth check is genuinely fast (72-91ms
+  warm) — not the cause.
+- Measured every authenticated page load at a flat 660-800ms with no
+  warm-up curve across 15 rapid repeated hits, which read as a
+  connection-reuse problem. Added a temporary diagnostic log to
+  `packages/database/src/client.ts`'s `getDb()` (module-instance id +
+  whether each call reused the existing connection), deployed it, and read
+  Vercel's function logs: **`reusedExistingConnection=true` consistently**,
+  with the same module instance persisting across a full minute of real
+  navigation. The connection singleton was working correctly the entire
+  time — that hypothesis was wrong, and the diagnostic (now removed) is
+  what proved it rather than leaving it as an assumption.
+
+### Found
+
+- `listMyEntries` and its archived/trashed/search variants ran three
+  genuinely sequential steps on every list-screen load: list entries → look
+  up which have a cover photo → call Supabase **Storage's**
+  `createSignedUrls` (a separate HTTPS service from Postgres, its own round
+  trip to Seoul). None of it could be `Promise.all`'d — each step needs the
+  previous step's actual result, not just its own inputs.
+
+### Fixed
+
+- Thumbnail signing removed from the initial server render entirely.
+  `listMyEntries`/`listMyArchivedEntries`/`listMyTrashedEntries`/
+  `searchMyEntries` (`apps/web/lib/services/entries.service.ts`) now return
+  entries with no `thumbnailUrl`, via a new `withPlainSnippets` helper
+  replacing the old `attachThumbnails`.
+- New `getMyEntryThumbnails` service function + `POST /api/entries/thumbnails`
+  batch endpoint. New `useEntryThumbnails` hook
+  (`apps/web/app/(protected)/_components/use-entry-thumbnails.ts`) fetches
+  thumbnails client-side after the list has already painted, only for ids
+  not already resolved — wired into `EntryListScreen` (journal/notes),
+  `ArchiveList`, and `TrashList`, replacing the inline effect that used to
+  live only in `EntryListScreen` for day-thumbnails. Same "defer to lazy
+  client fetch" pattern already established for the calendar's day-cell
+  thumbnails.
+
+### Verified
+
+- Re-ran the exact same steady-state latency test (10 requests, 1.5s apart,
+  same route) before and after: **723ms avg → 281ms avg locally**, a
+  ~442ms reduction matching the removed round trips almost exactly.
+- `pnpm lint` (6/6) and `pnpm typecheck` (7/7) pass.
+- End-to-end against a real authenticated session: created a fresh entry,
+  confirmed `/journal` renders it, and confirmed
+  `POST /api/entries/thumbnails` returns a correct empty result for an
+  entry with no photo (200, not an error) — the shape a real account with
+  photos would also get real signed URLs from, same code path as before,
+  just relocated off the critical path.
+- Temporary `getDb()` diagnostic removed from `packages/database/src/client.ts`
+  now that it answered its question.
+
+### Not independently verified
+
+- The in-browser experience of thumbnails appearing a beat after the list
+  itself (the intended lazy-load behavior) — no browser tool available in
+  this environment. Worth a manual check that this doesn't read as a
+  jarring pop-in rather than a graceful fill-in.
+
 ## 2026-08-15 — Perf: deferred `CalendarPicker` off the journal/notes critical path
 
 Prompted by a live smoke test on the deployed URL reporting every screen as
