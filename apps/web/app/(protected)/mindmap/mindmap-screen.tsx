@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Network } from "lucide-react";
+import { PrefetchLink } from "../_components/prefetch-link";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -146,7 +147,7 @@ export function MindmapScreen({
           ) : cluster && cluster.entries.length > 0 ? (
             <div className="mt-3 max-h-[60vh] space-y-2 overflow-y-auto pb-2">
               {cluster.entries.map((entry) => (
-                <Link
+                <PrefetchLink
                   key={entry.entryId}
                   href={`/entries/${entry.entryId}`}
                   className="border-border bg-card hover:bg-warm-50 block rounded-lg border p-3.5 transition-colors"
@@ -162,7 +163,7 @@ export function MindmapScreen({
                       {entry.snippet}
                     </p>
                   )}
-                </Link>
+                </PrefetchLink>
               ))}
             </div>
           ) : (

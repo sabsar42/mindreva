@@ -35,6 +35,7 @@ import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { TranscriptionWatcher } from "./transcription-watcher";
 import { useEntryThumbnails } from "./use-entry-thumbnails";
+import { PrefetchLink } from "./prefetch-link";
 
 // CalendarPicker pulls in react-day-picker (~164kB, confirmed by measuring
 // the real deployed /journal bundle) for a component that sits inside a
@@ -353,7 +354,7 @@ export function EntryListScreen({
                 },
               ]}
             >
-              <Link href={`/entries/${entry.id}`}>
+              <PrefetchLink href={`/entries/${entry.id}`}>
                 <NoteCard
                   title={entry.title || "Untitled entry"}
                   weekdayLabel={
@@ -366,7 +367,7 @@ export function EntryListScreen({
                   snippet={entry.snippet ?? undefined}
                   thumbnailUrl={entryThumbnails[entry.id] ?? entry.thumbnailUrl}
                 />
-              </Link>
+              </PrefetchLink>
             </SwipeableRow>
           ))}
       </div>

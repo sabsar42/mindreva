@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Send } from "lucide-react";
 import { Button, Input, cn, toast } from "@mindreva/ui";
@@ -13,6 +12,7 @@ import { Button, Input, cn, toast } from "@mindreva/ui";
 import { NO_RECORD_REPLY } from "@mindreva/llm/persona-chat-prompt";
 import type { ChatRole } from "@mindreva/database";
 import { RangeContextPanel } from "./range-context-panel";
+import { PrefetchLink } from "../../_components/prefetch-link";
 
 interface Message {
   id: string;
@@ -65,13 +65,13 @@ function CitationChips({
         :
       </span>
       {entryIds.map((id) => (
-        <Link
+        <PrefetchLink
           key={id}
           href={`/entries/${id}`}
           className="border-mint-200 bg-accent text-accent-foreground hover:bg-mint-100 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors"
         >
           {shortDateLabel(entryDates[id])}
-        </Link>
+        </PrefetchLink>
       ))}
     </div>
   );

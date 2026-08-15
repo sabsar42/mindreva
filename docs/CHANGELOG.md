@@ -7,6 +7,67 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-08-16 — Perf: prefetch entry data on hover/touch-intent, not just on-visible
+
+Follow-up to the back-navigation fix above — the remaining gap was the
+_first_ tap into any entry, not just revisits. Asked directly why other
+products feel instant on every tap, not just repeat ones.
+
+### Found
+
+- `next/link` already auto-prefetches when a link scrolls into view
+  (confirmed by reading `next/dist/client/link.js` — it uses an
+  `IntersectionObserver`), but for a dynamic route like `/entries/[id]`
+  (reads cookies/session per request) that default prefetch
+  (`PrefetchKind.AUTO`) only warms the route's static shell, not its real
+  data — deliberately, so a long list doesn't fire a database query for
+  every row merely visible on screen. Confirmed the same in the type
+  definitions (`PrefetchKind.AUTO`'s own doc comment: "if the page is
+  dynamic, prefetch the page data **partially**").
+- Getting the actual entry content prefetched requires opting a specific
+  link into `PrefetchKind.FULL`, which isn't exported from the public
+  `next/navigation` types (it's an internal enum) but is accepted as its
+  literal string value by `router.prefetch()` — confirmed by writing the
+  call both ways: the bare string literal fails typecheck (enums aren't
+  structurally typed even when string-valued), a cast makes it pass.
+
+### Added
+
+- `usePrefetchOnIntent` hook
+  (`apps/web/app/(protected)/_components/use-full-prefetch.ts`) — returns a
+  handler that fires `router.prefetch(href, { kind: "full" })` once, on
+  first call.
+- `PrefetchLink` component
+  (`apps/web/app/(protected)/_components/prefetch-link.tsx`) — a
+  `next/link` wrapper that wires that handler to `onMouseEnter` and
+  `onTouchStart`. On mobile, `touchstart` fires before the tap it's part of
+  fully registers, which is enough of a head start for the request to a
+  geographically distant pooler to make real progress before the
+  navigation commits.
+- Wired into every link to `/entries/[id]`: `EntryListScreen`
+  (journal/notes — the highest-traffic path), `ArchiveList`,
+  `mindmap-screen.tsx`'s cluster-entry list, and `chat-conversation.tsx`'s
+  citation chips. `TrashList` deliberately excluded — trashed entries
+  already don't link to the detail route at all (it 404s on soft-deleted
+  rows, per that file's own existing comment), so there was nothing to fix
+  there.
+
+### Verified
+
+- `pnpm lint` and `pnpm typecheck` pass; `pnpm build` succeeds with no
+  meaningful bundle growth (`/journal`'s First Load JS 177KB → 178KB).
+
+### Not independently verified
+
+- The actual in-browser feel of tapping into an entry for the first time.
+  Like the back-navigation fix above, this is fundamentally a client-side
+  browser behavior (hover/touch timing racing a network request) that
+  cannot be verified with `curl` — there's no way to script "does this feel
+  instant" from this environment. Worth a manual check: from `/journal`,
+  tap a NoteCard you haven't visited yet and see if the detail page appears
+  noticeably faster than before, especially on a touch device where
+  `touchstart` gets a real head start over the completed tap.
+
 ## 2026-08-16 — Perf: fixed back-navigation reloading pages from scratch
 
 Reported directly: navigating journal → entry detail → back (via the app's

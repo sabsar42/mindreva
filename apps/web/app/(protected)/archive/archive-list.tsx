@@ -18,6 +18,7 @@ import {
 } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
+import { PrefetchLink } from "../_components/prefetch-link";
 
 function formatWeekday(dateKey: string | null): string {
   if (!dateKey) return "";
@@ -108,7 +109,7 @@ export function ArchiveList({
               },
             ]}
           >
-            <Link href={`/entries/${entry.id}`}>
+            <PrefetchLink href={`/entries/${entry.id}`}>
               <NoteCard
                 title={entry.title || "Untitled entry"}
                 weekdayLabel={formatWeekday(entry.entryDate)}
@@ -116,7 +117,7 @@ export function ArchiveList({
                 snippet={entry.snippet ?? undefined}
                 thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
               />
-            </Link>
+            </PrefetchLink>
           </SwipeableRow>
         ))}
       </div>
