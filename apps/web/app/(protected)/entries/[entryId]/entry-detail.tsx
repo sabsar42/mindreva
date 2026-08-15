@@ -292,9 +292,19 @@ export function EntryDetail({
       <header className="flex items-center justify-between gap-2">
         <button
           type="button"
-          onClick={() =>
-            router.push(type === "journal" ? "/journal" : "/notes")
-          }
+          onClick={() => {
+            // router.back() reuses Next.js's Router Cache for the page we
+            // came from — instant, same as the browser's own back button.
+            // router.push() to the same URL does NOT get that treatment; it's
+            // a fresh navigation that re-runs the server component. Only
+            // falls back to push() when there's no in-app history to go back
+            // to (e.g. a deep link straight to this entry).
+            if (window.history.length > 1) {
+              router.back();
+            } else {
+              router.push(type === "journal" ? "/journal" : "/notes");
+            }
+          }}
           aria-label="Back"
           className="text-foreground hover:bg-warm-100 -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
         >

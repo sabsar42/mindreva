@@ -10,6 +10,27 @@ const nextConfig: NextConfig = {
     "@mindreva/asr",
     "@mindreva/llm",
   ],
+  experimental: {
+    // Next.js 15's own default for dynamic routes (journal/notes/entry
+    // detail/etc — anything reading cookies per-request) is staleTimes.dynamic
+    // = 0, meaning the Router Cache is effectively off for them: EVERY
+    // client-side navigation to a dynamic route, including router.back() and
+    // the browser's own back button, re-runs the full server component. That
+    // was the real cause of "back into journal reloads from scratch, but the
+    // browser's native back is instant" — the browser's back button can use
+    // its own bfcache (a full page snapshot), which Next's Router Cache has
+    // no default equivalent for at 0s.
+    //
+    // 30s is a deliberate tradeoff: every mutation that needs fresh data
+    // already calls router.refresh() explicitly (archive/trash/restore,
+    // transcription-watcher — see those call sites), which bypasses this
+    // cache regardless of its duration. So the only thing this affects is
+    // pure back/forward navigation with no mutation involved, which is
+    // exactly the case that should be instant.
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
 };
 
 // withSentryConfig wraps the build to upload source maps (via the sentry-cli

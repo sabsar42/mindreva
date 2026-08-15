@@ -7,6 +7,66 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-08-16 — Perf: fixed back-navigation reloading pages from scratch
+
+Reported directly: navigating journal → entry detail → back (via the app's
+own back arrow, not the browser's) reloads the journal page from scratch;
+the browser's own native back button is instant. That contrast was the key
+clue — the browser's back button can use its bfcache (a full page
+snapshot), a different, lower-level mechanism than anything Next.js
+controls.
+
+### Found
+
+- `entry-detail.tsx`'s and `chat-conversation.tsx`'s back-arrow buttons both
+  used `router.push("/journal")` / `router.push("/chat")` instead of
+  `router.back()`. Functionally similar (same destination), but
+  `router.push()` to a URL is always treated as a fresh navigation;
+  `router.back()` is what actually lets Next.js's client Router Cache
+  restore the page you came from instead of re-running its server component.
+- That alone wasn't sufficient, though: checked the installed
+  `next@15.5.21`'s actual default config
+  (`node_modules/next/dist/server/config-shared.js`) and confirmed
+  `staleTimes.dynamic: 0` — Next 15's own default effectively disables the
+  Router Cache for any dynamic route (anything reading cookies/session
+  per-request, which is every protected page in this app). Under that
+  default, even `router.back()` would still force a fresh server request.
+
+### Fixed
+
+- Both back-arrow buttons now call `router.back()`, falling back to the
+  original `router.push()` destination only when `window.history.length`
+  indicates there's no in-app history to go back to (e.g. a direct/shared
+  link straight to an entry).
+- Added `experimental.staleTimes.dynamic: 30` to `next.config.ts` — the
+  actual fix that makes the above meaningful. Deliberately not raised
+  higher: every mutation that needs fresh data on return (archive, trash,
+  restore, transcription-complete) already calls `router.refresh()`
+  explicitly at its own call site, which bypasses this cache regardless of
+  its duration — confirmed by grepping every `router.refresh()` call site
+  before making this change, so the only thing a 30s window actually
+  affects is pure back/forward navigation with no mutation involved, which
+  is exactly the case that should be instant.
+
+### Verified
+
+- `pnpm lint` and `pnpm typecheck` pass; `pnpm build` accepts the new
+  `staleTimes` config with no warnings.
+- Confirmed via source inspection (not assumption) that
+  `staleTimes.dynamic: 0` is genuinely this Next.js version's shipped
+  default, and that every existing mutation path already has its own
+  explicit `router.refresh()` unaffected by this change.
+
+### Not independently verified
+
+- The actual in-browser feel of back-navigation after this fix. This is a
+  client-side router caching behavior that fundamentally cannot be verified
+  with `curl` — every `curl` request is a fresh HTTP request with no
+  persistent client router state between calls, so there is no way to
+  script-verify this from this environment. Needs a real manual check:
+  journal → tap an entry → tap the app's own back arrow (not the browser's)
+  → confirm it now feels instant, matching the browser's native back button.
+
 ## 2026-08-16 — Perf: found and fixed the real ~700ms-per-page cost (sequential Storage calls, not DB connections)
 
 Follow-up to the 2026-08-15 `CalendarPicker` fix — the deploy still felt
