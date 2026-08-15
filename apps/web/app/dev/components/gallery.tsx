@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { Archive, Trash2, RefreshCw, Mail, Search } from "lucide-react";
 import {
   Avatar,
@@ -11,7 +12,6 @@ import {
   BottomSheetTitle,
   BottomSheetTrigger,
   Button,
-  CalendarPicker,
   Card,
   CardContent,
   CardDescription,
@@ -45,6 +45,14 @@ import {
   TransportButton,
   WaveformVisualizer,
 } from "@mindreva/ui";
+
+// Deferred the same way as its real app usage (entry-list-screen.tsx) — see
+// that file's comment. Keeps this dev-only gallery from silently
+// reintroducing react-day-picker's weight into its own bundle.
+const CalendarPicker = dynamic(
+  () => import("@mindreva/ui/calendar-picker").then((m) => m.CalendarPicker),
+  { ssr: false },
+);
 
 function Section({
   title,

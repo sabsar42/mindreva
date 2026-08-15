@@ -17,6 +17,10 @@ out/
 # turborepo
 .turbo/
 
+# sentry (may contain the auth token if the CLI ever writes it locally)
+.sentryclirc
+.env.sentry-build-plugin
+
 # build output
 dist/
 build/

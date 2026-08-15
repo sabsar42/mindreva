@@ -14,7 +14,17 @@ import * as schema from "./schema";
  */
 let dbSingleton: PostgresJsDatabase<typeof schema> | undefined;
 
+// TEMPORARY DIAGNOSTIC — module load timestamp + a per-process random id, so
+// Vercel's function logs show whether getDb() is reusing the same module
+// instance across requests (singleton working) or re-evaluating this file
+// fresh each time (singleton defeated by the platform's instance lifecycle).
+// Remove once the question is answered — see docs/KNOWN-ISSUES.md.
+const MODULE_INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+let getDbCallCount = 0;
+
 export function getDb(): PostgresJsDatabase<typeof schema> {
+  getDbCallCount++;
+  const wasAlreadyInitialized = !!dbSingleton;
   if (!dbSingleton) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
@@ -26,5 +36,8 @@ export function getDb(): PostgresJsDatabase<typeof schema> {
     const client = postgres(connectionString, { prepare: false });
     dbSingleton = drizzle(client, { schema });
   }
+  console.log(
+    `[getDb diagnostic] moduleInstance=${MODULE_INSTANCE_ID} callCount=${getDbCallCount} reusedExistingConnection=${wasAlreadyInitialized}`,
+  );
   return dbSingleton;
 }

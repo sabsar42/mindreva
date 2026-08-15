@@ -1396,9 +1396,9 @@ The repo had **no root `start` script** and `turbo.json` defined no `start` task
 - [ ] Confirm Vercel's automatic PR preview deployments are enabled (should already work from the Phase 1 connection)
 - [ ] Set environment variables separately for Preview and Production in the Vercel dashboard; **never point Preview at the same Supabase project as Production** once real user data exists
 - [ ] Add branch protection on `main`: require the CI workflow to pass before merge
-- [ ] Set up Sentry (free tier) for client and server error tracking
+- [ ] Set up Sentry (free tier) for client and server error tracking — code is wired in (`@sentry/nextjs`, all three runtime configs, `global-error.tsx`, source-map upload config; see `DEPLOYMENT.md`), verified as a safe no-op with no DSN set. Still open: create the actual Sentry project and confirm a real error arrives in its dashboard — that step needs account access this environment doesn't have.
 - [ ] Enable Vercel Analytics (free tier) for basic traffic visibility
-- [ ] Write `DEPLOYMENT.md`: every env var and what it's for, how to rotate keys, how to roll back a deployment, a manual smoke-test checklist
+- [x] Write `DEPLOYMENT.md`: every env var and what it's for, how to rotate keys, how to roll back a deployment, a manual smoke-test checklist
 - [ ] Run the full manual smoke test against the live production URL: sign up, record, transcribe, summarize, start a past-self chat
 - [ ] Explicitly revisit ADR-7: confirm you're still within Vercel Hobby's non-commercial terms, and note the calendar date you plan to introduce monetization so the Pro upgrade isn't a surprise later
 

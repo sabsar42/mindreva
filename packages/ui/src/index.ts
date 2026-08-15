@@ -46,10 +46,14 @@ export {
   type FilterPillOption,
   type FilterPillsProps,
 } from "./components/filter-pills";
-export {
-  CalendarPicker,
-  type CalendarPickerProps,
-} from "./components/calendar-picker";
+// CalendarPicker is deliberately NOT re-exported here. It pulls in
+// react-day-picker (~164kB, confirmed by measuring the real deployed
+// /journal bundle), and every consumer of the shared barrel would otherwise
+// bundle that weight even though the calendar sits inside a closed-by-default
+// BottomSheet most page visits never open. Import it directly via
+// "@mindreva/ui/calendar-picker" behind next/dynamic — the same isolation
+// pattern already used for @mindreva/ui/rich-text-editor.
+export type { CalendarPickerProps } from "./components/calendar-picker";
 export { NoteCard, type NoteCardProps } from "./components/note-card";
 export {
   SwipeableRow,

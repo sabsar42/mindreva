@@ -7,6 +7,153 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-08-15 — Perf: deferred `CalendarPicker` off the journal/notes critical path
+
+Prompted by a live smoke test on the deployed URL reporting every screen as
+slow/laggy, after the `start`-script fix that should have resolved
+dev-mode slowness. Investigated by creating a throwaway account and hitting
+the deployed URL with a real authenticated session (not just curl-ing an
+unauthenticated redirect, which had misleadingly looked fast) — a real
+diagnostic, not a guess.
+
+### Found
+
+- **`next build`'s "First Load JS" figure is not the real payload.** It only
+  reports a route's own chunk plus the top-level shared framework chunk, not
+  every chunk the browser actually fetches on first visit. Measured the real
+  number by downloading every asset referenced in an authenticated
+  `/journal` response: **~812KB**, not the ~198KB the build report implied —
+  reproduced identically from a fresh local production build, confirming
+  this is a real code issue, not a stale or Vercel-specific deploy artifact.
+- Of that ~812KB, **~164KB (as unminified `react-day-picker`, ~79KB
+  minified) was `CalendarPicker`**, imported eagerly at the top of
+  `entry-list-screen.tsx` and `dev/components/gallery.tsx` even though the
+  calendar lives inside a `BottomSheet` closed by default — most page visits
+  never open it. Same category of bug as the `RichTextEditor`/Lexical
+  barrel-leak documented in this file's 2026-07-27 entry.
+
+### Fixed
+
+- `CalendarPicker` removed from `packages/ui/src/index.ts`'s barrel (its
+  type stays exported — types are erased at compile time and cost nothing at
+  runtime, only the value/component export needed isolating). Both
+  consumers now import it via `@mindreva/ui/calendar-picker` behind
+  `next/dynamic({ ssr: false })`, the same isolation pattern already
+  established for `@mindreva/ui/rich-text-editor`.
+
+### Verified
+
+- Confirmed the DayPicker chunk is genuinely absent from `/journal`'s own
+  build manifest and from the authenticated page's rendered HTML afterward
+  (grepped for its content hash in both) — it now only loads once the date
+  picker is actually opened, not on every list-screen visit.
+- Real measured payload for `/journal`: **812KB → 738KB (-74KB)**. Smaller
+  than the full 164KB estimate, because `react-day-picker` minifies to
+  ~79KB in production — still a real, verified reduction, and more
+  importantly it's now conditional rather than paid on every visit.
+- `pnpm lint` (6/6) and `pnpm typecheck` (7/7) pass; `pnpm build` succeeds
+  with `/journal`'s reported First Load JS dropping 198KB → 177KB (a
+  correlated, not equivalent, number — see the "Found" note above on why
+  that figure understates the true payload either way).
+- The deferred chunk was fetched directly from a local production server and
+  confirmed to serve correctly (200, not a broken dynamic-import 404); the
+  package's `exports` wildcard (`"./*": "./src/components/*.tsx"`) was
+  confirmed to resolve `@mindreva/ui/calendar-picker` to the real file.
+
+### Not independently verified
+
+- The calendar's actual in-browser behavior after this change (opening the
+  sheet, seeing the loading skeleton, the calendar rendering correctly) —
+  no browser tool available in this environment. Build/typecheck/manifest
+  checks pass, but a manual check of the real interaction is still worth
+  doing.
+- Whether this fully explains the "every screen felt slow" report from the
+  live smoke test, or whether other routes/interactions have a similar
+  eager-import issue not yet found. Recommend re-running the smoke test
+  after this ships to see if the perceived slowness is resolved or only
+  partially improved.
+
+## 2026-08-07 — Phase 7 (continued): Sentry error tracking wired in
+
+### Added
+
+- `@sentry/nextjs`, hand-configured rather than via the interactive
+  `@sentry/wizard` CLI (which needs a browser OAuth login unavailable in
+  this environment): `apps/web/sentry.client.config.ts`,
+  `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`
+  (Next.js's `register()`/`onRequestError` hooks, the SDK's current
+  recommended entry point), `app/global-error.tsx` (root-layout crash
+  boundary — deliberately styled with plain inline CSS, since it replaces
+  the entire `<html>` document and can't rely on `globals.css` or
+  `@mindreva/ui` having loaded), and a `withSentryConfig` wrapper around
+  `next.config.ts` for source-map upload.
+- `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`,
+  `SENTRY_PROJECT` documented in `.env.example` and `DEPLOYMENT.md`.
+- `@sentry/cli` added to `onlyBuiltDependencies` in the root `package.json`
+  so its postinstall script (fetches the sentry-cli binary used for
+  source-map uploads) runs without pnpm's build-script prompt blocking CI.
+
+### Verified
+
+- **Sentry is a true no-op with no DSN configured** — the state this repo is
+  in right now, since no Sentry project has been created yet. Confirmed
+  directly: `pnpm build` succeeds with every Sentry var unset, including
+  under CI's exact placeholder-Supabase-var build command; `next start`
+  afterward serves `/` (200) and an authenticated redirect on `/journal`
+  (307) correctly.
+- Caught and fixed a real deprecation warning during verification —
+  `disableLogger` is deprecated in the installed SDK version in favor of
+  `webpack.treeshake.removeDebugLogging`; the build log was clean of it
+  after the fix.
+- Found two real costs during the same verification pass, not fixed (not
+  worth trading away Sentry's actual value):
+  - Middleware bundle size roughly doubled (94.6kB → 192kB) once the edge
+    config was wired in, confirmed to happen even with no DSN set — the
+    config module bundles regardless of runtime activity.
+  - The build now emits ~10 Turbopack warnings about
+    `import-in-the-middle`/`@opentelemetry/instrumentation` not being
+    externalizable — a known Sentry/Turbopack interaction, confirmed
+    non-fatal by testing the resulting build actually serves correctly.
+    Both documented in `DEPLOYMENT.md` rather than silently accepted.
+
+### Not done here
+
+- No Sentry project exists yet — that's dashboard/account work outside this
+  environment's access, same as the other Phase 7 items. `DEPLOYMENT.md`
+  has the exact steps to finish activating it once a project is created.
+
+## 2026-08-07 — Phase 7 (continued): DEPLOYMENT.md
+
+Added `DEPLOYMENT.md` at the repo root, closing that checklist item.
+References `.env.example` for what each variable is rather than duplicating
+its descriptions (avoids drift between the two files); adds the operational
+detail `.env.example` doesn't cover — which values are secret, what happens
+if each is missing, and where to obtain each one. Also documents: rotating
+`SUPABASE_SERVICE_ROLE_KEY` (including verifying the old key is actually
+dead afterward, not just assuming), rolling back a Vercel deployment (and
+the explicit warning that database migrations do not roll back with it), and
+a 10-step production smoke test covering sign-up through onboarding,
+recording, transcription, summarization, photos, notes, mindmap, and
+persona chat.
+
+Verified the two most load-bearing factual claims in it rather than assuming
+them from memory: `packages/asr/src/factory.ts` exists at the path
+referenced, and `embeddings.embedding` is genuinely `vector(2048)`
+(`packages/database/src/schema.ts:179`), matching the warning that
+`OPENROUTER_EMBEDDING_MODEL` must stay a different, fixed-dimension model
+from `OPENROUTER_MODEL`.
+
+Explicitly flags two things a deployer needs to know before trusting a
+deploy: Preview and Production still share one Supabase project (a
+data-safety concern the smoke-test / rollback sections both point back to
+docs/KNOWN-ISSUES.md for), and CI's test step is close to vacuous today.
+
+The remaining Phase 7 checklist items (Vercel preview-deploy confirmation,
+Preview/Production env separation, branch protection, Sentry, Vercel
+Analytics, the live smoke test itself) are dashboard actions or decisions
+requiring account access this environment doesn't have — not done here,
+tracked as open in docs/roadmap.md's checklist.
+
 ## 2026-08-07 — Phase 7 (partial): root `start` script and CI pipeline
 
 Prompted by a slow deployed preview environment. A DevTools capture on

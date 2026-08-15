@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -16,7 +17,6 @@ import {
   BottomSheet,
   BottomSheetContent,
   BottomSheetTitle,
-  CalendarPicker,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -34,6 +34,21 @@ import {
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { TranscriptionWatcher } from "./transcription-watcher";
+
+// CalendarPicker pulls in react-day-picker (~164kB, confirmed by measuring
+// the real deployed /journal bundle) for a component that sits inside a
+// BottomSheet closed by default — most page visits never open it. Deferred
+// to its own chunk, fetched only once the sheet is actually opened, the same
+// isolation pattern used for @mindreva/ui/rich-text-editor.
+const CalendarPicker = dynamic(
+  () => import("@mindreva/ui/calendar-picker").then((m) => m.CalendarPicker),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-warm-100 h-72 w-full animate-pulse rounded-md" />
+    ),
+  },
+);
 
 type FilterValue = "all" | "today" | "week" | "date";
 
