@@ -7,6 +7,54 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-08-16 — Perf: pinned the Vercel function region to Tokyo, closing the real remaining gap
+
+Reported directly: every screen still felt slow on its first visit each
+session, even after the prefetch/caching fixes above — those only help
+_repeat_ visits and taps into a list you're already on, not the very first
+request after signing in.
+
+### Found
+
+- Re-measured the LIVE deploy specifically (prior rounds had only re-verified
+  locally, which was the gap) with fresh accounts and repeated hits: `/mindmap`
+  (a route doing almost no work) landed flat at 656-681ms across _confirmed
+  warm, confirmed reused_ function instances — ruling out cold starts and
+  ruling out the connection-reuse question already resolved earlier.
+- `x-vercel-id` on every request read `bom1::iad1` — the function was
+  running in `iad1` (Washington, D.C., USA East), while Supabase is in
+  `ap-northeast-2` (Seoul). That transcontinental hop, paid on every single
+  request regardless of what the route actually queries, was the flat ~660ms
+  floor. Local testing never showed this because a local machine talks to
+  Seoul directly, with no US detour in the path.
+
+### Fixed
+
+- Added `vercel.json` at the repo root with `"regions": ["hnd1"]` (Tokyo) —
+  confirmed against the user's own Vercel dashboard (Settings → Functions →
+  Function Region) as a real, available option before committing to it,
+  rather than guessing the region code from memory. Tokyo is the closest
+  available Vercel region to Seoul; direct Seoul (`icn1`) was also listed
+  but Tokyo was the one selected. The dashboard setting was changed by the
+  user directly (from the default North America region); this file makes
+  that choice durable in the repo instead of only living as a
+  dashboard setting someone could later revert without realizing why.
+
+### Verified
+
+- `vercel.json` is valid JSON.
+- The dashboard's Function Region screenshot confirms `hnd1` — Tokyo,
+  Japan — as the now-selected region, matching this file.
+
+### Not independently verified
+
+- The actual post-deploy latency improvement. This requires a fresh
+  deploy under the new region (which this environment doesn't trigger —
+  only a git push does) and then the same live-deploy measurement
+  methodology used to find the problem. Worth re-running that check once
+  deployed: fresh account, several routes, confirm the flat ~660ms floor is
+  gone.
+
 ## 2026-08-16 — Perf: prefetch entry data on hover/touch-intent, not just on-visible
 
 Follow-up to the back-navigation fix above — the remaining gap was the
