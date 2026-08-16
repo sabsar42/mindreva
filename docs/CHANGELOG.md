@@ -45,15 +45,21 @@ request after signing in.
 - `vercel.json` is valid JSON.
 - The dashboard's Function Region screenshot confirms `hnd1` — Tokyo,
   Japan — as the now-selected region, matching this file.
-
-### Not independently verified
-
-- The actual post-deploy latency improvement. This requires a fresh
-  deploy under the new region (which this environment doesn't trigger —
-  only a git push does) and then the same live-deploy measurement
-  methodology used to find the problem. Worth re-running that check once
-  deployed: fresh account, several routes, confirm the flat ~660ms floor is
-  gone.
+- **Re-measured the live deploy after the redeploy rolled out**, same
+  methodology as the original diagnosis (fresh account, repeated hits to
+  `/mindmap`, checked `x-vercel-id`):
+  - `x-vercel-id` now reads `bom1::hnd1` on every request — confirms the
+    function is genuinely executing in Tokyo, not Washington, D.C.
+  - The flat ~656-681ms floor is gone. Warm requests to `/mindmap` now land
+    at **323-486ms**, roughly a **45-50% reduction**, and critically no
+    longer _flat_ — meaning the remaining time is real per-route work
+    (queries, rendering) that further optimization can actually affect,
+    rather than being masked by a fixed geography tax every request paid
+    regardless of what it did.
+  - Every other route checked (`/journal`, `/notes`, `/account`, `/chat`,
+    `/archive`, `/trash`) showed the same `bom1::hnd1` routing and landed in
+    the 323-546ms range, down from the prior flat ~660-870ms band measured
+    across all of them.
 
 ## 2026-08-16 — Perf: prefetch entry data on hover/touch-intent, not just on-visible
 
