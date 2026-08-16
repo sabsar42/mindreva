@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, History } from "lucide-react";
 import { Button, Input, cn, toast } from "@mindreva/ui";
+import { PrefetchLink } from "../_components/prefetch-link";
 
 interface SessionSummary {
   id: string;
@@ -85,13 +86,13 @@ export function ChatHome({
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 pb-24 pt-6">
       <header className="flex items-center gap-3">
-        <Link
+        <PrefetchLink
           href="/journal"
           aria-label="Back"
           className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
         >
           <ArrowLeft className="size-5" />
-        </Link>
+        </PrefetchLink>
       </header>
 
       <h1 className="text-foreground mt-4 font-serif text-3xl font-bold leading-tight tracking-tight">
@@ -228,7 +229,7 @@ export function ChatHome({
               </h2>
               <div className="mt-3 space-y-2">
                 {sessions.map((s) => (
-                  <Link
+                  <PrefetchLink
                     key={s.id}
                     href={`/chat/${s.id}`}
                     className="border-border bg-card hover:bg-warm-50 flex items-center gap-3 rounded-lg border p-3.5 transition-colors"
@@ -245,7 +246,7 @@ export function ChatHome({
                       </span>
                     </span>
                     <ArrowRight className="text-muted-foreground size-4 shrink-0" />
-                  </Link>
+                  </PrefetchLink>
                 ))}
               </div>
             </section>

@@ -12,6 +12,7 @@ import {
 import { getUser } from "@mindreva/auth/server";
 import { getMyProfile, type UseCase } from "@/lib/services/profile.service";
 import { countMyEntries } from "@/lib/services/entries.service";
+import { PrefetchLink } from "../_components/prefetch-link";
 import {
   LanguagesCard,
   PreferenceToggles,
@@ -36,13 +37,13 @@ export default async function AccountPage() {
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 py-6">
       <header className="mb-6 flex items-center gap-3">
-        <Link
+        <PrefetchLink
           href="/journal"
           aria-label="Back"
           className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
         >
           <ArrowLeft className="size-5" />
-        </Link>
+        </PrefetchLink>
         <h1 className="text-xl font-bold tracking-tight">Account</h1>
       </header>
 
@@ -92,22 +93,22 @@ export default async function AccountPage() {
             title="Cloud sync"
             description={`${noteCount} ${noteCount === 1 ? "note" : "notes"} kept · Free`}
           />
-          <Link href="/archive">
+          <PrefetchLink href="/archive">
             <SettingsRow
               icon={<Archive />}
               title="Archived"
               description="Notes you archive are kept here"
               chevron
             />
-          </Link>
-          <Link href="/trash">
+          </PrefetchLink>
+          <PrefetchLink href="/trash">
             <SettingsRow
               icon={<Trash2 />}
               title="Trash"
               description="Restore or permanently delete notes"
               chevron
             />
-          </Link>
+          </PrefetchLink>
         </Card>
 
         <PreferenceToggles />

@@ -84,13 +84,13 @@ export function MindmapScreen({
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 pb-12 pt-6">
       <header className="flex items-center gap-3">
-        <Link
+        <PrefetchLink
           href="/journal"
           aria-label="Back"
           className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
         >
           <ArrowLeft className="size-5" />
-        </Link>
+        </PrefetchLink>
       </header>
 
       <h1 className="text-foreground mt-4 font-serif text-3xl font-bold leading-tight tracking-tight">

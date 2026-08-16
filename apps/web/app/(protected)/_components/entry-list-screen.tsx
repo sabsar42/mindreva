@@ -272,29 +272,29 @@ export function EntryListScreen({
           )}
           {showChatLink && (
             <>
-              <Link
+              <PrefetchLink
                 href="/mindmap"
                 aria-label="Your mindmap"
                 className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
               >
                 <Network className="size-5" />
-              </Link>
-              <Link
+              </PrefetchLink>
+              <PrefetchLink
                 href="/chat"
                 aria-label="Chat with your past self"
                 className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
               >
                 <History className="size-5" />
-              </Link>
+              </PrefetchLink>
             </>
           )}
-          <Link
+          <PrefetchLink
             href="/account"
             aria-label="Account"
             className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
           >
             <Settings className="size-5" />
-          </Link>
+          </PrefetchLink>
         </div>
       </div>
 

@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Undo2 } from "lucide-react";
 import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
+import { PrefetchLink } from "../_components/prefetch-link";
 
 // Note: trashed entries are intentionally NOT links to /entries/[id] — the
 // detail route excludes soft-deleted rows (getByIdForUser returns null once
@@ -48,13 +48,13 @@ export function TrashList({
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 py-6">
       <header className="flex items-center gap-3">
-        <Link
+        <PrefetchLink
           href="/account"
           aria-label="Back"
           className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
         >
           <ArrowLeft className="size-5" />
-        </Link>
+        </PrefetchLink>
         <h1 className="text-xl font-bold tracking-tight">Trash</h1>
       </header>
       <p className="text-muted-foreground mt-1 text-sm">

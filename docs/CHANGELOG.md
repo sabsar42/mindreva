@@ -7,6 +7,51 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-08-16 — Perf: extended hover/touch prefetching to every remaining nav link
+
+Reported directly: some screens still showed a loading state despite the
+region pin and the earlier prefetch work.
+
+### Found
+
+- `PrefetchLink` (added earlier the same day) was only wired into links
+  going to `/entries/[id]`. Every other cross-screen navigation — the
+  header icons for mindmap/chat/account on journal & notes, account's links
+  to archive/trash, and every screen's own back arrow (archive→account,
+  trash→account, chat→journal, mindmap→journal) — was still a plain
+  `next/link`, meaning it only got `PrefetchKind.AUTO` (static shell only)
+  from Next's default. None of those got the hover/touch-intent head start,
+  so tapping into any of them still waited for the fetch to start only once
+  the tap landed.
+
+### Fixed
+
+- Replaced every remaining plain `<Link>` to a _dynamic_ destination with
+  `PrefetchLink` across `entry-list-screen.tsx` (mindmap/chat/account
+  header icons), `account/page.tsx` (back-to-journal, archive, trash),
+  `archive-list.tsx` and `trash-list.tsx` (back-to-account),
+  `chat-home.tsx` (back-to-journal, every past-conversation row), and
+  `mindmap-screen.tsx` (back-to-journal).
+- Deliberately left as plain `<Link>`: anything pointing at a **static**
+  route (`/notes/new`, `/record`, `/privacy`, `/terms`, `/support`) —
+  those are prerendered (`○` in the build output), so `next/link`'s default
+  prefetch already fetches them fully; wrapping them would add nothing.
+
+### Verified
+
+- `pnpm lint` (0 warnings after removing two now-unused `Link` imports in
+  `archive-list.tsx`/`trash-list.tsx`) and `pnpm typecheck` (7/7) pass.
+- `pnpm build` succeeds with no meaningful bundle-size change.
+
+### Not independently verified
+
+- The in-browser feel of these specific navigations after the fix — same
+  limitation as every prefetch-related change in this file: hover/touch
+  timing racing a network request can't be verified with `curl`. Worth a
+  manual check across the newly-wired links (journal→mindmap, journal→chat,
+  journal→account, account→archive, account→trash, chat home→a past
+  conversation).
+
 ## 2026-08-16 — Perf: pinned the Vercel function region to Tokyo, closing the real remaining gap
 
 Reported directly: every screen still felt slow on its first visit each

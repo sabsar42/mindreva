@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArchiveRestore, Trash2 } from "lucide-react";
 import {
@@ -70,13 +69,13 @@ export function ArchiveList({
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 py-6">
       <header className="flex items-center gap-3">
-        <Link
+        <PrefetchLink
           href="/account"
           aria-label="Back"
           className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
         >
           <ArrowLeft className="size-5" />
-        </Link>
+        </PrefetchLink>
         <h1 className="text-xl font-bold tracking-tight">Archived</h1>
       </header>
 
