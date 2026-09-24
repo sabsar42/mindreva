@@ -66,7 +66,7 @@ function Section({
       <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
         {title}
       </h2>
-      <div className="border-border bg-card shadow-subtle rounded-lg border p-6">
+      <div className="border-border bg-card rounded-xl border p-6">
         {children}
       </div>
     </section>
@@ -251,8 +251,7 @@ export function ComponentsGallery() {
         <div className="space-y-4">
           <NoteCard
             title="And so I was wondering what happened when I sleep and wake up in the morning."
-            weekdayLabel="Wed"
-            dayOfMonth="22"
+            dateLabel="Sep 22, 10:30 AM"
             durationLabel="37 s"
             snippet="when I sleep and wake up Do you understand what I'm saying about the mornings…"
             thumbnailUrl="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&h=200&fit=crop"
@@ -260,8 +259,7 @@ export function ComponentsGallery() {
           />
           <NoteCard
             title="Um, hey, what's up?"
-            weekdayLabel="Tue"
-            dayOfMonth="21"
+            dateLabel="Sep 21, 3:45 PM"
             durationLabel="3 s"
             snippet="Um, hey, what's up?"
             onClick={() => {}}

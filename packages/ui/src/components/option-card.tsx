@@ -35,8 +35,8 @@ const OptionCard = React.forwardRef<HTMLButtonElement, OptionCardProps>(
           "flex w-full items-center gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors",
           "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
           selected
-            ? "border-mint-300 bg-accent"
-            : "border-border bg-card hover:bg-warm-100",
+            ? "border-foreground bg-accent"
+            : "border-border bg-card hover:bg-accent",
           className,
         )}
         {...props}
@@ -53,7 +53,7 @@ const OptionCard = React.forwardRef<HTMLButtonElement, OptionCardProps>(
           aria-hidden
           className={cn(
             "flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-            selected ? "border-primary bg-primary" : "border-warm-300 bg-card",
+            selected ? "border-primary bg-primary" : "bg-card border-gray-300",
           )}
         >
           {selected && <span className="size-1.5 rounded-full bg-white" />}

@@ -19,18 +19,16 @@ export interface MindmapLink {
 }
 
 /**
- * Shades drawn from the app's own dark-mint scale (see packages/ui tokens),
- * not an arbitrary categorical palette — the map should read as part of this
- * app, not a data-viz widget dropped into it. Ordered light-to-dark so
- * adjacent indices stay visually distinct.
+ * Mint-scale tints for the mindmap — alternating dark/light stops so adjacent
+ * nodes stay visually distinct while staying on brand.
  */
 const MINDMAP_TINTS = [
-  { fill: "var(--color-mint-600)", text: "#ffffff" },
-  { fill: "var(--color-mint-300)", text: "var(--color-mint-900)" },
-  { fill: "var(--color-mint-700)", text: "#ffffff" },
+  { fill: "var(--color-mint-700)", text: "var(--color-mint-50)" },
   { fill: "var(--color-mint-200)", text: "var(--color-mint-900)" },
-  { fill: "var(--color-mint-500)", text: "#ffffff" },
-  { fill: "var(--color-mint-400)", text: "var(--color-mint-900)" },
+  { fill: "var(--color-mint-500)", text: "var(--color-mint-50)" },
+  { fill: "var(--color-mint-100)", text: "var(--color-mint-800)" },
+  { fill: "var(--color-mint-900)", text: "var(--color-mint-100)" },
+  { fill: "var(--color-mint-300)", text: "var(--color-mint-900)" },
 ] as const;
 
 /** Node radius from entry count — area-proportional so a 4x cluster doesn't read as 4x wide. */
@@ -177,7 +175,7 @@ export function MindmapGraph({
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
-                stroke="var(--color-mint-200)"
+                stroke="var(--color-border)"
                 strokeWidth={Math.min(3, 1 + link.weight * 0.5)}
                 strokeLinecap="round"
                 opacity={0.7}

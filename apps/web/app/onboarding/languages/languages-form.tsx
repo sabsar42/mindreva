@@ -33,7 +33,7 @@ export function LanguagesForm({ initial }: { initial: string[] }) {
         Which languages do you speak?
       </h1>
       <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-        Pick every language that appears in your recordings — Mindreva listens
+        Pick every language that appears in your recordings. Mindreva listens
         for these, and mixing them in one recording is fine.
       </p>
 

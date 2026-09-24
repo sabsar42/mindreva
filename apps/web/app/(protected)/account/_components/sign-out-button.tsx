@@ -1,18 +1,21 @@
 "use client";
 
 import * as React from "react";
+import { Button } from "@mindreva/ui";
 import { signOutAction } from "../actions";
 
 export function SignOutButton() {
   const [pending, startTransition] = React.useTransition();
   return (
-    <button
+    <Button
       type="button"
+      variant="primary"
+      size="default"
       disabled={pending}
+      className="w-full"
       onClick={() => startTransition(() => signOutAction())}
-      className="text-destructive text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
     >
       {pending ? "Signing out…" : "Sign out"}
-    </button>
+    </Button>
   );
 }

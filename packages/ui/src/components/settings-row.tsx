@@ -43,7 +43,7 @@ const SettingsRow = React.forwardRef<HTMLDivElement, SettingsRowProps>(
         className={cn(
           "flex items-center gap-3.5 px-5 py-4",
           interactive &&
-            "hover:bg-warm-100 focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
+            "hover:bg-accent focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
           className,
         )}
         {...props}
@@ -64,7 +64,7 @@ const SettingsRow = React.forwardRef<HTMLDivElement, SettingsRowProps>(
         {trailing ? (
           <div className="shrink-0">{trailing}</div>
         ) : chevron ? (
-          <ChevronRight className="text-warm-400 size-5 shrink-0" />
+          <ChevronRight className="text-muted-foreground size-5 shrink-0" />
         ) : null}
       </div>
     );

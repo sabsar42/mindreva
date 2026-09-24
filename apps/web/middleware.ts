@@ -33,8 +33,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Signed-in users should not sit on the auth screens.
-  if (user && isAuthRoute) {
+  // Signed-in users should not sit on the auth screens or the landing page.
+  if (user && (isAuthRoute || pathname === "/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/journal";
     return NextResponse.redirect(url);

@@ -139,7 +139,7 @@ export function RecordFlow() {
         finish();
       } else if (elapsed >= SOFT_WARNING_MS && !warnedRef.current) {
         warnedRef.current = true;
-        toast("5 minutes in — shorter recordings transcribe fastest.");
+        toast("5 minutes in. Shorter recordings transcribe fastest.");
       }
     }, 250);
   }, [stopTimer]);
@@ -166,7 +166,7 @@ export function RecordFlow() {
         // a review screen for it: go straight home, and queue this entry for
         // the journal list's own background poll to toast once it's done.
         queueTranscriptionWatch(data.entryId);
-        toast.success("Recording saved — transcribing in the background…");
+        toast.success("Recording saved. Transcribing in the background…");
         router.push("/journal");
       } catch {
         setUploadFailed(true);
@@ -305,7 +305,7 @@ export function RecordFlow() {
 
   if (micError) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+      <main className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center md:max-w-2xl">
         <p className="text-foreground">{micError}</p>
         <div className="flex gap-3">
           <button
@@ -328,7 +328,7 @@ export function RecordFlow() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-5">
+    <main className="mx-auto flex min-h-screen flex-col px-6 py-5 md:max-w-2xl">
       <header className="flex items-center justify-between">
         <button
           type="button"
@@ -351,7 +351,7 @@ export function RecordFlow() {
               "size-2 rounded-full",
               state === "recording" && "bg-destructive animate-pulse",
               state === "preparing" && "bg-warning",
-              state === "paused" && "bg-warm-400",
+              state === "paused" && "bg-muted-foreground",
               state === "processing" && "bg-primary",
             )}
           />
@@ -371,7 +371,7 @@ export function RecordFlow() {
         />
 
         <p className="text-muted-foreground max-w-xs text-center text-sm">
-          Keep this tab open — closing it ends the recording. Your transcript is
+          Keep this tab open. Closing it ends the recording. Your transcript is
           ready to review once you finish.
         </p>
 
@@ -393,7 +393,7 @@ export function RecordFlow() {
             onClick={state === "recording" ? pause : resume}
             aria-label={state === "recording" ? "Pause" : "Resume"}
             className={cn(
-              "border-border bg-card shadow-subtle hover:bg-warm-100 focus-visible:ring-ring focus-visible:ring-offset-background flex size-14 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+              "border-border bg-card hover:bg-accent focus-visible:ring-ring focus-visible:ring-offset-background flex size-14 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
               state === "paused" ? "text-primary" : "text-foreground",
             )}
           >

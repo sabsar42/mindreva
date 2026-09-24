@@ -122,7 +122,7 @@ const TransportButton = React.forwardRef<
     type="button"
     aria-label={action === "pause" ? "Pause" : "Finish recording"}
     className={cn(
-      "border-border bg-card text-foreground shadow-subtle hover:bg-warm-100 focus-visible:ring-ring focus-visible:ring-offset-background flex size-14 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+      "border-border bg-card text-foreground hover:bg-accent focus-visible:ring-ring focus-visible:ring-offset-background flex size-14 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
       action === "stop" && "text-destructive",
       className,
     )}

@@ -7,6 +7,23 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-09-24 — Responsive design: desktop and tablet layout
+
+Added full responsive layout support for tablet and desktop breakpoints, on top of the existing mobile-first design.
+
+### Added
+
+- `apps/web/app/(protected)/layout.tsx` — new Next.js App Router layout for the protected route group; renders `SideNav` (desktop/tablet sidebar) + `BottomNav` (mobile only, now `md:hidden`); both are in one place instead of spread across every screen.
+- `apps/web/app/(protected)/_components/side-nav.tsx` — fixed left sidebar: icon-only at `md` (56px, `w-14`), icon + label at `lg` (224px, `w-56`); active state matches BottomNav's pill style; uses `PrefetchLink` for hover-intent prefetching like every other nav element.
+
+### Changed
+
+- `BottomNav` — added `md:hidden` so it is a mobile-only component; no longer rendered by individual screens.
+- Removed `<BottomNav />` from all individual screen files that previously rendered it directly (`entry-list-screen.tsx`, `chat-home.tsx`, `mindmap-screen.tsx`, `account/page.tsx`).
+- Main content containers across all protected pages — widened from `max-w-md` only to `max-w-md md:max-w-2xl`; bottom padding changed from `pb-24` to `pb-24 md:pb-10` (no bottom nav on desktop) wherever applicable.
+- Notes FAB — repositioned from `bottom-24 right-5` to `md:bottom-8 md:right-8` so it doesn't overlap the sidebar area on desktop.
+- All page `<main>` elements gain `md:ml-14 lg:ml-56` via the layout wrapper div to offset them away from the fixed sidebar.
+
 ## 2026-08-16 — Perf: extended hover/touch prefetching to every remaining nav link
 
 Reported directly: some screens still showed a loading state despite the

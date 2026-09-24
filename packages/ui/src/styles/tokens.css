@@ -50,16 +50,14 @@
 
   /* ---- Radius scale --------------------------------------------------- */
   --radius-sm: 0.375rem; /* 6px  */
-  --radius-md: 0.625rem; /* 10px — cards, chips, buttons: sharp rectangle, not a pill */
-  --radius-lg: 0.625rem; /* 10px — kept equal to md; nothing in this app wants a softer card corner */
+  --radius-md: 0.75rem; /* 12px — chips, small elements */
+  --radius-lg: 1rem; /* 16px — cards, panels */
   --radius-xl: 1.25rem; /* 20px */
   --radius-2xl: 1.75rem; /* 28px — record button / big surfaces */
 
-  /* ---- Elevation (two levels) ----------------------------------------- */
-  --shadow-subtle:
-    0 1px 2px rgba(20, 18, 15, 0.04), 0 1px 3px rgba(20, 18, 15, 0.06);
-  --shadow-elevated:
-    0 8px 24px rgba(20, 18, 15, 0.1), 0 2px 6px rgba(20, 18, 15, 0.05);
+  /* ---- Elevation — none; depth is created by bg contrast alone -------- */
+  --shadow-subtle: none;
+  --shadow-elevated: none;
 
   /* ---- Fonts (wired to next/font CSS variables in apps/web) ----------- */
   --font-sans:
@@ -82,72 +80,76 @@
 }
 
 /**
- * Semantic tokens. Light theme is the default (all reference screens are
- * light). Override this same set inside `.dark` to theme dark mode later —
- * no component needs to change.
+ * Semantic tokens — 4-color system.
+ *   #fbfaf7  background (near-white)
+ *   #b2efce  accent (hover / selected surfaces)
+ *   #26623f  primary (action — buttons, rings, active states)
+ *   #26372d  foreground (text / dark surface)
+ *
+ * Secondary, muted, border, and card values are derived from this set.
+ * To swap the palette: replace the four hex values above and re-derive
+ * the others proportionally — no component code needs to change.
  */
 :root {
-  --background: var(--color-warm-50);
-  --foreground: var(--color-warm-900);
+  --background: #fbfaf7;
+  --foreground: #26372d;
 
   --card: #ffffff;
-  --card-foreground: var(--color-warm-900);
+  --card-foreground: #26372d;
 
   --popover: #ffffff;
-  --popover-foreground: var(--color-warm-900);
+  --popover-foreground: #26372d;
 
-  /* action = dark mint */
-  --primary: var(--color-mint-600);
+  --primary: #26623f;
   --primary-foreground: #ffffff;
 
-  --secondary: var(--color-warm-100);
-  --secondary-foreground: var(--color-warm-800);
+  --secondary: #eaf3ee;
+  --secondary-foreground: #26372d;
 
-  --muted: var(--color-warm-100);
-  --muted-foreground: var(--color-warm-600);
+  --muted: #eaf3ee;
+  --muted-foreground: #5a7a68;
 
-  /* selected/active surface = lightest mint tint */
-  --accent: var(--color-mint-50);
-  --accent-foreground: var(--color-mint-700);
+  --accent: #b2efce;
+  --accent-foreground: #26372d;
 
   --destructive: var(--color-danger);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: var(--color-danger-foreground);
 
-  --border: var(--color-warm-200);
-  --input: var(--color-warm-200);
-  --ring: var(--color-mint-600);
+  --border: #c8e0d0;
+  --input: #c8e0d0;
+  --ring: #26623f;
 
   --radius: var(--radius-lg);
 }
 
 .dark {
-  --background: #12110e;
-  --foreground: #f3f1ea;
+  --background: #26372d;
+  --foreground: #fbfaf7;
 
-  --card: #1a1712;
-  --card-foreground: #f3f1ea;
+  --card: #2d4237;
+  --card-foreground: #fbfaf7;
 
-  --popover: #1a1712;
-  --popover-foreground: #f3f1ea;
+  --popover: #2d4237;
+  --popover-foreground: #fbfaf7;
 
-  --primary: var(--color-mint-400);
-  --primary-foreground: #0f2a1b;
+  --primary: #b2efce;
+  --primary-foreground: #26372d;
 
-  --secondary: #2c2820;
-  --secondary-foreground: #f3f1ea;
+  --secondary: #334a3e;
+  --secondary-foreground: #c8e0d0;
 
-  --muted: #2c2820;
-  --muted-foreground: #b0a996;
+  --muted: #334a3e;
+  --muted-foreground: #7fb595;
 
-  --accent: #163c27;
-  --accent-foreground: #d7ebdf;
+  --accent: #26623f;
+  --accent-foreground: #fbfaf7;
 
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --destructive: var(--color-danger);
+  --destructive-foreground: var(--color-danger-foreground);
 
-  --border: #2c2820;
-  --input: #2c2820;
-  --ring: var(--color-mint-400);
+  --border: #3d5447;
+  --input: #3d5447;
+  --ring: #b2efce;
 }
 
 /**

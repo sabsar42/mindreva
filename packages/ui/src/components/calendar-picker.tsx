@@ -52,7 +52,7 @@ function ThumbnailDayButton(
         style={
           thumbnailUrl
             ? {
-                backgroundImage: `linear-gradient(rgba(15, 42, 27, 0.15), rgba(15, 42, 27, 0.15)), url(${thumbnailUrl})`,
+                backgroundImage: `linear-gradient(color-mix(in srgb, var(--color-mint-900) 15%, transparent), color-mix(in srgb, var(--color-mint-900) 15%, transparent)), url(${thumbnailUrl})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }
@@ -116,9 +116,9 @@ function CalendarPicker({
           caption_label: "text-sm font-semibold text-foreground",
           nav: "absolute inset-x-0 top-0 flex items-center justify-between",
           button_previous:
-            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-warm-100 hover:text-foreground",
+            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
           button_next:
-            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-warm-100 hover:text-foreground",
+            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
           month_grid: "w-full border-collapse border-spacing-1",
           weekdays: "flex",
           weekday:
@@ -126,11 +126,11 @@ function CalendarPicker({
           week: "mt-1 flex w-full gap-1",
           day: "flex-1 p-0 text-center",
           day_button:
-            "relative mx-auto flex size-9 items-center justify-center rounded-md bg-warm-100 text-sm text-foreground transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "relative mx-auto flex size-9 items-center justify-center rounded-lg bg-accent text-sm text-foreground transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           today: "[&>button]:ring-2 [&>button]:ring-primary",
           selected:
             "[&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:font-semibold",
-          outside: "[&>button]:text-warm-400 [&>button]:opacity-50",
+          outside: "[&>button]:text-muted-foreground [&>button]:opacity-50",
           disabled: "[&>button]:opacity-40",
           hidden: "invisible",
         }}
@@ -167,7 +167,7 @@ function CalendarPicker({
                 setMonth(today);
                 onToday();
               }}
-              className="bg-accent text-accent-foreground hover:bg-mint-100"
+              className="bg-secondary text-secondary-foreground hover:bg-accent"
             >
               Today
             </Button>

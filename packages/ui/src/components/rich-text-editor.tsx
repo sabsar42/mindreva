@@ -80,7 +80,7 @@ function ToolbarPlugin({ toolbarEnd }: { toolbarEnd?: React.ReactNode }) {
           aria-label="Bold"
           aria-pressed={isBold}
           className={cn(
-            "hover:bg-warm-100 hover:text-foreground flex size-8 items-center justify-center rounded-md transition-colors",
+            "hover:bg-accent hover:text-foreground flex size-8 items-center justify-center rounded-md transition-colors",
             isBold
               ? "bg-accent text-accent-foreground"
               : "text-muted-foreground",
@@ -95,7 +95,7 @@ function ToolbarPlugin({ toolbarEnd }: { toolbarEnd?: React.ReactNode }) {
           aria-label="Italic"
           aria-pressed={isItalic}
           className={cn(
-            "hover:bg-warm-100 hover:text-foreground flex size-8 items-center justify-center rounded-md transition-colors",
+            "hover:bg-accent hover:text-foreground flex size-8 items-center justify-center rounded-md transition-colors",
             isItalic
               ? "bg-accent text-accent-foreground"
               : "text-muted-foreground",

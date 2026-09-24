@@ -127,7 +127,7 @@ export function TranscriptReview({
 
   if (status === "pending" || status === "processing") {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+      <main className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center md:max-w-2xl">
         <Loader2 className="text-primary size-8 animate-spin" />
         <p className="text-foreground">Transcribing your recording…</p>
         <p className="text-muted-foreground text-sm">
@@ -139,12 +139,12 @@ export function TranscriptReview({
 
   if (status === "failed") {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+      <main className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center md:max-w-2xl">
         <p className="text-foreground">
           We couldn&apos;t transcribe this recording.
         </p>
         <p className="text-muted-foreground text-sm">
-          It&apos;s still saved — you can find it in your journal.
+          It&apos;s still saved. You can find it in your journal.
         </p>
         <Button variant="secondary" onClick={() => router.push("/journal")}>
           Back to journal
@@ -154,7 +154,7 @@ export function TranscriptReview({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 px-6 py-6">
+    <main className="mx-auto flex min-h-screen flex-col gap-4 px-6 py-6 md:max-w-2xl">
       <div>
         <h1 className="text-foreground text-xl font-bold tracking-tight">
           Review your transcript

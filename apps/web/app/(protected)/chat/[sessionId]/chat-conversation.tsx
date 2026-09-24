@@ -68,7 +68,7 @@ function CitationChips({
         <PrefetchLink
           key={id}
           href={`/entries/${id}`}
-          className="border-mint-200 bg-accent text-accent-foreground hover:bg-mint-100 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors"
+          className="border-border bg-secondary text-secondary-foreground hover:bg-accent rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors"
         >
           {shortDateLabel(entryDates[id])}
         </PrefetchLink>
@@ -204,22 +204,13 @@ export function ChatConversation({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-5">
+    <main className="mx-auto flex min-h-screen flex-col px-5 py-5 md:max-w-2xl">
       <header className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => {
-            // router.back() reuses Next.js's Router Cache for /chat instead
-            // of forcing a fresh server render — same fix as entry-detail.tsx's
-            // back button, see that file's comment for the full explanation.
-            if (window.history.length > 1) {
-              router.back();
-            } else {
-              router.push("/chat");
-            }
-          }}
+          onClick={() => router.push("/chat")}
           aria-label="Back"
-          className="text-foreground hover:bg-warm-100 -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
+          className="text-foreground hover:bg-accent -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
         >
           <ArrowLeft className="size-5" />
         </button>
@@ -260,7 +251,7 @@ export function ChatConversation({
         {messages.map((m) =>
           m.role === "user" ? (
             <div key={m.id} className="flex justify-end">
-              <p className="bg-warm-100 text-foreground max-w-[85%] rounded-2xl px-4 py-2.5 text-sm">
+              <p className="bg-secondary text-secondary-foreground max-w-[85%] rounded-2xl px-4 py-2.5 text-sm">
                 {m.content}
               </p>
             </div>
@@ -317,6 +308,7 @@ export function ChatConversation({
           onClick={handleSend}
           disabled={sending || !input.trim()}
           aria-label="Send"
+          variant="primary"
         >
           <Send className="size-4" />
         </Button>

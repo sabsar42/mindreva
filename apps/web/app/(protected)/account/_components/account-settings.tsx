@@ -33,7 +33,7 @@ export function SummaryStyleCard({ initial }: { initial: UseCase }) {
             Summary style
           </h2>
           <p className="text-muted-foreground text-sm">
-            How Mindreva writes new notes — applies to your next recording
+            How Mindreva writes new notes, applies to your next recording
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ export function LanguagesCard({ initial }: { initial: string[] }) {
             Languages you speak
           </h2>
           <p className="text-muted-foreground text-sm">
-            Steers transcription and live captions — pick every language that
+            Steers transcription and live captions. Pick every language that
             appears in your recordings
           </p>
         </div>

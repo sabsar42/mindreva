@@ -17,8 +17,8 @@ export interface FilterPillsProps {
 }
 
 /**
- * The All / Today / This week / Date segmented control from the journal list.
- * Selected pill uses the light mint tint (accent), never the dark primary.
+ * iOS-style segmented control. All tabs sit inside a single rounded container;
+ * the active tab gets a white card background, inactive ones are plain muted text.
  */
 function FilterPills({
   options,
@@ -30,7 +30,10 @@ function FilterPills({
     <div
       role="tablist"
       aria-orientation="horizontal"
-      className={cn("flex flex-wrap items-center gap-2", className)}
+      className={cn(
+        "bg-secondary border-border flex w-full items-center gap-0.5 rounded-full border p-1",
+        className,
+      )}
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -42,15 +45,15 @@ function FilterPills({
             aria-selected={selected}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-4 py-1.5 text-sm font-medium transition-colors",
-              "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+              "inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+              "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
               selected
-                ? "border-mint-300 bg-accent text-accent-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-warm-100 hover:text-foreground",
+                ? "bg-card text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {option.icon && (
-              <span className="[&_svg]:size-4">{option.icon}</span>
+              <span className="[&_svg]:size-3.5">{option.icon}</span>
             )}
             {option.label}
           </button>

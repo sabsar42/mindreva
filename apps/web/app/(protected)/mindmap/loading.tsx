@@ -5,7 +5,7 @@ import { Skeleton } from "@mindreva/ui/skeleton";
 
 export default function MindmapLoading() {
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 pb-12 pt-6">
+    <main className="mx-auto min-h-screen px-5 pb-12 pt-6 md:max-w-2xl md:pb-10">
       <Skeleton className="size-9 rounded-full" />
       <Skeleton className="mt-4 h-9 w-52" />
       <Skeleton className="mt-3 h-4 w-full" />
