@@ -1,6 +1,5 @@
 import { listMyEntries, entryDatesFrom } from "@/lib/services/entries.service";
 import { EntryListScreen } from "../_components/entry-list-screen";
-import { RecordEntryButton } from "./record-entry-button";
 
 export default async function JournalPage() {
   const entries = await listMyEntries({ type: "journal" });
@@ -12,8 +11,6 @@ export default async function JournalPage() {
       heading="Journal"
       entries={entries}
       entryDates={entryDates}
-      showChatLink
-      floatingAction={<RecordEntryButton />}
     />
   );
 }

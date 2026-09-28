@@ -25,7 +25,12 @@ import {
   toast,
   type FilterPillOption,
 } from "@mindreva/ui";
-import { formatEntryDateTime, formatDuration } from "@/lib/format-entry";
+import {
+  DATE_PLACEHOLDER,
+  formatEntryDateTime,
+  formatDuration,
+} from "@/lib/format-entry";
+import { useHydrated } from "@/lib/use-hydrated";
 import { ConfirmTrashDialog } from "./confirm-trash-dialog";
 import { EmptyState } from "./empty-state";
 import { SwipeNav } from "./swipe-nav";
@@ -78,8 +83,6 @@ export function EntryListScreen({
   entries,
   entryDates,
   newEntryHref,
-  showChatLink: _showChatLink,
-  floatingAction: _floatingAction,
 }: {
   type: EntryType;
   heading: string;
@@ -87,12 +90,9 @@ export function EntryListScreen({
   entryDates: string[];
   /** Notes gets a "+" compose button; journal doesn't (recording is separate). */
   newEntryHref?: string;
-  /** Navigation is now handled by the bottom nav bar. */
-  showChatLink?: boolean;
-  /** Navigation is now handled by the bottom nav bar. */
-  floatingAction?: React.ReactNode;
 }) {
   const router = useRouter();
+  const hydrated = useHydrated();
   const [localEntries, setLocalEntries] = React.useState(entries);
   const [filter, setFilter] = React.useState<FilterValue>("all");
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>();
@@ -224,15 +224,16 @@ export function EntryListScreen({
   const visibleIds = React.useMemo(() => visible.map((e) => e.id), [visible]);
   const entryThumbnails = useEntryThumbnails(visibleIds);
 
-  const now = new Date();
-  const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
-  const dateStamp = now
-    .toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-    .toUpperCase();
+  const dateStamp = hydrated
+    ? new Date()
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+        .toUpperCase()
+    : DATE_PLACEHOLDER;
 
   return (
     <SwipeNav>
@@ -244,7 +245,7 @@ export function EntryListScreen({
               {dateStamp}
             </p>
             <h1 className="text-foreground mt-0.5 text-4xl font-bold tracking-tight">
-              {dayName}
+              {heading}
             </h1>
           </div>
         </div>
@@ -337,7 +338,11 @@ export function EntryListScreen({
                 <PrefetchLink href={`/entries/${entry.id}`}>
                   <NoteCard
                     title={entry.title || "Untitled entry"}
-                    dateLabel={formatEntryDateTime(entry.createdAt)}
+                    dateLabel={
+                      hydrated
+                        ? formatEntryDateTime(entry.createdAt)
+                        : DATE_PLACEHOLDER
+                    }
                     durationLabel={formatDuration(entry.durationMs)}
                     snippet={entry.snippet ?? undefined}
                     thumbnailUrl={

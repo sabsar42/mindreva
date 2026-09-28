@@ -6,7 +6,8 @@ import { ArchiveRestore } from "lucide-react";
 import { trashSwipeAction } from "../_components/swipe-actions";
 import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
-import { formatEntryDateTime } from "@/lib/format-entry";
+import { DATE_PLACEHOLDER, formatEntryDateTime } from "@/lib/format-entry";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 import { PrefetchLink } from "../_components/prefetch-link";
 import { PageHeader } from "../_components/page-header";
@@ -25,6 +26,7 @@ export function ArchiveList({
   );
   const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
   const thumbnails = useEntryThumbnails(entryIds);
+  const hydrated = useHydrated();
 
   async function unarchive(id: string) {
     const res = await fetch(`/api/entries/${id}/archive`, { method: "DELETE" });
@@ -49,7 +51,7 @@ export function ArchiveList({
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 py-6 md:max-w-2xl">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
       <PageHeader back="/account" title="Archived" />
 
       <div className="mt-6 space-y-4">
@@ -72,7 +74,11 @@ export function ArchiveList({
             <PrefetchLink href={`/entries/${entry.id}`}>
               <NoteCard
                 title={entry.title || "Untitled entry"}
-                dateLabel={formatEntryDateTime(entry.createdAt)}
+                dateLabel={
+                  hydrated
+                    ? formatEntryDateTime(entry.createdAt)
+                    : DATE_PLACEHOLDER
+                }
                 snippet={entry.snippet ?? undefined}
                 thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
               />

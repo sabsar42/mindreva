@@ -98,7 +98,10 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
   }
 
   return (
-    <div className={cn("relative overflow-hidden rounded-lg", className)}>
+    <div
+      data-swipeable-row=""
+      className={cn("relative overflow-hidden rounded-lg", className)}
+    >
       <div
         className="absolute inset-y-0 right-0 flex"
         style={{ width: maxOffset }}

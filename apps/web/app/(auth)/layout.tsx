@@ -12,7 +12,7 @@ export default function AuthLayout({
         <Logo size="lg" />
         <p className="text-muted-foreground text-balance text-sm leading-relaxed">
           Tap the leaf, Mindreva listens, and the conversation is kept as a
-          readable note, in English, বাংলা, اردু, and more.
+          readable note, in English, বাংলা, اردو, and more.
         </p>
       </div>
 

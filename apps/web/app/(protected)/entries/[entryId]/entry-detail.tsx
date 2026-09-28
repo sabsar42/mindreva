@@ -288,7 +288,7 @@ export function EntryDetail({
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-16 pt-6 md:max-w-2xl md:pb-10">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
       <header className="flex items-center justify-between gap-2">
         <button
           type="button"

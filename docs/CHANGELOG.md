@@ -7,6 +7,58 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-09-27 — Fix pass on the UI redesign (`feature/ui-update`)
+
+A code audit of the 2026-09-24 redesign found one data-loss bug and several
+broken mobile interactions. All fixed on the same branch.
+
+### Fixed
+
+- **Recording could be silently discarded.** The new protected layout put the
+  bottom nav and side nav on `/record`; tapping a nav item mid-recording
+  unmounted the recorder (mic stopped, nothing uploaded, no warning, since
+  `beforeunload` doesn't fire for in-app navigation). New
+  `_components/app-shell.tsx` now renders both navs only on tab/list pages and
+  hides them on focused flows: `/record`, `/notes/new`,
+  `/entries/[id]/review`, `/chat/[sessionId]`.
+- **Bottom nav covered controls.** Hiding it on the focused flows above frees
+  their Save/Stop/Send controls; Archive, Trash and entry detail (plus its
+  loading skeleton) now reserve `pb-24` on mobile.
+- **Row swipe also switched tabs.** `SwipeNav` now ignores touches that start
+  inside a `SwipeableRow` (new `data-swipeable-row` attribute), form fields,
+  editable content, or a dialog/bottom sheet. Its scroll-to-top effect was
+  removed so returning to a list keeps its scroll position (Next already
+  scrolls to top on forward navigation).
+- **Hydration mismatch on every list page in production.** Card timestamps
+  and the header date were formatted in the server's time zone (UTC on
+  Vercel) and again in the viewer's. They now render only after hydration via
+  a new `lib/use-hydrated.ts` hook, with a non-breaking-space placeholder so
+  card height doesn't shift.
+- **Chat back button** restored to `router.back()` with a `/chat` fallback
+  (the redesign had reverted the 2026-08-16 back-navigation fix).
+- **Corrupted Urdu text** in the auth layout ("اردو" had its last letter
+  replaced by the Bengali vowel sign U+09C1).
+- **Error/success toasts** were visually identical after the redesign; red and
+  green text restored in `packages/ui/src/components/toast.tsx`.
+
+### Changed
+
+- Journal/Notes headers show the section name ("Journal"/"Notes") as the
+  heading again, with the weekday and date on the small line above it.
+- Card dates include the year for entries from a previous year; durations
+  under a minute show seconds again ("37 s").
+- `--muted-foreground` darkened `#5a7a68` → `#4d6b5a` (5.2:1 on `--muted`,
+  was 4.2:1, below WCAG AA).
+- Filter pills fit 320px screens (tighter padding, icons hidden under 360px).
+- Replaced off-palette Tailwind grays in `OptionCard` and `TaskChecklist`
+  with design tokens.
+
+### Removed
+
+- Unused `showChatLink`/`floatingAction` props on `EntryListScreen` and the
+  now-unrendered `journal/record-entry-button.tsx` (the journal screen's
+  "Start recording" card replaced it).
+
 ## 2026-09-24 — Responsive design: desktop and tablet layout
 
 Added full responsive layout support for tablet and desktop breakpoints, on top of the existing mobile-first design.
@@ -21,8 +73,15 @@ Added full responsive layout support for tablet and desktop breakpoints, on top 
 - `BottomNav` — added `md:hidden` so it is a mobile-only component; no longer rendered by individual screens.
 - Removed `<BottomNav />` from all individual screen files that previously rendered it directly (`entry-list-screen.tsx`, `chat-home.tsx`, `mindmap-screen.tsx`, `account/page.tsx`).
 - Main content containers across all protected pages — widened from `max-w-md` only to `max-w-md md:max-w-2xl`; bottom padding changed from `pb-24` to `pb-24 md:pb-10` (no bottom nav on desktop) wherever applicable.
-- Notes FAB — repositioned from `bottom-24 right-5` to `md:bottom-8 md:right-8` so it doesn't overlap the sidebar area on desktop.
+- Notes "+" button — the floating button is now mobile-only (`md:hidden`); on tablet/desktop a "New note" button sits next to the search field instead.
 - All page `<main>` elements gain `md:ml-14 lg:ml-56` via the layout wrapper div to offset them away from the fixed sidebar.
+- Visual redesign across `packages/ui`: new four-colour mint palette with hard-coded hex tokens (replacing the warm scale), all shadows removed, pill-shaped buttons/inputs/tabs/filter pills, card radius raised to 16px. See docs/DECISIONS.md (2026-09-24).
+- `NoteCard` redesigned: date+time and a duration chip on top, larger two-line title; the leading weekday/day badge was removed. List screens now show the entry's `createdAt` time rather than only its `entryDate`.
+- Journal screen: a large "Start recording" card replaces the floating record button; header back arrows removed from tab screens (navigation is via the nav bars).
+- New swipe-left/right between tabs on mobile (`_components/swipe-nav.tsx`).
+- Bottom sheets become centred dialogs on tablet/desktop; toasts restyled flat.
+- Landing page simplified; signed-in users visiting `/` are redirected to `/journal`.
+- Shared components extracted: `ConfirmTrashDialog`, `EmptyState`, `PageHeader`, `trashSwipeAction`, `lib/format-entry.ts`.
 
 ## 2026-08-16 — Perf: extended hover/touch prefetching to every remaining nav link
 

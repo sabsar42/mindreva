@@ -107,7 +107,7 @@
   --secondary-foreground: #26372d;
 
   --muted: #eaf3ee;
-  --muted-foreground: #5a7a68;
+  --muted-foreground: #4d6b5a; /* ≥4.5:1 on both --background and --muted */
 
   --accent: #b2efce;
   --accent-foreground: #26372d;

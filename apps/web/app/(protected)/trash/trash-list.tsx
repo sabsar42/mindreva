@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Undo2 } from "lucide-react";
 import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
-import { formatEntryDateTime } from "@/lib/format-entry";
+import { DATE_PLACEHOLDER, formatEntryDateTime } from "@/lib/format-entry";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 import { PageHeader } from "../_components/page-header";
 import { EmptyState } from "../_components/empty-state";
@@ -23,6 +24,7 @@ export function TrashList({
   const [entries, setEntries] = React.useState(initial);
   const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
   const thumbnails = useEntryThumbnails(entryIds);
+  const hydrated = useHydrated();
 
   async function restore(id: string) {
     const res = await fetch(`/api/entries/${id}/restore`, { method: "POST" });
@@ -36,7 +38,7 @@ export function TrashList({
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 py-6 md:max-w-2xl">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
       <PageHeader back="/account" title="Trash" />
       <p className="text-muted-foreground mt-1 text-sm">
         Restore a note, or leave it here. Nothing is permanently deleted yet.
@@ -60,7 +62,11 @@ export function TrashList({
           >
             <NoteCard
               title={entry.title || "Untitled entry"}
-              dateLabel={formatEntryDateTime(entry.createdAt)}
+              dateLabel={
+                hydrated
+                  ? formatEntryDateTime(entry.createdAt)
+                  : DATE_PLACEHOLDER
+              }
               snippet={entry.snippet ?? undefined}
               thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
             />

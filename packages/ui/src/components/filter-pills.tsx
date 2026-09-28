@@ -45,7 +45,7 @@ function FilterPills({
             aria-selected={selected}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              "inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+              "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1.5 text-sm font-medium transition-colors sm:px-3",
               "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
               selected
                 ? "bg-card text-foreground"
@@ -53,7 +53,9 @@ function FilterPills({
             )}
           >
             {option.icon && (
-              <span className="[&_svg]:size-3.5">{option.icon}</span>
+              <span className="max-[359px]:hidden [&_svg]:size-3.5">
+                {option.icon}
+              </span>
             )}
             {option.label}
           </button>

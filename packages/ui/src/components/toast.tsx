@@ -29,15 +29,16 @@ function Toaster(props: ToasterProps) {
       }
       toastOptions={{
         classNames: {
-          toast:
-            "!border !border-border !bg-card !text-card-foreground !font-sans !shadow-none",
+          // Default text/border colors come from globals.css; setting them here
+          // too would compete with the error/success colors below.
+          toast: "!border !bg-card !font-sans !shadow-none",
           title: "!font-medium",
           description: "!text-muted-foreground",
           actionButton: "!bg-primary !text-primary-foreground !rounded-full",
           cancelButton:
             "!bg-secondary !text-secondary-foreground !rounded-full",
-          error: "!border-destructive/30",
-          success: "!border-border",
+          error: "!text-destructive !border-destructive/30",
+          success: "!text-success",
         },
       }}
       {...props}

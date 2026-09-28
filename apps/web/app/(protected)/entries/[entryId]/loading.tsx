@@ -8,7 +8,7 @@ import { Skeleton } from "@mindreva/ui/skeleton";
  */
 export default function EntryDetailLoading() {
   return (
-    <main className="mx-auto min-h-screen px-5 pb-16 pt-6 md:max-w-2xl md:pb-10">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
       <div className="flex items-center justify-between gap-2">
         <Skeleton className="size-9 rounded-full" />
         <div className="flex items-center gap-1">

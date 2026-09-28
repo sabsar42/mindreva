@@ -53,7 +53,9 @@ const OptionCard = React.forwardRef<HTMLButtonElement, OptionCardProps>(
           aria-hidden
           className={cn(
             "flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-            selected ? "border-primary bg-primary" : "bg-card border-gray-300",
+            selected
+              ? "border-primary bg-primary"
+              : "bg-card border-muted-foreground/40",
           )}
         >
           {selected && <span className="size-1.5 rounded-full bg-white" />}

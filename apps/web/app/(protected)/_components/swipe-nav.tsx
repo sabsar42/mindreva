@@ -7,6 +7,11 @@ const TAB_ORDER = ["/notes", "/chat", "/journal", "/mindmap", "/account"];
 const SWIPE_THRESHOLD = 60;
 const LOCK_RATIO = 1.5;
 
+// Horizontal gestures that start here belong to the element itself (row
+// swipe actions, text selection/caret movement), not to tab switching.
+const IGNORE_SELECTOR =
+  "[data-swipeable-row], input, textarea, select, [contenteditable='true'], [role='dialog']";
+
 export function SwipeNav({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -14,14 +19,13 @@ export function SwipeNav({ children }: { children: React.ReactNode }) {
 
   const currentIdx = TAB_ORDER.findIndex((h) => pathname === h);
 
-  // Scroll to top on every tab switch so a list page never opens midway down.
-  React.useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-
   function handleTouchStart(e: React.TouchEvent) {
     const t = e.touches[0];
-    if (!t) return;
+    const target = e.target as Element | null;
+    if (!t || target?.closest(IGNORE_SELECTOR)) {
+      touchStartRef.current = null;
+      return;
+    }
     touchStartRef.current = { x: t.clientX, y: t.clientY };
   }
 

@@ -11,6 +11,52 @@ rather than resolved.
 
 ---
 
+## 2026-09-27 — Hide the nav bars on focused flows instead of guarding navigation
+
+**What happened:** The 2026-09-24 protected-group layout rendered `SideNav`
+and `BottomNav` on every protected page. On `/record` that made it one tap to
+leave mid-recording, which unmounts `RecordFlow`, stops the microphone and
+discards the audio with no prompt (`beforeunload` doesn't fire for
+client-side navigation). The nav also covered bottom controls on `/notes/new`,
+transcript review and chat conversations.
+
+**Why:** A "you're recording, leave?" guard would need intercepting every
+`Link`/`router.push` in the app, which Next's App Router has no supported hook
+for. Those screens already have their own exit (Cancel/Back/Save) and are
+single-purpose flows where a tab bar doesn't belong anyway.
+
+**What was decided:** `_components/app-shell.tsx` (client component, used by
+`(protected)/layout.tsx`) checks the pathname and renders no nav and no
+sidebar offset on `/record`, `/notes/new`, `/entries/[id]/review` and
+`/chat/[sessionId]`. Entry detail, Archive and Trash keep the nav and reserve
+bottom padding for it. Chose a pathname list over moving pages into a second
+route group to avoid relocating a dozen files and their relative imports.
+
+---
+
+## 2026-09-24 — UI redesign supersedes the Phase 6.6 sharp-radius / warm palette
+
+**What happened:** The `feature/ui-update` branch (commit `cf59f7c`) reworked
+the design system: a four-colour mint palette with hard-coded hex values
+replaced the warm scale, all shadows were removed (`--shadow-subtle` and
+`--shadow-elevated` are now `none`), buttons/inputs/tabs/filter pills went
+back to fully rounded pills, and `--radius-lg` rose from 10px to 16px.
+
+**Why:** It was a deliberate redesign toward a flatter look, but it reverses
+Phase 6.6's explicit decision to use a single sharp 10px radius and take
+`rounded-full` off buttons, badges, filter pills, tabs and toasts. That
+reversal wasn't recorded when the branch was written.
+
+**What was decided:** Kept the redesign as the current direction, since it's
+the purpose of the branch, and recorded it here so the Phase 6.6 rule isn't
+re-applied by mistake. Status: pending product-owner confirmation. If the
+sharp 10px style should win, revert `packages/ui/src/styles/tokens.css`'s
+radius scale and the `rounded-full` classes in `button.tsx`, `input.tsx`,
+`tabs.tsx` and `filter-pills.tsx`. Genuinely circular elements (Avatar,
+RecordButton, Switch) were circular under both designs.
+
+---
+
 ## 2026-07-26 — Switched default LLM provider from Gemini to OpenRouter
 
 **What happened:** `GEMINI_API_KEY` calls started failing with
