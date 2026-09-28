@@ -40,7 +40,7 @@ export function TranscriptionWatcher() {
             }
             if (data.status === "failed") {
               toast.error(
-                "Couldn't transcribe that recording — it's still saved.",
+                "Couldn't transcribe that recording. It's still saved.",
               );
               return;
             }

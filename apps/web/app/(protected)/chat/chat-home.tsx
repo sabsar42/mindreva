@@ -37,6 +37,14 @@ export function ChatHome({
   entryCountsByYear: Record<number, number>;
 }) {
   const router = useRouter();
+
+  // The Router Cache holds this page for 30s (staleTimes.dynamic in next.config.ts).
+  // Refresh on every mount so a new session created just before navigating here
+  // is always visible without waiting for the cache to expire.
+  React.useEffect(() => {
+    router.refresh();
+  }, [router]);
+
   const [selectedYear, setSelectedYear] = React.useState<number | null>(
     availableYears[0] ?? null,
   );

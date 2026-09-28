@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@mindreva/ui";
 
 const MONTH_INITIALS = [
   "J",
@@ -18,96 +17,68 @@ const MONTH_INITIALS = [
   "D",
 ];
 
-/**
- * Shown when a session's range has fewer than the suggested minimum entries.
- * Deliberately encouragement, not a gate — the composer below stays enabled at
- * any count (see docs/roadmap.md Phase 6: the empty state matters more here
- * than anywhere else in the app, and should read warmly, not as a blocker).
- */
 export function RangeContextPanel({
   entryCount,
   suggestedMin,
-  monthsWithEntries,
-  isSingleYear,
+  entriesPerMonth,
   year,
 }: {
   entryCount: number;
   suggestedMin: number;
-  monthsWithEntries: number[];
-  isSingleYear: boolean;
+  entriesPerMonth: Record<number, number>;
   year: number | null;
 }) {
-  const filled = new Set(monthsWithEntries);
-  const progress = Math.min(entryCount / suggestedMin, 1);
+  const counts = Array.from(
+    { length: 12 },
+    (_, i) => entriesPerMonth[i + 1] ?? 0,
+  );
+  const maxCount = Math.max(...counts, 1);
 
   return (
-    <section className="border-border bg-card mt-4 rounded-lg border p-4">
-      {isSingleYear && year && (
-        <div className="mb-4">
-          <p className="text-muted-foreground mb-2 text-xs">
-            Your {year} at a glance
-          </p>
-          <div className="flex items-end justify-between gap-1">
-            {MONTH_INITIALS.map((initial, i) => {
-              const month = i + 1;
-              const hasEntry = filled.has(month);
-              return (
-                <div
-                  key={month}
-                  className="flex flex-1 flex-col items-center gap-1.5"
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "size-2 rounded-full transition-colors",
-                      hasEntry ? "bg-primary" : "bg-muted",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "text-[10px] leading-none",
-                      hasEntry
-                        ? "text-foreground font-medium"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {initial}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <p className="sr-only">
-            {monthsWithEntries.length} of 12 months in {year} have entries.
-          </p>
-        </div>
-      )}
+    <section className="border-border bg-card mt-4 rounded-xl border p-4">
+      <p className="text-muted-foreground mb-3 text-xs">Entries per month</p>
 
-      <div>
-        <div className="mb-1.5 flex items-baseline justify-between gap-2">
-          <span className="text-foreground text-sm font-medium">
-            {entryCount} of {suggestedMin} entries
-          </span>
-        </div>
-        <div
-          className="bg-muted h-1.5 w-full overflow-hidden rounded-full"
-          role="progressbar"
-          aria-valuenow={entryCount}
-          aria-valuemin={0}
-          aria-valuemax={suggestedMin}
-          aria-label={`${entryCount} of ${suggestedMin} suggested entries for this period`}
-        >
-          <div
-            className="bg-primary h-full rounded-full transition-[width]"
-            style={{ width: `${progress * 100}%` }}
-          />
-        </div>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          {entryCount === 0
-            ? "There's nothing written from this period yet, so there won't be much to draw on. You can still ask. I'll tell you honestly when I don't have it."
-            : "A few more and this will have more to work with. You can still ask anything below."}
-        </p>
+      <div className="flex items-end justify-between gap-1" aria-hidden>
+        {counts.map((count, i) => {
+          // Bar height: min 4px when 0 entries, max 48px at the peak month
+          const heightPx =
+            count === 0 ? 4 : Math.max(8, Math.round((count / maxCount) * 48));
+          // Opacity: lighter for fewer entries, full opacity at peak
+          const opacity = count === 0 ? 0.15 : 0.3 + 0.7 * (count / maxCount);
+          return (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
+              <div
+                className="bg-primary w-full rounded-sm"
+                style={{ height: `${heightPx}px`, opacity }}
+              />
+              <span className="text-muted-foreground text-[10px] leading-none">
+                {MONTH_INITIALS[i]}
+              </span>
+            </div>
+          );
+        })}
       </div>
+
+      <p className="sr-only">
+        {MONTH_INITIALS.map((m, i) => `${m}: ${counts[i]}`).join(", ")}
+      </p>
+
+      <p className="text-foreground mt-3 text-sm font-semibold">
+        Grounded in {entryCount} {entryCount === 1 ? "entry" : "entries"}
+      </p>
+
+      {entryCount < suggestedMin && entryCount > 0 && (
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+          A few more entries will give this more to draw on. You can still ask
+          anything.
+        </p>
+      )}
+      {entryCount === 0 && (
+        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+          Nothing written from {year ?? "this period"} yet. You can still ask;
+          I&apos;ll say honestly when I don&apos;t have it.
+        </p>
+      )}
     </section>
   );
 }

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9BBCCC"/>
+      <stop offset="100%" stop-color="#C4D8E2"/>
+    </linearGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3E6070"/>
+      <stop offset="100%" stop-color="#2A4452"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#a)"/>
+  <!-- Back range -->
+  <polygon points="100,38 186,162 14,162" fill="#7294A4"/>
+  <!-- Left peak -->
+  <polygon points="34,65 118,162 -50,162" fill="#5A7A8C"/>
+  <!-- Right peak -->
+  <polygon points="162,52 260,162 64,162" fill="#5A7A8C"/>
+  <!-- Snow caps -->
+  <polygon points="100,38 118,72 82,72" fill="white" opacity="0.88"/>
+  <polygon points="34,65 50,98 18,98" fill="white" opacity="0.88"/>
+  <polygon points="162,52 178,88 146,88" fill="white" opacity="0.88"/>
+  <!-- Ground -->
+  <rect y="160" width="200" height="40" fill="url(#b)"/>
+</svg>

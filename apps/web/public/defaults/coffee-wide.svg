@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4B882"/>
+      <stop offset="100%" stop-color="#B8966A"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="160" fill="url(#a)"/>
+  <line x1="0" y1="32" x2="400" y2="32" stroke="#907038" stroke-width="1" opacity="0.18"/>
+  <line x1="0" y1="80" x2="400" y2="80" stroke="#907038" stroke-width="1" opacity="0.14"/>
+  <line x1="0" y1="128" x2="400" y2="128" stroke="#907038" stroke-width="1" opacity="0.18"/>
+  <ellipse cx="152" cy="106" rx="58" ry="18" fill="#3C1E08" opacity="0.18"/>
+  <ellipse cx="152" cy="102" rx="54" ry="16" fill="#E8D4A0"/>
+  <circle cx="152" cy="92" r="38" fill="#3C1E08"/>
+  <circle cx="152" cy="92" r="30" fill="#7C4420"/>
+  <circle cx="152" cy="92" r="20" fill="#C07E38" opacity="0.88"/>
+  <circle cx="152" cy="92" r="9" fill="#E6A455" opacity="0.82"/>
+  <path d="M138,50 Q134,42 138,34 Q142,26 138,18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
+  <path d="M152,48 Q148,40 152,32 Q156,24 152,16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
+  <path d="M166,50 Q162,42 166,34 Q170,26 166,18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
+  <rect x="248" y="44" width="104" height="76" rx="4" fill="#F5ECD8" opacity="0.86"/>
+  <rect x="248" y="44" width="8" height="76" rx="2" fill="#C8A86C" opacity="0.7"/>
+  <line x1="266" y1="66" x2="340" y2="66" stroke="#A08858" stroke-width="1.5" opacity="0.3"/>
+  <line x1="266" y1="78" x2="340" y2="78" stroke="#A08858" stroke-width="1.5" opacity="0.3"/>
+  <line x1="266" y1="90" x2="340" y2="90" stroke="#A08858" stroke-width="1.5" opacity="0.3"/>
+  <line x1="266" y1="102" x2="320" y2="102" stroke="#A08858" stroke-width="1.5" opacity="0.3"/>
+</svg>

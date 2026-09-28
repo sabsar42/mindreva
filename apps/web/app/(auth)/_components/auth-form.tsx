@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button, Input, toast } from "@mindreva/ui";
 import { createClient } from "@mindreva/auth/client";
 import { GoogleIcon } from "./google-icon";
@@ -164,6 +164,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           </div>
         </div>
         <Button type="submit" className="w-full" disabled={pending}>
+          {pending && <Loader2 className="size-4 animate-spin" />}
           {pending ? "Please wait…" : c.submit}
         </Button>
       </form>

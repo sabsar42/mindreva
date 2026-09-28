@@ -23,7 +23,6 @@ export default async function EntryDetailPage({
         detail.transcript?.editedText ?? detail.transcript?.rawText ?? ""
       }
       summaryText={detail.summary?.summaryText ?? null}
-      summaryProvider={detail.summary?.provider ?? null}
       initialPhotos={detail.photos}
       initialTasks={detail.tasks}
     />

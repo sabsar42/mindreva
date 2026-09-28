@@ -48,19 +48,23 @@ function ThumbnailDayButton(
     return (
       <button
         ref={ref}
-        className={className}
-        style={
-          thumbnailUrl
-            ? {
-                backgroundImage: `linear-gradient(color-mix(in srgb, var(--color-mint-900) 15%, transparent), color-mix(in srgb, var(--color-mint-900) 15%, transparent)), url(${thumbnailUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
+        className={cn("overflow-hidden", className)}
         {...buttonProps}
       >
-        <span className={thumbnailUrl ? "drop-shadow-sm" : undefined}>
+        {thumbnailUrl && (
+          <img
+            src={thumbnailUrl}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-80"
+          />
+        )}
+        <span
+          className={cn(
+            "relative z-10",
+            thumbnailUrl && "text-white drop-shadow-sm",
+          )}
+        >
           {children}
         </span>
       </button>

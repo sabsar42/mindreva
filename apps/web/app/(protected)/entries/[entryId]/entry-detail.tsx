@@ -9,6 +9,7 @@ import {
   ArchiveRestore,
   Loader2,
   RefreshCw,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import {
@@ -22,6 +23,7 @@ import {
   type TaskChecklistTask,
 } from "@mindreva/ui";
 import type { EntryType, TranscriptStatus } from "@mindreva/database";
+import { getDefaultArtworkWide } from "@/lib/default-artwork";
 
 // Lexical is a client-only interactive widget — its SSR output for the
 // contentEditable div doesn't match what it renders once hydrated (a known
@@ -51,7 +53,6 @@ export function EntryDetail({
   transcriptStatus,
   confirmedText,
   summaryText,
-  summaryProvider,
   initialPhotos,
   initialTasks,
 }: {
@@ -63,7 +64,6 @@ export function EntryDetail({
   transcriptStatus: TranscriptStatus | null;
   confirmedText: string;
   summaryText: string | null;
-  summaryProvider: string | null;
   initialPhotos: PhotoUploaderPhoto[];
   initialTasks: TaskChecklistTask[];
 }) {
@@ -75,7 +75,6 @@ export function EntryDetail({
   const [savingText, setSavingText] = React.useState(false);
   const [textDirty, setTextDirty] = React.useState(false);
   const [summary, setSummary] = React.useState(summaryText);
-  const [provider, setProvider] = React.useState(summaryProvider);
   const [regenerating, setRegenerating] = React.useState(false);
   const [isArchived, setIsArchived] = React.useState(archived);
   const [trashing, setTrashing] = React.useState(false);
@@ -137,6 +136,7 @@ export function EntryDetail({
       setTextDirty(false);
       toast.success("Saved");
       setSummarizingInBackground(true);
+      router.refresh();
     } catch {
       toast.error("Couldn't save. Please try again.");
     } finally {
@@ -162,7 +162,6 @@ export function EntryDetail({
           };
           if (data.summary?.summaryText !== summary) {
             setSummary(data.summary?.summaryText ?? null);
-            setProvider(data.summary?.provider ?? null);
             setTasks(data.tasks);
             setSummarizingInBackground(false);
             return;
@@ -191,11 +190,11 @@ export function EntryDetail({
       };
       if (data.summary) {
         setSummary(data.summary.summaryText);
-        setProvider(data.summary.provider);
         setTasks(data.tasks);
         toast.success(
           hadSummaryBefore ? "Summary regenerated" : "Summary generated",
         );
+        router.refresh();
       } else {
         toast.error("Nothing to summarize yet.");
       }
@@ -225,7 +224,7 @@ export function EntryDetail({
       });
       if (!res.ok) throw new Error("Failed");
       toast.success("Moved to Trash");
-      router.push(type === "journal" ? "/journal" : "/notes");
+      router.push("/journal");
     } catch {
       toast.error("Couldn't move to Trash.");
       setTrashing(false);
@@ -278,6 +277,7 @@ export function EntryDetail({
         .map((r) => r.value);
       if (uploaded.length > 0) {
         setPhotos((prev) => [...prev, ...uploaded]);
+        router.refresh();
       }
       if (uploaded.length < files.length) {
         toast.error("Couldn't upload one or more photos. Please try again.");
@@ -302,7 +302,7 @@ export function EntryDetail({
             if (window.history.length > 1) {
               router.back();
             } else {
-              router.push(type === "journal" ? "/journal" : "/notes");
+              router.push("/journal");
             }
           }}
           aria-label="Back"
@@ -346,50 +346,56 @@ export function EntryDetail({
         {title || "Untitled entry"}
       </h1>
 
-      <div className="mt-3 flex items-center justify-between">
-        <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
-          Summary
-          {summarizingInBackground && (
-            <span className="text-muted-foreground/70 flex items-center gap-1 normal-case tracking-normal">
-              <Loader2 className="size-3 animate-spin" />
-              updating…
-            </span>
-          )}
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={regenerateSummary}
-          disabled={
-            regenerating || status === "pending" || status === "processing"
-          }
-        >
-          {regenerating ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <RefreshCw className="size-4" />
-          )}
-          {summary ? "Regenerate" : "Generate"}
-        </Button>
+      <div className="mt-4">
+        <img
+          src={photos[0]?.url ?? getDefaultArtworkWide(entryId)}
+          alt=""
+          className="h-48 w-full rounded-2xl object-cover"
+        />
       </div>
-      {summary ? (
-        <>
-          <p className="text-foreground mt-1 whitespace-pre-wrap text-base leading-relaxed">
-            {summary}
+
+      <div className="bg-primary/10 mt-4 rounded-2xl p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-primary flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest">
+            <Sparkles className="size-3.5" />
+            Summary
+            {summarizingInBackground && (
+              <span className="text-primary/60 flex items-center gap-1 font-normal normal-case tracking-normal">
+                <Loader2 className="size-3 animate-spin" />
+                updating…
+              </span>
+            )}
           </p>
-          {provider && (
-            <p className="text-muted-foreground mt-2 text-xs">
-              Generated by {provider}
+          <button
+            type="button"
+            onClick={regenerateSummary}
+            disabled={
+              regenerating || status === "pending" || status === "processing"
+            }
+            aria-label={summary ? "Regenerate summary" : "Generate summary"}
+            className="text-primary/60 hover:text-primary transition-colors disabled:opacity-40"
+          >
+            {regenerating ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+          </button>
+        </div>
+        {summary ? (
+          <>
+            <p className="text-foreground mt-3 whitespace-pre-wrap text-sm leading-relaxed">
+              {summary}
             </p>
-          )}
-        </>
-      ) : (
-        <p className="text-muted-foreground mt-1 text-sm">
-          {status === "pending" || status === "processing"
-            ? "Waiting for the transcript to finish."
-            : "No summary yet."}
-        </p>
-      )}
+          </>
+        ) : (
+          <p className="text-primary/70 mt-3 text-sm">
+            {status === "pending" || status === "processing"
+              ? "Waiting for the transcript to finish."
+              : "No summary yet. Tap the refresh icon to generate one."}
+          </p>
+        )}
+      </div>
 
       {tasks.length > 0 && (
         <TaskChecklist

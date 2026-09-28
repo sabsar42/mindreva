@@ -59,16 +59,13 @@ function CitationChips({
 }) {
   if (entryIds.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground text-xs">
-        Based on {entryIds.length} {entryIds.length === 1 ? "entry" : "entries"}
-        :
-      </span>
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <span className="text-muted-foreground text-xs">From your entries:</span>
       {entryIds.map((id) => (
         <PrefetchLink
           key={id}
           href={`/entries/${id}`}
-          className="border-border bg-secondary text-secondary-foreground hover:bg-accent rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors"
+          className="border-border text-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
         >
           {shortDateLabel(entryDates[id])}
         </PrefetchLink>
@@ -92,7 +89,7 @@ export function ChatConversation({
   initialEntryDates,
   entryCountInRange,
   suggestedMinEntries,
-  monthsWithEntries,
+  entriesPerMonth,
   isSingleYear,
   openingLine,
 }: {
@@ -104,7 +101,7 @@ export function ChatConversation({
   initialEntryDates: Record<string, string | null>;
   entryCountInRange: number;
   suggestedMinEntries: number;
-  monthsWithEntries: number[];
+  entriesPerMonth: Record<number, number>;
   isSingleYear: boolean;
   openingLine: OpeningLine | null;
 }) {
@@ -208,15 +205,7 @@ export function ChatConversation({
       <header className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => {
-            // router.back() reuses the Router Cache for /chat instead of a
-            // fresh server render; see entry-detail.tsx's back button.
-            if (window.history.length > 1) {
-              router.back();
-            } else {
-              router.push("/chat");
-            }
-          }}
+          onClick={() => router.push("/chat")}
           aria-label="Back"
           className="text-foreground hover:bg-accent -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
         >
@@ -230,12 +219,11 @@ export function ChatConversation({
         </div>
       </header>
 
-      {entryCountInRange < suggestedMinEntries && (
+      {isSingleYear && (
         <RangeContextPanel
           entryCount={entryCountInRange}
           suggestedMin={suggestedMinEntries}
-          monthsWithEntries={monthsWithEntries}
-          isSingleYear={isSingleYear}
+          entriesPerMonth={entriesPerMonth}
           year={yearStart}
         />
       )}

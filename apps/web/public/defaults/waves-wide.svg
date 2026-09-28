@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#162A3E"/>
+      <stop offset="100%" stop-color="#0A1624"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="160" fill="url(#a)"/>
+  <circle cx="316" cy="36" r="22" fill="#E8D8A4"/>
+  <circle cx="325" cy="29" r="17" fill="#162A3E"/>
+  <rect x="314" y="56" width="3" height="56" rx="1.5" fill="#E8D8A4" opacity="0.12"/>
+  <circle cx="36" cy="18" r="1.5" fill="white" opacity="0.6"/>
+  <circle cx="78" cy="10" r="1" fill="white" opacity="0.5"/>
+  <circle cx="126" cy="26" r="1.5" fill="white" opacity="0.55"/>
+  <circle cx="196" cy="14" r="1" fill="white" opacity="0.5"/>
+  <circle cx="58" cy="40" r="1" fill="white" opacity="0.4"/>
+  <circle cx="158" cy="8" r="1" fill="white" opacity="0.45"/>
+  <circle cx="248" cy="20" r="1" fill="white" opacity="0.4"/>
+  <circle cx="170" cy="34" r="1.5" fill="white" opacity="0.35"/>
+  <path d="M-10,72 Q40,56 90,72 Q140,88 190,72 Q240,56 290,72 Q340,88 390,72 L410,72 L410,160 L-10,160 Z" fill="#1C3D5A" opacity="0.95"/>
+  <path d="M-10,94 Q42,80 92,94 Q142,108 192,94 Q242,80 292,94 Q342,108 392,94 L410,94 L410,160 L-10,160 Z" fill="#142E45"/>
+  <path d="M-10,116 Q44,104 94,116 Q144,128 194,116 Q244,104 294,116 Q344,128 394,116 L410,116 L410,160 L-10,160 Z" fill="#0E2030"/>
+</svg>

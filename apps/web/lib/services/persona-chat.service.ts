@@ -65,9 +65,9 @@ export const SUGGESTED_MIN_ENTRIES = 5;
 
 export interface SessionRangeContext {
   entryCount: number;
-  /** Months (1-12) of the session's range that have at least one entry. Only meaningful for single-year sessions; empty for multi-year. */
-  monthsWithEntries: number[];
-  /** Whether the range covers exactly one calendar year, i.e. whether the monthly timeline applies. */
+  /** Map of month (1-12) → entry count. Only populated for single-year sessions; empty object for multi-year. */
+  entriesPerMonth: Record<number, number>;
+  /** Whether the range covers exactly one calendar year, i.e. whether the monthly bar chart applies. */
   isSingleYear: boolean;
   /** The real first line of the earliest entry in range, used to open the conversation. Null when the range has no entries. */
   openingLine: {
@@ -92,7 +92,7 @@ export async function getSessionRangeContext(
   if (!session) {
     return {
       entryCount: 0,
-      monthsWithEntries: [],
+      entriesPerMonth: {},
       isSingleYear: false,
       openingLine: null,
     };
@@ -107,15 +107,17 @@ export async function getSessionRangeContext(
     EntriesRepository.getEarliestInRange(userId, start, end),
   ]);
 
-  const monthsWithEntries = isSingleYear
-    ? [...new Set(dates.map((d) => Number(d.slice(5, 7))))].sort(
-        (a, b) => a - b,
-      )
-    : [];
+  const entriesPerMonth: Record<number, number> = isSingleYear
+    ? dates.reduce<Record<number, number>>((acc, d) => {
+        const m = Number(d.slice(5, 7));
+        acc[m] = (acc[m] ?? 0) + 1;
+        return acc;
+      }, {})
+    : {};
 
   return {
     entryCount: dates.length,
-    monthsWithEntries,
+    entriesPerMonth,
     isSingleYear,
     openingLine: earliest ? buildOpeningLine(earliest) : null,
   };
