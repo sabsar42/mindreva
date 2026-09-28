@@ -17,3 +17,18 @@
     text-rendering: optimizeLegibility;
   }
 }
+
+/* Override sonner's built-in shadow and radius on every toast element.
+   The CSS-variable approach on <Toaster> covers the host; this covers
+   the individual [data-sonner-toast] elements that inherit separately. */
+[data-sonner-toast] {
+  box-shadow: none !important;
+  border-radius: 0.75rem !important;
+  background: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-card-foreground) !important;
+}
+
+[data-sonner-toast] [data-description] {
+  color: var(--color-muted-foreground) !important;
+}

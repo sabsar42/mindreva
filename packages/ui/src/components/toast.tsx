@@ -13,14 +13,31 @@ function Toaster(props: ToasterProps) {
   return (
     <Sonner
       position="top-center"
+      // Sonner v2 reads these CSS vars for all toast types — setting them
+      // here is the only reliable way to override its built-in shadow, color,
+      // and radius, since inline styles beat className !important on the host
+      // element. classNames still handle typography and button shapes.
+      style={
+        {
+          "--normal-bg": "var(--color-card)",
+          "--normal-text": "var(--color-card-foreground)",
+          "--normal-border": "var(--color-border)",
+          "--border-radius": "0.75rem",
+          "--box-shadow": "none",
+          "--toast-shadow": "none",
+        } as React.CSSProperties
+      }
       toastOptions={{
         classNames: {
-          toast:
-            "!rounded-lg !border !border-border !bg-card !text-card-foreground !shadow-elevated !font-sans",
+          // Default text/border colors come from globals.css; setting them here
+          // too would compete with the error/success colors below.
+          toast: "!border !bg-card !font-sans !shadow-none",
+          title: "!font-medium",
           description: "!text-muted-foreground",
-          actionButton: "!bg-primary !text-primary-foreground !rounded-md",
-          cancelButton: "!bg-warm-100 !text-foreground !rounded-md",
-          error: "!text-destructive",
+          actionButton: "!bg-primary !text-primary-foreground !rounded-full",
+          cancelButton:
+            "!bg-secondary !text-secondary-foreground !rounded-full",
+          error: "!text-destructive !border-destructive/30",
           success: "!text-success",
         },
       }}

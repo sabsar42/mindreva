@@ -6,6 +6,35 @@ things still outstanding.
 
 ---
 
+## UI redesign (`feature/ui-update`) not yet checked in a real browser
+
+**Status:** Open. The 2026-09-27 fix pass was verified with lint, typecheck,
+tests and `pnpm build` only; no browser automation or logged-in session was
+available.
+
+**Needs a manual check on a phone, then desktop:**
+
+- Swipe a journal/notes card left: it should open Archive/Trash and stay on
+  the same tab. Swipe on empty page space: it should switch tabs.
+- `/record`, `/notes/new`, transcript review and a chat conversation should
+  show no bottom nav or sidebar, and their bottom buttons should be fully
+  tappable.
+- Card timestamps should appear right after load with no hydration warning in
+  the console (best tested on the deployed site, where server and browser time
+  zones differ).
+- Error toasts should show red text, success toasts green.
+- Filter pills should fit on a 320px-wide screen.
+
+---
+
+## Redesign's pill/rounded style awaits confirmation
+
+**Status:** Open, pending a product decision. See docs/DECISIONS.md
+(2026-09-24): the redesign reverses Phase 6.6's sharp 10px radius. Kept for
+now; revert steps are listed there.
+
+---
+
 ## RESOLVED: ~700ms per authenticated page load was sequential Storage round trips, not a DB connection issue
 
 **Status:** Fixed. See docs/CHANGELOG.md's 2026-08-16 entry for the full

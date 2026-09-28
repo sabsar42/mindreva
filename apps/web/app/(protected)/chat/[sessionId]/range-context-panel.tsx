@@ -60,7 +60,7 @@ export function RangeContextPanel({
                     aria-hidden
                     className={cn(
                       "size-2 rounded-full transition-colors",
-                      hasEntry ? "bg-primary" : "bg-warm-200",
+                      hasEntry ? "bg-primary" : "bg-muted",
                     )}
                   />
                   <span
@@ -90,7 +90,7 @@ export function RangeContextPanel({
           </span>
         </div>
         <div
-          className="bg-warm-200 h-1.5 w-full overflow-hidden rounded-full"
+          className="bg-muted h-1.5 w-full overflow-hidden rounded-full"
           role="progressbar"
           aria-valuenow={entryCount}
           aria-valuemin={0}
@@ -104,7 +104,7 @@ export function RangeContextPanel({
         </div>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
           {entryCount === 0
-            ? "There's nothing written from this period yet, so there won't be much to draw on. You can still ask — I'll tell you honestly when I don't have it."
+            ? "There's nothing written from this period yet, so there won't be much to draw on. You can still ask. I'll tell you honestly when I don't have it."
             : "A few more and this will have more to work with. You can still ask anything below."}
         </p>
       </div>

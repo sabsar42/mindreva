@@ -56,14 +56,19 @@ const requiredEnv = [
 const missingEnv = requiredEnv.filter((k) => !process.env[k]);
 
 describe.skipIf(missingEnv.length > 0)("transcribeEntry", () => {
-  const admin = createAdminClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  // Constructed inside beforeAll, not at describe-body scope: describe()'s
+  // callback always runs to register the test tree (skipIf only skips the
+  // its), so building this here would throw in CI, where SUPABASE_URL is
+  // intentionally unset — see the CI workflow's comment on this file.
+  let admin: ReturnType<typeof createAdminClient>;
   let userId: string;
 
   beforeAll(async () => {
+    admin = createAdminClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
     const { data, error } = await admin.auth.admin.createUser({
       email: `asr-test-${Date.now()}@example.com`,
       password: "Test-pw-123456",

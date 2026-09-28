@@ -1,36 +1,39 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Search,
   Plus,
-  Settings,
-  History,
-  Network,
-  Trash2,
   Archive,
+  LayoutGrid,
+  Calendar,
+  CalendarDays,
 } from "lucide-react";
+import { trashSwipeAction } from "./swipe-actions";
 import {
   BottomSheet,
   BottomSheetContent,
   BottomSheetTitle,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Button,
   FilterPills,
   Input,
+  LeafMark,
   NoteCard,
   SwipeableRow,
   toast,
   type FilterPillOption,
 } from "@mindreva/ui";
+import {
+  DATE_PLACEHOLDER,
+  formatEntryDateTime,
+  formatDuration,
+} from "@/lib/format-entry";
+import { useHydrated } from "@/lib/use-hydrated";
+import { ConfirmTrashDialog } from "./confirm-trash-dialog";
+import { EmptyState } from "./empty-state";
+import { SwipeNav } from "./swipe-nav";
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { TranscriptionWatcher } from "./transcription-watcher";
@@ -47,7 +50,7 @@ const CalendarPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="bg-warm-100 h-72 w-full animate-pulse rounded-md" />
+      <div className="bg-muted h-72 w-full animate-pulse rounded-xl" />
     ),
   },
 );
@@ -55,10 +58,10 @@ const CalendarPicker = dynamic(
 type FilterValue = "all" | "today" | "week" | "date";
 
 const FILTER_OPTIONS: FilterPillOption[] = [
-  { value: "all", label: "All" },
-  { value: "today", label: "Today" },
-  { value: "week", label: "This week" },
-  { value: "date", label: "Date" },
+  { value: "all", label: "All", icon: <LayoutGrid className="size-3.5" /> },
+  { value: "today", label: "Today", icon: <Calendar className="size-3.5" /> },
+  { value: "week", label: "Week", icon: <CalendarDays className="size-3.5" /> },
+  { value: "date", label: "Date", icon: <Calendar className="size-3.5" /> },
 ];
 
 function startOfWeekMonday(d: Date): Date {
@@ -74,32 +77,12 @@ function toDateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatWeekday(dateKey: string): string {
-  const d = new Date(`${dateKey}T00:00:00`);
-  return d.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase();
-}
-
-function formatDayOfMonth(dateKey: string): string {
-  const d = new Date(`${dateKey}T00:00:00`);
-  return String(d.getDate());
-}
-
-function formatDuration(ms: number | null): string | undefined {
-  if (!ms || ms <= 0) return undefined;
-  const totalSeconds = Math.round(ms / 1000);
-  if (totalSeconds < 60) return `${totalSeconds} s`;
-  const minutes = Math.round(totalSeconds / 60);
-  return `${minutes} min`;
-}
-
 export function EntryListScreen({
   type,
   heading,
   entries,
   entryDates,
   newEntryHref,
-  showChatLink,
-  floatingAction,
 }: {
   type: EntryType;
   heading: string;
@@ -107,12 +90,9 @@ export function EntryListScreen({
   entryDates: string[];
   /** Notes gets a "+" compose button; journal doesn't (recording is separate). */
   newEntryHref?: string;
-  /** Journal's entry point into "chat with past self". */
-  showChatLink?: boolean;
-  /** Journal's floating record button. Fixed to the bottom, above the sheet. */
-  floatingAction?: React.ReactNode;
 }) {
   const router = useRouter();
+  const hydrated = useHydrated();
   const [localEntries, setLocalEntries] = React.useState(entries);
   const [filter, setFilter] = React.useState<FilterValue>("all");
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>();
@@ -241,201 +221,187 @@ export function EntryListScreen({
   }
 
   const visible = searchResults ?? filtered;
-  const todayLabel = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-
   const visibleIds = React.useMemo(() => visible.map((e) => e.id), [visible]);
   const entryThumbnails = useEntryThumbnails(visibleIds);
 
+  const dateStamp = hydrated
+    ? new Date()
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+        .toUpperCase()
+    : DATE_PLACEHOLDER;
+
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 pb-24 pt-6">
-      <TranscriptionWatcher />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            {heading}
-          </h1>
-          <p className="text-muted-foreground mt-0.5 text-sm">{todayLabel}</p>
-        </div>
-        <div className="flex items-center gap-1">
-          {newEntryHref && (
-            <Link
-              href={newEntryHref}
-              aria-label="New note"
-              className="bg-primary text-primary-foreground shadow-subtle hover:bg-mint-700 flex size-10 items-center justify-center rounded-full transition-colors"
-            >
-              <Plus className="size-5" />
-            </Link>
-          )}
-          {showChatLink && (
-            <>
-              <PrefetchLink
-                href="/mindmap"
-                aria-label="Your mindmap"
-                className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
-              >
-                <Network className="size-5" />
-              </PrefetchLink>
-              <PrefetchLink
-                href="/chat"
-                aria-label="Chat with your past self"
-                className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
-              >
-                <History className="size-5" />
-              </PrefetchLink>
-            </>
-          )}
-          <PrefetchLink
-            href="/account"
-            aria-label="Account"
-            className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
-          >
-            <Settings className="size-5" />
-          </PrefetchLink>
-        </div>
-      </div>
-
-      <div className="relative mt-4">
-        <Search className="text-muted-foreground pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={`Search ${heading.toLowerCase()}…`}
-          className="pl-10"
-        />
-      </div>
-
-      <div className="mt-4">
-        <FilterPills
-          options={FILTER_OPTIONS}
-          value={searchResults ? "" : filter}
-          onValueChange={onFilterChange}
-        />
-      </div>
-
-      <div className="mt-6 space-y-2">
-        {searching && (
-          <p className="text-muted-foreground text-sm">Searching…</p>
-        )}
-
-        {!searching && visible.length === 0 && (
-          <div className="border-border rounded-lg border border-dashed py-12 text-center">
-            <p className="text-muted-foreground text-sm">
-              {searchResults
-                ? "No matches."
-                : filter === "all"
-                  ? `Nothing here yet.`
-                  : "Nothing for this filter."}
+    <SwipeNav>
+      <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+        <TranscriptionWatcher />
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-widest">
+              {dateStamp}
             </p>
+            <h1 className="text-foreground mt-0.5 text-4xl font-bold tracking-tight">
+              {heading}
+            </h1>
           </div>
+        </div>
+
+        {type === "journal" && (
+          <PrefetchLink href="/record" className="mt-5 block">
+            <div className="bg-card border-border hover:bg-accent rounded-2xl border p-6 text-center transition-colors">
+              {/* Static outer ring (always visible) + pulsing animation layer */}
+              <div className="relative mx-auto mb-5 flex size-32 items-center justify-center">
+                <div className="bg-primary/10 absolute inset-0 rounded-full" />
+                <span className="bg-primary/10 animate-mic-pulse absolute inset-0 rounded-full" />
+                <div className="bg-primary relative flex size-20 items-center justify-center rounded-full">
+                  <LeafMark className="text-primary-foreground size-10" />
+                </div>
+              </div>
+              <h2 className="text-foreground text-xl font-bold">
+                Start recording
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Record audio and get a clear, structured note.
+              </p>
+            </div>
+          </PrefetchLink>
         )}
 
-        {!searching &&
-          visible.map((entry) => (
-            <SwipeableRow
-              key={entry.id}
-              actions={[
-                {
-                  key: "archive",
-                  label: "Archive",
-                  icon: <Archive className="size-5" />,
-                  onClick: () => void archiveEntry(entry.id),
-                  className: "bg-orange-100 text-orange-700",
-                },
-                {
-                  key: "trash",
-                  label: "Trash",
-                  icon: <Trash2 className="size-5" />,
-                  onClick: () => setConfirmTrashId(entry.id),
-                  className: "bg-red-100 text-red-700",
-                },
-              ]}
-            >
-              <PrefetchLink href={`/entries/${entry.id}`}>
-                <NoteCard
-                  title={entry.title || "Untitled entry"}
-                  weekdayLabel={
-                    entry.entryDate ? formatWeekday(entry.entryDate) : ""
-                  }
-                  dayOfMonth={
-                    entry.entryDate ? formatDayOfMonth(entry.entryDate) : ""
-                  }
-                  durationLabel={formatDuration(entry.durationMs)}
-                  snippet={entry.snippet ?? undefined}
-                  thumbnailUrl={entryThumbnails[entry.id] ?? entry.thumbnailUrl}
-                />
-              </PrefetchLink>
-            </SwipeableRow>
-          ))}
-      </div>
-
-      <BottomSheet open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-        <BottomSheetContent>
-          <BottomSheetTitle>Pick a date</BottomSheetTitle>
-          <div className="mt-3">
-            <CalendarPicker
-              selected={selectedDate}
-              onSelect={(d) => {
-                setSelectedDate(d);
-                if (d) {
-                  setFilter("date");
-                  setDatePickerOpen(false);
-                }
-              }}
-              entryDates={calendarDates}
-              dayThumbnails={dayThumbnails}
-              onClear={() => {
-                setSelectedDate(undefined);
-                setFilter("all");
-                setDatePickerOpen(false);
-              }}
-              onToday={() => {
-                setSelectedDate(new Date());
-                setFilter("date");
-                setDatePickerOpen(false);
-              }}
+        <div className="mt-4 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="text-muted-foreground pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${heading.toLowerCase()}…`}
+              className="pl-10"
             />
           </div>
-        </BottomSheetContent>
-      </BottomSheet>
-
-      {floatingAction && (
-        <div className="fixed inset-x-0 bottom-6 flex justify-center">
-          {floatingAction}
-        </div>
-      )}
-
-      <Dialog
-        open={confirmTrashId !== null}
-        onOpenChange={(open) => !open && setConfirmTrashId(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Move to Trash?</DialogTitle>
-            <DialogDescription>
-              You can restore it from Trash later — nothing is permanently
-              deleted yet.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmTrashId(null)}>
-              Cancel
-            </Button>
+          {newEntryHref && (
             <Button
-              variant="destructive"
-              onClick={() => {
-                if (confirmTrashId) void trashEntry(confirmTrashId);
-                setConfirmTrashId(null);
-              }}
+              asChild
+              size="sm"
+              className="hidden shrink-0 gap-1.5 md:flex"
             >
-              Move to Trash
+              <PrefetchLink href={newEntryHref}>
+                <Plus className="size-4" />
+                New note
+              </PrefetchLink>
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </main>
+          )}
+        </div>
+
+        <div className="mt-4">
+          <FilterPills
+            options={FILTER_OPTIONS}
+            value={searchResults ? "" : filter}
+            onValueChange={onFilterChange}
+          />
+        </div>
+
+        <div className="mt-6 space-y-2">
+          {searching && (
+            <p className="text-muted-foreground text-sm">Searching…</p>
+          )}
+
+          {!searching && visible.length === 0 && (
+            <EmptyState
+              message={
+                searchResults
+                  ? "No matches."
+                  : filter === "all"
+                    ? "Nothing here yet."
+                    : "Nothing for this filter."
+              }
+            />
+          )}
+
+          {!searching &&
+            visible.map((entry) => (
+              <SwipeableRow
+                key={entry.id}
+                actions={[
+                  {
+                    key: "archive",
+                    label: "Archive",
+                    icon: <Archive className="size-5" />,
+                    onClick: () => void archiveEntry(entry.id),
+                    className: "bg-secondary text-secondary-foreground",
+                  },
+                  trashSwipeAction(() => setConfirmTrashId(entry.id)),
+                ]}
+              >
+                <PrefetchLink href={`/entries/${entry.id}`}>
+                  <NoteCard
+                    title={entry.title || "Untitled entry"}
+                    dateLabel={
+                      hydrated
+                        ? formatEntryDateTime(entry.createdAt)
+                        : DATE_PLACEHOLDER
+                    }
+                    durationLabel={formatDuration(entry.durationMs)}
+                    snippet={entry.snippet ?? undefined}
+                    thumbnailUrl={
+                      entryThumbnails[entry.id] ?? entry.thumbnailUrl
+                    }
+                  />
+                </PrefetchLink>
+              </SwipeableRow>
+            ))}
+        </div>
+
+        <BottomSheet open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+          <BottomSheetContent>
+            <BottomSheetTitle>Pick a date</BottomSheetTitle>
+            <div className="mt-3">
+              <CalendarPicker
+                selected={selectedDate}
+                onSelect={(d) => {
+                  setSelectedDate(d);
+                  if (d) {
+                    setFilter("date");
+                    setDatePickerOpen(false);
+                  }
+                }}
+                entryDates={calendarDates}
+                dayThumbnails={dayThumbnails}
+                onClear={() => {
+                  setSelectedDate(undefined);
+                  setFilter("all");
+                  setDatePickerOpen(false);
+                }}
+                onToday={() => {
+                  setSelectedDate(new Date());
+                  setFilter("date");
+                  setDatePickerOpen(false);
+                }}
+              />
+            </div>
+          </BottomSheetContent>
+        </BottomSheet>
+
+        {newEntryHref && (
+          <PrefetchLink
+            href={newEntryHref}
+            aria-label="New note"
+            className="bg-primary text-primary-foreground fixed bottom-24 right-5 flex size-14 items-center justify-center rounded-full transition-opacity hover:opacity-90 md:hidden"
+          >
+            <Plus className="size-6" />
+          </PrefetchLink>
+        )}
+
+        <ConfirmTrashDialog
+          open={confirmTrashId !== null}
+          onOpenChange={(open) => !open && setConfirmTrashId(null)}
+          onConfirm={() => {
+            if (confirmTrashId) void trashEntry(confirmTrashId);
+          }}
+        />
+      </main>
+    </SwipeNav>
   );
 }

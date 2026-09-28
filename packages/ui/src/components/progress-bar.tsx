@@ -46,7 +46,7 @@ const ProgressBar = React.forwardRef<
         ref={ref}
         value={pct}
         className={cn(
-          "bg-warm-200 relative h-2 w-full overflow-hidden rounded-full",
+          "bg-muted relative h-2 w-full overflow-hidden rounded-full",
           className,
         )}
         {...props}

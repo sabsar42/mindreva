@@ -7,7 +7,7 @@ import { Skeleton } from "@mindreva/ui/skeleton";
  */
 export function EntryListLoading() {
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 pb-24 pt-6">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
       <div className="flex items-center justify-between">
         <div>
           <Skeleton className="h-8 w-32" />

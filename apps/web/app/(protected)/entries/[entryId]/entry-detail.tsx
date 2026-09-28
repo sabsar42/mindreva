@@ -35,7 +35,7 @@ const RichTextEditor = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="bg-warm-100 h-48 w-full animate-pulse rounded-md" />
+      <div className="bg-muted h-48 w-full animate-pulse rounded-xl" />
     ),
   },
 );
@@ -288,7 +288,7 @@ export function EntryDetail({
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 pb-16 pt-6">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
       <header className="flex items-center justify-between gap-2">
         <button
           type="button"
@@ -306,7 +306,7 @@ export function EntryDetail({
             }
           }}
           aria-label="Back"
-          className="text-foreground hover:bg-warm-100 -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
+          className="text-foreground hover:bg-accent -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
         >
           <ArrowLeft className="size-5" />
         </button>
@@ -315,7 +315,7 @@ export function EntryDetail({
             type="button"
             onClick={toggleArchive}
             aria-label={isArchived ? "Unarchive" : "Archive"}
-            className="text-muted-foreground hover:bg-warm-100 hover:text-foreground flex size-9 items-center justify-center rounded-full transition-colors"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground flex size-9 items-center justify-center rounded-full transition-colors"
           >
             {isArchived ? (
               <ArchiveRestore className="size-5" />
@@ -328,7 +328,7 @@ export function EntryDetail({
             onClick={handleTrash}
             disabled={trashing}
             aria-label="Move to Trash"
-            className="text-muted-foreground hover:bg-warm-100 hover:text-destructive flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+            className="text-muted-foreground hover:bg-accent hover:text-destructive flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
           >
             <Trash2 className="size-5" />
           </button>

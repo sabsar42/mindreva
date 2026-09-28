@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { Button, Textarea, toast } from "@mindreva/ui";
+import { Button, toast } from "@mindreva/ui";
+import { PageHeader } from "../../_components/page-header";
 
 export default function NewNotePage() {
   const router = useRouter();
@@ -29,29 +29,29 @@ export default function NewNotePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 px-5 py-6">
-      <header className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="Back"
-          className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
-        >
-          <ArrowLeft className="size-5" />
-        </button>
-        <h1 className="text-xl font-bold tracking-tight">New note</h1>
-      </header>
+    <main className="mx-auto flex min-h-screen flex-col px-5 pb-6 pt-6 md:max-w-2xl">
+      <PageHeader title="New note" />
 
-      <Textarea
+      <textarea
         autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Write what's on your mind…"
-        className="min-h-[60vh] flex-1"
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+            e.preventDefault();
+            void handleSave();
+          }
+        }}
+        className="text-foreground placeholder:text-muted-foreground mt-6 flex-1 resize-none bg-transparent text-base leading-relaxed outline-none"
       />
 
-      <Button onClick={handleSave} disabled={!text.trim() || saving}>
-        {saving ? "Saving…" : "Save note"}
+      <Button
+        className="mt-6 w-full"
+        onClick={handleSave}
+        disabled={!text.trim() || saving}
+      >
+        {saving ? "Saving…" : "Save"}
       </Button>
     </main>
   );

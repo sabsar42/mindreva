@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Network } from "lucide-react";
+import { Loader2, Network } from "lucide-react";
 import { PrefetchLink } from "../_components/prefetch-link";
+import { SwipeNav } from "../_components/swipe-nav";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -82,97 +83,89 @@ export function MindmapScreen({
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 pb-12 pt-6">
-      <header className="flex items-center gap-3">
-        <PrefetchLink
-          href="/journal"
-          aria-label="Back"
-          className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
-        >
-          <ArrowLeft className="size-5" />
-        </PrefetchLink>
-      </header>
+    <SwipeNav>
+      <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+        <h1 className="text-foreground font-serif text-3xl font-bold leading-tight tracking-tight">
+          Your mindmap
+        </h1>
+        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+          Themes drawn from what you&apos;ve written, grouped by month. Tap a
+          circle to see the entries inside it.
+        </p>
 
-      <h1 className="text-foreground mt-4 font-serif text-3xl font-bold leading-tight tracking-tight">
-        Your mindmap
-      </h1>
-      <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-        Themes drawn from what you&apos;ve written, grouped by month. Tap a
-        circle to see the entries inside it.
-      </p>
-
-      {nodes.length === 0 ? (
-        <div className="border-border bg-card mt-8 rounded-lg border p-6 text-center">
-          <Network className="text-muted-foreground mx-auto size-6" />
-          <p className="text-foreground mt-3 text-sm font-medium">
-            Your map is still empty
-          </p>
-          <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
-            Themes appear here once you&apos;ve written a few entries and
-            they&apos;ve been summarized. Come back after a few more.
-          </p>
-          <Button asChild variant="secondary" className="mt-4">
-            <Link href="/record">Record an entry</Link>
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-6">
-          <MindmapGraph
-            nodes={nodes}
-            links={links}
-            newSince={newSince}
-            onSelect={(id) => void handleSelect(id)}
-          />
-        </div>
-      )}
-
-      <BottomSheet
-        open={selectedId !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedId(null);
-            setCluster(null);
-          }
-        }}
-      >
-        <BottomSheetContent>
-          <BottomSheetTitle>
-            {cluster?.label ?? (loadingCluster ? "Loading…" : "Theme")}
-          </BottomSheetTitle>
-
-          {loadingCluster ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="text-muted-foreground size-5 animate-spin" />
-            </div>
-          ) : cluster && cluster.entries.length > 0 ? (
-            <div className="mt-3 max-h-[60vh] space-y-2 overflow-y-auto pb-2">
-              {cluster.entries.map((entry) => (
-                <PrefetchLink
-                  key={entry.entryId}
-                  href={`/entries/${entry.entryId}`}
-                  className="border-border bg-card hover:bg-warm-50 block rounded-lg border p-3.5 transition-colors"
-                >
-                  <p className="text-muted-foreground text-xs">
-                    {formatDate(entry.entryDate)}
-                  </p>
-                  <p className="text-foreground mt-0.5 text-sm font-medium">
-                    {entry.title ?? "Untitled"}
-                  </p>
-                  {entry.snippet && (
-                    <p className="text-muted-foreground mt-1 line-clamp-2 text-sm leading-relaxed">
-                      {entry.snippet}
-                    </p>
-                  )}
-                </PrefetchLink>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground py-6 text-center text-sm">
-              Couldn&apos;t load the entries for this theme.
+        {nodes.length === 0 ? (
+          <div className="border-border bg-card mt-8 rounded-lg border p-6 text-center">
+            <Network className="text-muted-foreground mx-auto size-6" />
+            <p className="text-foreground mt-3 text-sm font-medium">
+              Your map is still empty
             </p>
-          )}
-        </BottomSheetContent>
-      </BottomSheet>
-    </main>
+            <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+              Themes appear here once you&apos;ve written a few entries and
+              they&apos;ve been summarized. Come back after a few more.
+            </p>
+            <Button asChild variant="secondary" className="mt-4">
+              <Link href="/record">Record an entry</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-6">
+            <MindmapGraph
+              nodes={nodes}
+              links={links}
+              newSince={newSince}
+              onSelect={(id) => void handleSelect(id)}
+            />
+          </div>
+        )}
+
+        <BottomSheet
+          open={selectedId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedId(null);
+              setCluster(null);
+            }
+          }}
+        >
+          <BottomSheetContent>
+            <BottomSheetTitle>
+              {cluster?.label ?? (loadingCluster ? "Loading…" : "Theme")}
+            </BottomSheetTitle>
+
+            {loadingCluster ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="text-muted-foreground size-5 animate-spin" />
+              </div>
+            ) : cluster && cluster.entries.length > 0 ? (
+              <div className="mt-3 max-h-[60vh] space-y-2 overflow-y-auto pb-2">
+                {cluster.entries.map((entry) => (
+                  <PrefetchLink
+                    key={entry.entryId}
+                    href={`/entries/${entry.entryId}`}
+                    className="border-border bg-card hover:bg-accent block rounded-xl border p-3.5 transition-colors"
+                  >
+                    <p className="text-muted-foreground text-xs">
+                      {formatDate(entry.entryDate)}
+                    </p>
+                    <p className="text-foreground mt-0.5 text-sm font-medium">
+                      {entry.title ?? "Untitled"}
+                    </p>
+                    {entry.snippet && (
+                      <p className="text-muted-foreground mt-1 line-clamp-2 text-sm leading-relaxed">
+                        {entry.snippet}
+                      </p>
+                    )}
+                  </PrefetchLink>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground py-6 text-center text-sm">
+                Couldn&apos;t load the entries for this theme.
+              </p>
+            )}
+          </BottomSheetContent>
+        </BottomSheet>
+      </main>
+    </SwipeNav>
   );
 }

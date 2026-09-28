@@ -2,27 +2,18 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
+import { DATE_PLACEHOLDER, formatEntryDateTime } from "@/lib/format-entry";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
-import { PrefetchLink } from "../_components/prefetch-link";
+import { PageHeader } from "../_components/page-header";
+import { EmptyState } from "../_components/empty-state";
 
 // Note: trashed entries are intentionally NOT links to /entries/[id] — the
 // detail route excludes soft-deleted rows (getByIdForUser returns null once
 // deleted_at is set), so a link here would just 404. Restore first, then view.
-
-function formatWeekday(dateKey: string | null): string {
-  if (!dateKey) return "";
-  return new Date(`${dateKey}T00:00:00`)
-    .toLocaleDateString(undefined, { weekday: "short" })
-    .toUpperCase();
-}
-
-function formatDayOfMonth(dateKey: string | null): string {
-  if (!dateKey) return "";
-  return String(new Date(`${dateKey}T00:00:00`).getDate());
-}
 
 export function TrashList({
   entries: initial,
@@ -33,6 +24,7 @@ export function TrashList({
   const [entries, setEntries] = React.useState(initial);
   const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
   const thumbnails = useEntryThumbnails(entryIds);
+  const hydrated = useHydrated();
 
   async function restore(id: string) {
     const res = await fetch(`/api/entries/${id}/restore`, { method: "POST" });
@@ -46,27 +38,14 @@ export function TrashList({
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 py-6">
-      <header className="flex items-center gap-3">
-        <PrefetchLink
-          href="/account"
-          aria-label="Back"
-          className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
-        >
-          <ArrowLeft className="size-5" />
-        </PrefetchLink>
-        <h1 className="text-xl font-bold tracking-tight">Trash</h1>
-      </header>
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+      <PageHeader back="/account" title="Trash" />
       <p className="text-muted-foreground mt-1 text-sm">
-        Restore a note, or leave it here — nothing is permanently deleted yet.
+        Restore a note, or leave it here. Nothing is permanently deleted yet.
       </p>
 
       <div className="mt-6 space-y-4">
-        {entries.length === 0 && (
-          <div className="border-border rounded-lg border border-dashed py-12 text-center">
-            <p className="text-muted-foreground text-sm">Trash is empty.</p>
-          </div>
-        )}
+        {entries.length === 0 && <EmptyState message="Trash is empty." />}
 
         {entries.map((entry) => (
           <SwipeableRow
@@ -77,14 +56,17 @@ export function TrashList({
                 label: "Restore",
                 icon: <Undo2 className="size-5" />,
                 onClick: () => void restore(entry.id),
-                className: "bg-mint-100 text-mint-700",
+                className: "bg-secondary text-secondary-foreground",
               },
             ]}
           >
             <NoteCard
               title={entry.title || "Untitled entry"}
-              weekdayLabel={formatWeekday(entry.entryDate)}
-              dayOfMonth={formatDayOfMonth(entry.entryDate)}
+              dateLabel={
+                hydrated
+                  ? formatEntryDateTime(entry.createdAt)
+                  : DATE_PLACEHOLDER
+              }
               snippet={entry.snippet ?? undefined}
               thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
             />

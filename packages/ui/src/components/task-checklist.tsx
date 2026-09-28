@@ -42,7 +42,7 @@ function TaskChecklist({ tasks, onToggle, className }: TaskChecklistProps) {
                 "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors",
                 task.isDone
                   ? "bg-primary border-primary"
-                  : "border-border bg-card group-hover:border-mint-500",
+                  : "border-border bg-card group-hover:border-primary",
               )}
             >
               {task.isDone && (

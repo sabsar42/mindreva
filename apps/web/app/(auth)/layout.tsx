@@ -7,12 +7,12 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6 py-12">
-      <div className="flex flex-col items-center gap-4 text-center">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-8 px-6 py-12">
+      <div className="flex flex-col items-center gap-3 text-center">
         <Logo size="lg" />
         <p className="text-muted-foreground text-balance text-sm leading-relaxed">
           Tap the leaf, Mindreva listens, and the conversation is kept as a
-          readable note — in English, বাংলা, اردو, and more.
+          readable note, in English, বাংলা, اردو, and more.
         </p>
       </div>
 
@@ -37,7 +37,7 @@ export default function AuthLayout({
           </Link>
         </nav>
         <p className="text-muted-foreground text-xs">
-          Recording works best in the Mindreva mobile app — the web can&apos;t
+          Recording works best in the Mindreva mobile app. The web can&apos;t
           record with the screen locked.
         </p>
       </div>

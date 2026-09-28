@@ -2,34 +2,17 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArchiveRestore, Trash2 } from "lucide-react";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  NoteCard,
-  SwipeableRow,
-  toast,
-} from "@mindreva/ui";
+import { ArchiveRestore } from "lucide-react";
+import { trashSwipeAction } from "../_components/swipe-actions";
+import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
+import { DATE_PLACEHOLDER, formatEntryDateTime } from "@/lib/format-entry";
+import { useHydrated } from "@/lib/use-hydrated";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 import { PrefetchLink } from "../_components/prefetch-link";
-
-function formatWeekday(dateKey: string | null): string {
-  if (!dateKey) return "";
-  return new Date(`${dateKey}T00:00:00`)
-    .toLocaleDateString(undefined, { weekday: "short" })
-    .toUpperCase();
-}
-
-function formatDayOfMonth(dateKey: string | null): string {
-  if (!dateKey) return "";
-  return String(new Date(`${dateKey}T00:00:00`).getDate());
-}
+import { PageHeader } from "../_components/page-header";
+import { ConfirmTrashDialog } from "../_components/confirm-trash-dialog";
+import { EmptyState } from "../_components/empty-state";
 
 export function ArchiveList({
   entries: initial,
@@ -43,6 +26,7 @@ export function ArchiveList({
   );
   const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
   const thumbnails = useEntryThumbnails(entryIds);
+  const hydrated = useHydrated();
 
   async function unarchive(id: string) {
     const res = await fetch(`/api/entries/${id}/archive`, { method: "DELETE" });
@@ -67,26 +51,11 @@ export function ArchiveList({
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-md px-5 py-6">
-      <header className="flex items-center gap-3">
-        <PrefetchLink
-          href="/account"
-          aria-label="Back"
-          className="text-foreground hover:bg-warm-100 -ml-2 rounded-full p-2 transition-colors"
-        >
-          <ArrowLeft className="size-5" />
-        </PrefetchLink>
-        <h1 className="text-xl font-bold tracking-tight">Archived</h1>
-      </header>
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+      <PageHeader back="/account" title="Archived" />
 
       <div className="mt-6 space-y-4">
-        {entries.length === 0 && (
-          <div className="border-border rounded-lg border border-dashed py-12 text-center">
-            <p className="text-muted-foreground text-sm">
-              Nothing archived yet.
-            </p>
-          </div>
-        )}
+        {entries.length === 0 && <EmptyState message="Nothing archived yet." />}
 
         {entries.map((entry) => (
           <SwipeableRow
@@ -97,22 +66,19 @@ export function ArchiveList({
                 label: "Unarchive",
                 icon: <ArchiveRestore className="size-5" />,
                 onClick: () => void unarchive(entry.id),
-                className: "bg-orange-100 text-orange-700",
+                className: "bg-secondary text-secondary-foreground",
               },
-              {
-                key: "trash",
-                label: "Trash",
-                icon: <Trash2 className="size-5" />,
-                onClick: () => setConfirmTrashId(entry.id),
-                className: "bg-red-100 text-red-700",
-              },
+              trashSwipeAction(() => setConfirmTrashId(entry.id)),
             ]}
           >
             <PrefetchLink href={`/entries/${entry.id}`}>
               <NoteCard
                 title={entry.title || "Untitled entry"}
-                weekdayLabel={formatWeekday(entry.entryDate)}
-                dayOfMonth={formatDayOfMonth(entry.entryDate)}
+                dateLabel={
+                  hydrated
+                    ? formatEntryDateTime(entry.createdAt)
+                    : DATE_PLACEHOLDER
+                }
                 snippet={entry.snippet ?? undefined}
                 thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
               />
@@ -121,34 +87,13 @@ export function ArchiveList({
         ))}
       </div>
 
-      <Dialog
+      <ConfirmTrashDialog
         open={confirmTrashId !== null}
         onOpenChange={(open) => !open && setConfirmTrashId(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Move to Trash?</DialogTitle>
-            <DialogDescription>
-              You can restore it from Trash later — nothing is permanently
-              deleted yet.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmTrashId(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (confirmTrashId) void trash(confirmTrashId);
-                setConfirmTrashId(null);
-              }}
-            >
-              Move to Trash
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onConfirm={() => {
+          if (confirmTrashId) void trash(confirmTrashId);
+        }}
+      />
     </main>
   );
 }

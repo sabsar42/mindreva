@@ -4,9 +4,9 @@ import { cn } from "../lib/utils";
 export type LeafMarkProps = React.ComponentProps<"svg">;
 
 /**
- * The Mindreva leaf mark. Single-color via `currentColor`, so it renders green
- * on light surfaces (text-primary) and white on the mint record button
- * (text-white). Path traced from the brand's source artwork
+ * The Mindreva leaf mark. Single-color via `currentColor` — inherits color
+ * from the parent. The Logo wrapper sets text-primary; the record button
+ * overrides to text-white. Path traced from the brand's source artwork
  * (packages/ui/src/assets/logo.png) via potrace, at its native 496x757
  * proportions — verified to stay legible from a 16px favicon up to a large
  * record-button tap target.
@@ -57,7 +57,7 @@ function Logo({
       {showWordmark && (
         <span
           className={cn(
-            "text-foreground font-serif font-bold leading-none tracking-tight",
+            "text-primary font-serif font-bold leading-none tracking-tight",
             s.text,
           )}
         >
