@@ -10,6 +10,7 @@ import { useHydrated } from "@/lib/use-hydrated";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 import { PageHeader } from "../_components/page-header";
 import { EmptyState } from "../_components/empty-state";
+import { getDefaultArtwork } from "@/lib/default-artwork";
 
 // Note: trashed entries are intentionally NOT links to /entries/[id] — the
 // detail route excludes soft-deleted rows (getByIdForUser returns null once
@@ -68,7 +69,11 @@ export function TrashList({
                   : DATE_PLACEHOLDER
               }
               snippet={entry.snippet ?? undefined}
-              thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
+              thumbnailUrl={
+                thumbnails[entry.id] ??
+                entry.thumbnailUrl ??
+                getDefaultArtwork(entry.id)
+              }
             />
           </SwipeableRow>
         ))}

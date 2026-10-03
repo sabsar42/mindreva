@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  Plus,
   Archive,
   LayoutGrid,
   Calendar,
@@ -16,7 +15,6 @@ import {
   BottomSheet,
   BottomSheetContent,
   BottomSheetTitle,
-  Button,
   FilterPills,
   Input,
   LeafMark,
@@ -39,6 +37,7 @@ import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service"
 import { TranscriptionWatcher } from "./transcription-watcher";
 import { useEntryThumbnails } from "./use-entry-thumbnails";
 import { PrefetchLink } from "./prefetch-link";
+import { getDefaultArtwork } from "@/lib/default-artwork";
 
 // CalendarPicker pulls in react-day-picker (~164kB, confirmed by measuring
 // the real deployed /journal bundle) for a component that sits inside a
@@ -74,7 +73,10 @@ function startOfWeekMonday(d: Date): Date {
 }
 
 function toDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function EntryListScreen({
@@ -82,14 +84,11 @@ export function EntryListScreen({
   heading,
   entries,
   entryDates,
-  newEntryHref,
 }: {
   type: EntryType;
   heading: string;
   entries: EntryListItemWithThumbnail[];
   entryDates: string[];
-  /** Notes gets a "+" compose button; journal doesn't (recording is separate). */
-  newEntryHref?: string;
 }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -159,6 +158,27 @@ export function EntryListScreen({
     () => entryDates.map((d) => new Date(`${d}T00:00:00`)),
     [entryDates],
   );
+
+  // Build a date→entryId map from the first entry per date so the calendar
+  // cell and the NoteCard for that date use the same deterministic artwork.
+  const firstEntryIdByDate = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const e of localEntries) {
+      if (e.entryDate && !map[e.entryDate]) map[e.entryDate] = e.id;
+    }
+    return map;
+  }, [localEntries]);
+
+  // Merge real cover photos with default artworks so every date that has an
+  // entry shows something. Real photos win (spread last).
+  const mergedDayThumbnails = React.useMemo(() => {
+    const defaults: Record<string, string> = {};
+    for (const dateStr of entryDates) {
+      const seed = firstEntryIdByDate[dateStr] ?? dateStr;
+      defaults[dateStr] = getDefaultArtwork(seed);
+    }
+    return { ...defaults, ...dayThumbnails };
+  }, [entryDates, firstEntryIdByDate, dayThumbnails]);
 
   const filtered = React.useMemo(() => {
     if (filter === "all") return localEntries;
@@ -281,18 +301,6 @@ export function EntryListScreen({
               className="pl-10"
             />
           </div>
-          {newEntryHref && (
-            <Button
-              asChild
-              size="sm"
-              className="hidden shrink-0 gap-1.5 md:flex"
-            >
-              <PrefetchLink href={newEntryHref}>
-                <Plus className="size-4" />
-                New note
-              </PrefetchLink>
-            </Button>
-          )}
         </div>
 
         <div className="mt-4">
@@ -346,7 +354,9 @@ export function EntryListScreen({
                     durationLabel={formatDuration(entry.durationMs)}
                     snippet={entry.snippet ?? undefined}
                     thumbnailUrl={
-                      entryThumbnails[entry.id] ?? entry.thumbnailUrl
+                      entryThumbnails[entry.id] ??
+                      entry.thumbnailUrl ??
+                      getDefaultArtwork(entry.id)
                     }
                   />
                 </PrefetchLink>
@@ -361,14 +371,13 @@ export function EntryListScreen({
               <CalendarPicker
                 selected={selectedDate}
                 onSelect={(d) => {
+                  if (!d) return;
                   setSelectedDate(d);
-                  if (d) {
-                    setFilter("date");
-                    setDatePickerOpen(false);
-                  }
+                  setFilter("date");
+                  setDatePickerOpen(false);
                 }}
                 entryDates={calendarDates}
-                dayThumbnails={dayThumbnails}
+                dayThumbnails={mergedDayThumbnails}
                 onClear={() => {
                   setSelectedDate(undefined);
                   setFilter("all");
@@ -383,16 +392,6 @@ export function EntryListScreen({
             </div>
           </BottomSheetContent>
         </BottomSheet>
-
-        {newEntryHref && (
-          <PrefetchLink
-            href={newEntryHref}
-            aria-label="New note"
-            className="bg-primary text-primary-foreground fixed bottom-24 right-5 flex size-14 items-center justify-center rounded-full transition-opacity hover:opacity-90 md:hidden"
-          >
-            <Plus className="size-6" />
-          </PrefetchLink>
-        )}
 
         <ConfirmTrashDialog
           open={confirmTrashId !== null}

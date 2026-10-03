@@ -1,13 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { BookOpen, FileText, MessageSquare, Brain, User } from "lucide-react";
+import { BookOpen, MessageSquare, Brain, User } from "lucide-react";
 import { cn, LeafMark } from "@mindreva/ui";
 import { PrefetchLink } from "./prefetch-link";
 
 const NAV_ITEMS = [
   { href: "/journal", label: "Journal", Icon: BookOpen },
-  { href: "/notes", label: "Notes", Icon: FileText },
   { href: "/chat", label: "Chat", Icon: MessageSquare },
   { href: "/mindmap", label: "Mindmap", Icon: Brain },
   { href: "/account", label: "Account", Icon: User },

@@ -35,7 +35,7 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         className={cn(
-          "bg-card border-border flex items-start gap-3 rounded-xl border p-5",
+          "bg-card border-border flex items-center gap-3 rounded-xl border p-5",
           interactive &&
             "hover:bg-accent focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2",
           className,
@@ -43,9 +43,9 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
         {...props}
       >
         <div className="min-w-0 flex-1">
-          {/* Metadata row: timestamp left, duration chip right */}
+          {/* Metadata row: timestamp + duration inline */}
           {(dateLabel || durationLabel) && (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
               {dateLabel && (
                 <p className="text-muted-foreground truncate text-xs">
                   {dateLabel}
@@ -58,7 +58,7 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
               )}
             </div>
           )}
-          <h3 className="text-foreground mt-2 line-clamp-2 text-lg font-bold leading-snug">
+          <h3 className="text-foreground mt-2 line-clamp-1 text-lg font-bold leading-snug">
             {title}
           </h3>
           {snippet && (
@@ -72,7 +72,7 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
           <img
             src={thumbnailUrl}
             alt=""
-            className="size-14 shrink-0 rounded-lg object-cover"
+            className="size-20 shrink-0 rounded-lg object-cover"
           />
         )}
       </div>

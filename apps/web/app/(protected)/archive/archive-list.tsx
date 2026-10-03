@@ -13,6 +13,7 @@ import { PrefetchLink } from "../_components/prefetch-link";
 import { PageHeader } from "../_components/page-header";
 import { ConfirmTrashDialog } from "../_components/confirm-trash-dialog";
 import { EmptyState } from "../_components/empty-state";
+import { getDefaultArtwork } from "@/lib/default-artwork";
 
 export function ArchiveList({
   entries: initial,
@@ -80,7 +81,11 @@ export function ArchiveList({
                     : DATE_PLACEHOLDER
                 }
                 snippet={entry.snippet ?? undefined}
-                thumbnailUrl={thumbnails[entry.id] ?? entry.thumbnailUrl}
+                thumbnailUrl={
+                  thumbnails[entry.id] ??
+                  entry.thumbnailUrl ??
+                  getDefaultArtwork(entry.id)
+                }
               />
             </PrefetchLink>
           </SwipeableRow>

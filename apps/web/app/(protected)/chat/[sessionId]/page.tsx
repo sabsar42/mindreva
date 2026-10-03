@@ -46,7 +46,7 @@ export default async function ChatSessionPage({
       initialEntryDates={entryDates}
       entryCountInRange={rangeContext.entryCount}
       suggestedMinEntries={SUGGESTED_MIN_ENTRIES}
-      monthsWithEntries={rangeContext.monthsWithEntries}
+      entriesPerMonth={rangeContext.entriesPerMonth}
       isSingleYear={rangeContext.isSingleYear}
       openingLine={rangeContext.openingLine}
     />

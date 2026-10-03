@@ -8,7 +8,6 @@ import { BottomNav } from "./bottom-nav";
 // leaving /record through it would unmount the recorder and discard the audio.
 const FOCUSED_ROUTES = [
   /^\/record(\/|$)/,
-  /^\/notes\/new(\/|$)/,
   /^\/entries\/[^/]+\/review(\/|$)/,
   /^\/chat\/[^/]+/,
 ];
