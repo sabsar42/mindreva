@@ -4,7 +4,7 @@ Mindreva is a private, voice-first journal for turning thoughts, recordings, and
 
 Currently in Phase 7 — see [docs/roadmap.md](docs/roadmap.md) for what's shipped and what's next.
 
-## Features
+## Features:
 
 - Voice recording and speech-to-text through a provider abstraction
 - Written journal entries and notes with Markdown-backed rich-text editing
