@@ -205,7 +205,16 @@ export function ChatConversation({
       <header className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => router.push("/chat")}
+          onClick={() => {
+            // router.back() reuses the Router Cache for /chat instead of a
+            // fresh server render; router.push() to the same URL is always a
+            // fresh navigation. See entry-detail.tsx's back button.
+            if (window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/chat");
+            }
+          }}
           aria-label="Back"
           className="text-foreground hover:bg-accent -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
         >
@@ -219,7 +228,7 @@ export function ChatConversation({
         </div>
       </header>
 
-      {isSingleYear && (
+      {isSingleYear && entryCountInRange < suggestedMinEntries && (
         <RangeContextPanel
           entryCount={entryCountInRange}
           suggestedMin={suggestedMinEntries}
