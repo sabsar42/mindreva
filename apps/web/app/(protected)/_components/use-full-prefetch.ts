@@ -32,12 +32,24 @@ export function usePrefetchOnIntent(href: string) {
   return React.useCallback(() => {
     if (firedRef.current) return;
     firedRef.current = true;
-    // "full" is PrefetchKind.FULL's own runtime value, but that enum isn't
-    // exported from the public next/navigation types (it's internal), so
-    // TypeScript can't see the literal and the enum as the same type without
-    // a cast — a real Next.js gap, not a workaround for anything shaky.
-    router.prefetch(href, { kind: "full" } as Parameters<
-      typeof router.prefetch
-    >[1]);
+    prefetchFull(router, href);
   }, [router, href]);
+}
+
+/**
+ * router.prefetch with PrefetchKind.FULL. A full prefetch is cached under
+ * staleTimes.static (Next's default: 5 minutes), not staleTimes.dynamic, so
+ * a later tap renders from memory with no server round trip.
+ */
+export function prefetchFull(
+  router: ReturnType<typeof useRouter>,
+  href: string,
+): void {
+  // "full" is PrefetchKind.FULL's own runtime value, but that enum isn't
+  // exported from the public next/navigation types (it's internal), so
+  // TypeScript can't see the literal and the enum as the same type without
+  // a cast — a real Next.js gap, not a workaround for anything shaky.
+  router.prefetch(href, { kind: "full" } as Parameters<
+    typeof router.prefetch
+  >[1]);
 }

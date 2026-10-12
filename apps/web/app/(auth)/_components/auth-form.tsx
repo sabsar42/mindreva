@@ -79,7 +79,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
         if (error) throw error;
         router.push(redirectTo);
       }
-      router.refresh();
+      // No router.refresh() here: both branches navigate to a different
+      // route, which already renders with the new session cookies. A refresh
+      // queued behind the push re-rendered the destination a second time
+      // and emptied the Router Cache right after AppShell's tab prefetches.
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
