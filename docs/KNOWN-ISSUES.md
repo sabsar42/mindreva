@@ -6,6 +6,21 @@ things still outstanding.
 
 ---
 
+## CI's push trigger watches `main`, but the repo's default branch is `master`
+
+**Status:** Open.
+
+**What's wrong:** `.github/workflows/ci.yml` runs on `pull_request` (any
+branch) and `push: branches: [main]`. This repo's default branch is
+`master`, so a direct push to `master` — bypassing a PR, e.g. a docs fix or
+an empty commit to re-trigger a Vercel deploy — never runs CI. PRs are
+unaffected; this only misses direct pushes.
+
+**To revisit:** change the workflow's push trigger to `master`, or rename
+the branch to `main` to match the trigger.
+
+---
+
 ## ~230ms per-request floor from the edge → Tokyo function hop
 
 **Status:** Open, accepted for now. See docs/DECISIONS.md (2026-10-12).
