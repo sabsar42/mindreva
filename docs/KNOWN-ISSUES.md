@@ -6,6 +6,66 @@ things still outstanding.
 
 ---
 
+## ~230ms per-request floor from the edge → Tokyo function hop
+
+**Status:** Open, accepted for now. See docs/DECISIONS.md (2026-10-12).
+
+**What's wrong:** Every dynamic request from Bangladesh pays ~230ms just to
+reach the `hnd1` function, before auth (~50ms) and DB (~70ms). The
+2026-10-12 caching changes hide this for tab switches but not for first
+visits, entry detail, or `/journal`.
+
+**To revisit:** after the 2026-10-12 changes deploy, re-run the Playwright
+tab-navigation measurement. If first visits still feel slow, consider
+co-locating in Mumbai: a new free Supabase project in `ap-south-1` plus
+`"regions": ["bom1"]`. Moving only the database would not help.
+
+---
+
+## Cold starts add ~1-1.5s to the first request after idle
+
+**Status:** Open, accepted for now (no free fix).
+
+**What's wrong:** Warm dynamic requests land at ~450ms, but the first one
+on a new function instance took 1.6-1.9s in live measurements (2026-10-12).
+At low traffic, most "open the app after a while" visits hit this.
+
+**Why no fix yet:** The usual workaround is a keep-warm ping every few
+minutes. The repo is private, so a GitHub Actions schedule at that rate
+(~8,600 runs/month) would far exceed the 2,000 free Actions minutes, and
+Vercel Hobby crons run at most once a day. Revisit if the repo goes public
+or a free external pinger is acceptable.
+
+---
+
+## Journal list goes stale after mutate-then-navigate within 30s
+
+**Status:** Open, pre-existing, minor.
+
+**What's wrong:** Record upload (`record-flow.tsx`), trash from entry detail
+(`entry-detail.tsx`) and transcript review (`transcript-review.tsx`) all
+`router.push("/journal")` right after a mutation without invalidating the
+Router Cache. If `/journal` is still cached (≤30s, or ≤5 min when a hover
+prefetch fired), the list shows the pre-mutation state until the next fetch.
+`refresh()` before `push()` doesn't fix it, since the navigation discards the
+pending refresh (see docs/DECISIONS.md, 2026-10-12).
+
+**To revisit:** do the mutation through a server action that calls
+`revalidatePath("/journal")`, which purges the client cache before the
+navigation, or remove the changed row from local state on arrival.
+
+---
+
+## Footer links to pages that don't exist
+
+**Status:** Open.
+
+**What's wrong:** `/privacy`, `/terms` and `/support` are linked from the
+sign-in page and Account, but no such routes exist. The live sign-in page
+logs three 404s from their prefetch on every load.
+
+---
+
 ## UI redesign (`feature/ui-update`) not yet checked in a real browser
 
 **Status:** Open. The 2026-09-27 fix pass was verified with lint, typecheck,

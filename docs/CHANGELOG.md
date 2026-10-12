@@ -7,6 +7,72 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-12 — Perf: tab navigation served from the Router Cache, Chat no longer wipes it
+
+Reported directly: the deployed app feels slow; question was whether the
+database needs moving. Measured on the live deploy with Playwright from the
+team's location (Bangladesh), signed in to a real account.
+
+### Found
+
+- **The database is not the bottleneck.** Medians per request: static page
+  from the Mumbai edge 62-82ms; reaching the Tokyo (`hnd1`) function with no
+  auth and no DB ~230ms; the same with a valid session (auth, no DB)
+  ~290-380ms; real pages doing 1-5 parallel queries (journal, mindmap,
+  account, entry detail) all ~445-460ms. DB work adds ~70ms regardless of
+  query count. The rest is the user → `bom1` edge → `hnd1` function hop,
+  which moving only the database cannot change. `getClaims()` was confirmed
+  verifying locally (the session's access token is ES256), so auth isn't the
+  cost either.
+- **Opening Chat emptied the whole client Router Cache.** `ChatHome` called
+  `router.refresh()` on every mount. That fetched `/chat` twice per visit
+  and, since `refresh()` resets the prefetch cache, made every other tab
+  re-fetch afterwards: revisiting Mindmap/Journal took 16-24ms with no
+  request before visiting Chat, 360-400ms after.
+- **Hover/touchstart prefetch barely helps on phones.** Where a prefetch had
+  already landed, a tab opened in ~112ms with no request; a phone's
+  touchstart gives only ~100ms of head start on a ~450ms request.
+- `/chat` and `/account` had no `loading.tsx`, so a tap froze on the old
+  screen until the server answered (account: 511-826ms).
+
+### Fixed
+
+- `chat-home.tsx`: refresh only on the first mount after starting a new
+  session (a one-shot `sessionStorage` flag set in `startSession`), not on
+  every mount.
+- `app-shell.tsx`: on every tab screen, fully prefetch `/chat`, `/mindmap`
+  and `/account` (skipping the current one). A full prefetch is cached for
+  `staleTimes.static` (Next's default, 5 minutes), so tab taps render from
+  memory. `/journal` deliberately excluded, see docs/DECISIONS.md.
+- `use-full-prefetch.ts`: the `{ kind: "full" }` cast extracted into a shared
+  `prefetchFull()` used by both `usePrefetchOnIntent` and the shell.
+- New `chat/loading.tsx` and `account/loading.tsx` skeletons.
+- `app-shell.tsx` also re-prefetches after every `router.refresh()`
+  (`children` added to the effect's deps). In Next 15.5 a prefetch writes
+  into the router's live cache map, and a refresh replaces that map once its
+  fetch resolves, so prefetches made just before or during a refresh
+  (archive/trash, transcription toast, sign-in) were silently lost.
+- `auth-form.tsx`: dropped the `router.refresh()` after sign-in/sign-up.
+  Both branches already navigate to a new route rendered with the new
+  cookies; the queued refresh rendered `/journal` a second time (three
+  `/journal` requests per sign-in were measured live) and emptied the cache.
+- `getMyEntryDetail`: photo signing chained onto its own query inside the
+  existing `Promise.all`, so the Storage round trip overlaps the other four
+  queries instead of running after them. Saves one sequential Storage call
+  on entries with photos; not measured, since the test account has none.
+
+### Verified
+
+- `pnpm lint` (only the pre-existing `<img>` warning in `entry-detail.tsx`),
+  `pnpm typecheck` 7/7, and `pnpm build` with CI's placeholder env vars all
+  pass; route sizes unchanged (176-180kB First Load JS).
+
+### Not independently verified
+
+- The live effect of these changes: measured before the fix only, since
+  the fix isn't deployed yet. Re-run the same Playwright tab-navigation test
+  against the deploy once it ships.
+
 ## 2026-09-27 — Fix pass on the UI redesign (`feature/ui-update`)
 
 A code audit of the 2026-09-24 redesign found one data-loss bug and several

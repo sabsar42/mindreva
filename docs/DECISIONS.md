@@ -11,6 +11,42 @@ rather than resolved.
 
 ---
 
+## 2026-10-12 — Don't move the database; cache tab pages on the client instead
+
+**What happened:** The deployed app felt slow, and moving the Supabase
+database was on the table. Live measurement (see docs/CHANGELOG.md,
+2026-10-12) showed DB queries cost ~70ms of a ~450ms request; the fixed
+~230ms is the user → Mumbai edge → Tokyo function hop.
+
+**Why:** Moving only the database can't shorten that hop. Moving the
+database _and_ the function region to Mumbai (a new Supabase project in
+`ap-south-1` plus `bom1` in `vercel.json`) would, but that means migrating
+auth users, Storage buckets and pgvector data — free, but not small. Paid
+options were ruled out for now.
+
+**What was decided:**
+
+- Keep Seoul + Tokyo. Fix perceived speed client-side: AppShell fully
+  prefetches `/chat`, `/mindmap` and `/account` on every tab screen, and
+  ChatHome no longer calls `router.refresh()` on every mount.
+- **`/journal` is excluded from that prefetch.** Record upload, trash from
+  entry detail and transcript review each `router.push("/journal")` right
+  after a mutation without invalidating the cache. Calling `refresh()` before
+  `push()` doesn't help: in Next 15.5 a navigation discards a pending
+  refresh, whose cache reset only applies once its own fetch resolves
+  (`app-router-instance.js`, `refresh-reducer.js`). A 5-minute prefetch of
+  the journal list would therefore show trashed entries or miss a new
+  recording. Journal keeps its existing 30s `staleTimes.dynamic` window.
+- Accepted: Mindmap, Chat home and Account can be up to 5 minutes stale when
+  opened from a tab. Account's server actions already purge the cache via
+  `revalidatePath`; a new chat session sets a flag that makes ChatHome
+  refresh on its next mount; the mindmap is a background-computed snapshot
+  anyway.
+- Revisit the Mumbai co-location only if first visits still feel slow after
+  this ships.
+
+---
+
 ## 2026-09-27 — Hide the nav bars on focused flows instead of guarding navigation
 
 **What happened:** The 2026-09-24 protected-group layout rendered `SideNav`
