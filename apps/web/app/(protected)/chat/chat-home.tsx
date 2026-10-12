@@ -14,6 +14,31 @@ interface SessionSummary {
   createdAt: string;
 }
 
+// Set when a session is created, consumed on ChatHome's next mount. A flag
+// rather than refresh-then-push: a navigation discards a pending refresh, so
+// the refresh would never actually invalidate the cached list.
+const SESSIONS_STALE_KEY = "mindreva:chat-sessions-stale";
+
+function markSessionsStale(): void {
+  try {
+    window.sessionStorage.setItem(SESSIONS_STALE_KEY, "1");
+  } catch {
+    // Storage unavailable — the list just catches up on its next fetch.
+  }
+}
+
+function consumeSessionsStale(): boolean {
+  try {
+    if (window.sessionStorage.getItem(SESSIONS_STALE_KEY) === null) {
+      return false;
+    }
+    window.sessionStorage.removeItem(SESSIONS_STALE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function relativeDate(iso: string): string {
   const then = new Date(iso);
   const days = Math.floor((Date.now() - then.getTime()) / 86_400_000);
@@ -38,11 +63,13 @@ export function ChatHome({
 }) {
   const router = useRouter();
 
-  // The Router Cache holds this page for 30s (staleTimes.dynamic in next.config.ts).
-  // Refresh on every mount so a new session created just before navigating here
-  // is always visible without waiting for the cache to expire.
+  // This page can render from the Router Cache (prefetched by AppShell), so a
+  // session started here wouldn't be listed on return. Refresh only then:
+  // router.refresh() also empties the whole client Router Cache, and doing it
+  // on every mount made each Chat visit cost two server round trips and
+  // re-fetch every other tab afterwards (measured on the live deploy).
   React.useEffect(() => {
-    router.refresh();
+    if (consumeSessionsStale()) router.refresh();
   }, [router]);
 
   const [selectedYear, setSelectedYear] = React.useState<number | null>(
@@ -67,6 +94,7 @@ export function ChatHome({
       });
       if (!res.ok) throw new Error("Failed to start");
       const data = (await res.json()) as { session: { id: string } };
+      markSessionsStale();
       router.push(`/chat/${data.session.id}`);
     } catch {
       toast.error("Couldn't start a new chat. Please try again.");

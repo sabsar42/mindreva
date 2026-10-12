@@ -216,17 +216,19 @@ export async function getMyEntryDetail(id: string): Promise<{
   // None of these five queries depend on each other's results (only on id/
   // userId, already known) — run them together instead of in three
   // sequential round-trip stages, since each one is a real network hop to
-  // Supabase.
-  const [entry, transcript, summary, photoRows, tasks] = await Promise.all([
+  // Supabase. Photo signing chains onto its own query inside the same
+  // Promise.all, so the Storage round trip overlaps the other four queries
+  // instead of starting after all of them. Photo rows are scoped by userId,
+  // so a missing or foreign entry signs nothing.
+  const [entry, transcript, summary, photos, tasks] = await Promise.all([
     EntriesRepository.getByIdForUser(id, userId),
     TranscriptsRepository.getByEntry(id, userId),
     SummariesRepository.getByEntry(id, userId),
-    EntryPhotosRepository.listByEntry(id, userId),
+    EntryPhotosRepository.listByEntry(id, userId).then(signPhotoUrls),
     EntryTasksRepository.listByEntry(id, userId),
   ]);
   if (!entry) return null;
 
-  const photos = await signPhotoUrls(photoRows);
   return { entry, transcript, summary, photos, tasks };
 }
 
