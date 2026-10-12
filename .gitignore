@@ -38,3 +38,7 @@ pnpm-debug.log*
 
 # design reference screenshots (kept local only)
 docs/design-reference
+
+# claude
+.claude/
+graphify-out/
