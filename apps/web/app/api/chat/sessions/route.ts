@@ -23,6 +23,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const yearStart = Number(body?.yearStart);
   const yearEnd = Number(body?.yearEnd ?? yearStart);
+  const half =
+    body?.half === 1 || body?.half === 2 ? (body.half as 1 | 2) : undefined;
   const currentYear = new Date().getFullYear();
 
   if (
@@ -35,6 +37,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid year range" }, { status: 400 });
   }
 
-  const session = await startPersonaChatSession({ yearStart, yearEnd });
+  if (half && yearStart !== yearEnd) {
+    return NextResponse.json(
+      { error: "A half-year session covers a single year" },
+      { status: 400 },
+    );
+  }
+
+  const session = await startPersonaChatSession({ yearStart, yearEnd, half });
   return NextResponse.json({ session }, { status: 201 });
 }

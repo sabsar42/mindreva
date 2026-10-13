@@ -26,11 +26,23 @@ export async function POST(
     return NextResponse.json({ error: "Image too large" }, { status: 400 });
   }
 
+  if (file.type && !file.type.startsWith("image/")) {
+    return NextResponse.json({ error: "Not an image" }, { status: 400 });
+  }
+
+  // 'inline' = a picture inserted into the journal body; anything else is the
+  // cover set (the default, which is what attaching a photo has always meant).
+  // `makeCover` is "Change cover image": the new photo becomes the cover.
+  const kind = form.get("kind") === "inline" ? "inline" : "cover";
+  const makeCover = form.get("makeCover") === "true";
+
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const photo = await addPhotoToEntry(entryId, {
       image: buffer,
       mimeType: file.type || "image/jpeg",
+      kind,
+      makeCover,
     });
     return NextResponse.json({ photo }, { status: 201 });
   } catch (err) {

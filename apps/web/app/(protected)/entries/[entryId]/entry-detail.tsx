@@ -4,34 +4,42 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   ArrowLeft,
   Archive,
   ArchiveRestore,
+  Check,
+  FileText,
+  ImagePlus,
   Loader2,
   RefreshCw,
+  Share2,
   Sparkles,
   Trash2,
 } from "lucide-react";
 import {
   Badge,
   Button,
-  PhotoUploader,
-  PhotoThumbnailStrip,
   TaskChecklist,
+  cn,
   toast,
-  type PhotoUploaderPhoto,
   type TaskChecklistTask,
 } from "@mindreva/ui";
-import type { EntryType, TranscriptStatus } from "@mindreva/database";
+import type {
+  EntryPhotoKind,
+  EntrySource,
+  TranscriptStatus,
+} from "@mindreva/database";
 import { getDefaultArtworkWide } from "@/lib/default-artwork";
+import { ShareSheet } from "./share-sheet";
+import { TranscriptSheet } from "./transcript-sheet";
 
 // Lexical is a client-only interactive widget — its SSR output for the
 // contentEditable div doesn't match what it renders once hydrated (a known
-// Lexical/Next.js mismatch), and its ~90kB+ bundle has no business loading
-// on every page that merely imports @mindreva/ui. ssr: false skips the
-// server render entirely (fixing the hydration error) and code-splits the
-// editor into its own chunk, fetched only when this page actually mounts —
-// note-card taps elsewhere in the app no longer wait on Lexical to parse.
+// Lexical/Next.js mismatch), and its bundle has no business loading on every
+// page that merely imports @mindreva/ui. ssr: false skips the server render
+// entirely (fixing the hydration error) and code-splits the editor into its own
+// chunk, fetched only when this page actually mounts.
 const RichTextEditor = dynamic(
   () => import("@mindreva/ui/rich-text-editor").then((m) => m.RichTextEditor),
   {
@@ -43,13 +51,71 @@ const RichTextEditor = dynamic(
 );
 
 const POLL_INTERVAL_MS = 2000;
+const TEXT_AUTOSAVE_MS = 900;
+const TITLE_AUTOSAVE_MS = 700;
+// One summary refresh after the user stops editing, instead of one per save.
+const SUMMARY_IDLE_MS = 25_000;
+
+export interface EntryPhoto {
+  id: string;
+  url: string;
+  kind: EntryPhotoKind;
+}
+
+type SaveState = "saved" | "dirty" | "saving" | "error";
+
+function SaveStatus({
+  state,
+  onRetry,
+}: {
+  state: SaveState;
+  onRetry: () => void;
+}) {
+  return (
+    <p
+      aria-live="polite"
+      className={cn(
+        "flex items-center gap-1.5 text-xs font-medium transition-colors",
+        state === "error" ? "text-destructive" : "text-muted-foreground",
+      )}
+    >
+      {state === "saving" && (
+        <>
+          <Loader2 className="size-3.5 animate-spin" />
+          Saving…
+        </>
+      )}
+      {state === "saved" && (
+        <>
+          <Check className="text-primary size-3.5" />
+          Saved
+        </>
+      )}
+      {state === "dirty" && <>Unsaved changes</>}
+      {state === "error" && (
+        <>
+          <AlertCircle className="size-3.5" />
+          Couldn&apos;t save
+          <button
+            type="button"
+            onClick={onRetry}
+            className="text-primary font-semibold underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </>
+      )}
+    </p>
+  );
+}
 
 export function EntryDetail({
   entryId,
-  type,
+  source,
   title,
   entryDate,
   archived,
+  shared,
   transcriptStatus,
   confirmedText,
   summaryText,
@@ -57,14 +123,15 @@ export function EntryDetail({
   initialTasks,
 }: {
   entryId: string;
-  type: EntryType;
+  source: EntrySource;
   title: string | null;
   entryDate: string | null;
   archived: boolean;
+  shared: boolean;
   transcriptStatus: TranscriptStatus | null;
   confirmedText: string;
   summaryText: string | null;
-  initialPhotos: PhotoUploaderPhoto[];
+  initialPhotos: EntryPhoto[];
   initialTasks: TaskChecklistTask[];
 }) {
   const router = useRouter();
@@ -72,22 +139,49 @@ export function EntryDetail({
     transcriptStatus,
   );
   const [text, setText] = React.useState(confirmedText);
-  const [savingText, setSavingText] = React.useState(false);
-  const [textDirty, setTextDirty] = React.useState(false);
+  const [titleValue, setTitleValue] = React.useState(title ?? "");
+  const [textState, setTextState] = React.useState<SaveState>("saved");
+  const [titleState, setTitleState] = React.useState<SaveState>("saved");
   const [summary, setSummary] = React.useState(summaryText);
   const [regenerating, setRegenerating] = React.useState(false);
   const [isArchived, setIsArchived] = React.useState(archived);
   const [trashing, setTrashing] = React.useState(false);
-  const [photos, setPhotos] =
-    React.useState<PhotoUploaderPhoto[]>(initialPhotos);
-  const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
+  const [coverPhotos, setCoverPhotos] = React.useState<EntryPhoto[]>(() =>
+    initialPhotos.filter((p) => p.kind === "cover"),
+  );
+  const [uploadingCover, setUploadingCover] = React.useState(false);
   const [tasks, setTasks] = React.useState<TaskChecklistTask[]>(initialTasks);
-  // True while a save's background re-summarize (kicked off via
-  // next/server's after()) is still in flight — the save itself already
-  // completed and returned, this just tracks whether the summary/tasks the
-  // save response returned are the stale pre-edit ones.
   const [summarizingInBackground, setSummarizingInBackground] =
     React.useState(false);
+  const [shareOpen, setShareOpen] = React.useState(false);
+  const [transcriptOpen, setTranscriptOpen] = React.useState(false);
+  const [isShared, setIsShared] = React.useState(shared);
+
+  // Pictures already in the body, id -> signed URL. New ones are tracked inside
+  // the editor itself.
+  const inlineImageUrls = React.useMemo(
+    () =>
+      Object.fromEntries(
+        initialPhotos
+          .filter((p) => p.kind === "inline")
+          .map((p) => [p.id, p.url]),
+      ),
+    [initialPhotos],
+  );
+
+  // ---- autosave plumbing (refs, so timers/handlers never see stale values) ----
+  const latestTextRef = React.useRef(confirmedText);
+  const lastSavedTextRef = React.useRef(confirmedText);
+  const textSavingRef = React.useRef(false);
+  const textTimerRef = React.useRef<number | null>(null);
+  const latestTitleRef = React.useRef(title ?? "");
+  const lastSavedTitleRef = React.useRef(title ?? "");
+  const titleSavingRef = React.useRef(false);
+  const titleTimerRef = React.useRef<number | null>(null);
+  const summaryTimerRef = React.useRef<number | null>(null);
+  const summaryStaleRef = React.useRef(false);
+  const summaryRef = React.useRef(summary);
+  summaryRef.current = summary;
 
   const dateLabel = entryDate
     ? new Date(`${entryDate}T00:00:00`).toLocaleDateString(undefined, {
@@ -97,6 +191,194 @@ export function EntryDetail({
         year: "numeric",
       })
     : null;
+
+  const overallState: SaveState =
+    textState === "error" || titleState === "error"
+      ? "error"
+      : textState === "saving" || titleState === "saving"
+        ? "saving"
+        : textState === "dirty" || titleState === "dirty"
+          ? "dirty"
+          : "saved";
+
+  async function refreshSummaryNow(keepalive = false) {
+    if (!summaryStaleRef.current) return;
+    summaryStaleRef.current = false;
+    try {
+      const res = await fetch(`/api/entries/${entryId}/summarize`, {
+        method: "POST",
+        keepalive,
+      });
+      if (!res.ok || keepalive) return;
+      const data = (await res.json()) as {
+        summary: { summaryText: string } | null;
+        tasks: TaskChecklistTask[];
+      };
+      if (data.summary) {
+        setSummary(data.summary.summaryText);
+        setTasks(data.tasks);
+      }
+    } catch {
+      // The summary just stays as it was; the refresh button is still there.
+    } finally {
+      setSummarizingInBackground(false);
+    }
+  }
+
+  function scheduleSummaryRefresh() {
+    summaryStaleRef.current = true;
+    if (summaryTimerRef.current) window.clearTimeout(summaryTimerRef.current);
+    summaryTimerRef.current = window.setTimeout(() => {
+      setSummarizingInBackground(true);
+      void refreshSummaryNow();
+    }, SUMMARY_IDLE_MS);
+  }
+
+  async function persistText(keepalive = false): Promise<boolean> {
+    if (textSavingRef.current) return true; // the in-flight save re-checks when it ends
+    const toSave = latestTextRef.current;
+    if (toSave === lastSavedTextRef.current) {
+      setTextState("saved");
+      return true;
+    }
+    textSavingRef.current = true;
+    setTextState("saving");
+    try {
+      const res = await fetch(`/api/entries/${entryId}/transcript`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        // Autosave must not re-summarize on every pause; see scheduleSummaryRefresh.
+        body: JSON.stringify({ editedText: toSave, resummarize: false }),
+        keepalive,
+      });
+      if (!res.ok) throw new Error("Save failed");
+      lastSavedTextRef.current = toSave;
+      scheduleSummaryRefresh();
+      textSavingRef.current = false;
+      if (latestTextRef.current !== toSave) {
+        // Typed more while that save was in flight: save again.
+        return persistText(keepalive);
+      }
+      setTextState("saved");
+      return true;
+    } catch {
+      textSavingRef.current = false;
+      setTextState("error");
+      return false;
+    }
+  }
+
+  async function persistTitle(keepalive = false): Promise<boolean> {
+    if (titleSavingRef.current) return true;
+    const toSave = latestTitleRef.current;
+    if (toSave === lastSavedTitleRef.current) {
+      setTitleState("saved");
+      return true;
+    }
+    titleSavingRef.current = true;
+    setTitleState("saving");
+    try {
+      const res = await fetch(`/api/entries/${entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: toSave }),
+        keepalive,
+      });
+      if (!res.ok) throw new Error("Save failed");
+      lastSavedTitleRef.current = toSave;
+      titleSavingRef.current = false;
+      if (latestTitleRef.current !== toSave) return persistTitle(keepalive);
+      setTitleState("saved");
+      return true;
+    } catch {
+      titleSavingRef.current = false;
+      setTitleState("error");
+      return false;
+    }
+  }
+
+  function handleTextChange(value: string) {
+    setText(value);
+    latestTextRef.current = value;
+    if (value === lastSavedTextRef.current) {
+      setTextState("saved");
+      return;
+    }
+    setTextState("dirty");
+    if (textTimerRef.current) window.clearTimeout(textTimerRef.current);
+    textTimerRef.current = window.setTimeout(
+      () => void persistText(),
+      TEXT_AUTOSAVE_MS,
+    );
+  }
+
+  function handleTitleChange(value: string) {
+    setTitleValue(value);
+    latestTitleRef.current = value;
+    if (value === lastSavedTitleRef.current) {
+      setTitleState("saved");
+      return;
+    }
+    setTitleState("dirty");
+    if (titleTimerRef.current) window.clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = window.setTimeout(
+      () => void persistTitle(),
+      TITLE_AUTOSAVE_MS,
+    );
+  }
+
+  /** Save anything pending now. Resolves false if a save failed. */
+  async function flushAll(): Promise<boolean> {
+    if (textTimerRef.current) window.clearTimeout(textTimerRef.current);
+    if (titleTimerRef.current) window.clearTimeout(titleTimerRef.current);
+    const [textOk, titleOk] = await Promise.all([
+      persistText(),
+      persistTitle(),
+    ]);
+    return textOk && titleOk;
+  }
+
+  // Keep the latest flush handlers reachable from effects that mount once.
+  const flushRef = React.useRef({
+    text: persistText,
+    title: persistTitle,
+    summary: refreshSummaryNow,
+  });
+  flushRef.current = {
+    text: persistText,
+    title: persistTitle,
+    summary: refreshSummaryNow,
+  };
+  const overallStateRef = React.useRef(overallState);
+  overallStateRef.current = overallState;
+
+  React.useEffect(() => {
+    // Closing the tab or locking the phone: send what's pending with keepalive
+    // so it survives the page going away, and ask the browser to confirm if a
+    // save is still outstanding.
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (overallStateRef.current !== "saved") e.preventDefault();
+    }
+    function sendPending() {
+      void flushRef.current.text(true);
+      void flushRef.current.title(true);
+    }
+    function onVisibility() {
+      if (document.visibilityState === "hidden") sendPending();
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("pagehide", sendPending);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("pagehide", sendPending);
+      document.removeEventListener("visibilitychange", onVisibility);
+      // Leaving the page in-app: flush edits and refresh a stale summary once.
+      sendPending();
+      if (summaryTimerRef.current) window.clearTimeout(summaryTimerRef.current);
+      void flushRef.current.summary(true);
+    };
+  }, []);
 
   // Poll while the transcript is still processing (only relevant if the user
   // navigates here before the review screen's own polling finished).
@@ -112,74 +394,22 @@ export function EntryDetail({
       };
       setStatus(data.status);
       if (data.status === "done") {
-        setText(data.editedText ?? data.rawText ?? "");
+        const value = data.editedText ?? data.rawText ?? "";
+        latestTextRef.current = value;
+        lastSavedTextRef.current = value;
+        setText(value);
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [entryId, status]);
 
-  async function saveText() {
-    setSavingText(true);
-    try {
-      const res = await fetch(`/api/entries/${entryId}/transcript`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ editedText: text }),
-      });
-      if (!res.ok) throw new Error("Save failed");
-      // The route responds as soon as the text write lands — it does NOT
-      // wait for re-summarization (that runs after the response, via
-      // next/server's after()). Clear dirty state and confirm the save
-      // immediately; the summary/tasks in this response are still the
-      // pre-edit ones, so kick off a short poll to pick up the fresh
-      // result once it's ready, same idiom as the transcript-status poll.
-      setTextDirty(false);
-      toast.success("Saved");
-      setSummarizingInBackground(true);
-      router.refresh();
-    } catch {
-      toast.error("Couldn't save. Please try again.");
-    } finally {
-      setSavingText(false);
-    }
-  }
-
-  // Polls briefly after a save to pick up the background re-summarize's
-  // result. Stops on its own once the summary/tasks actually change, or
-  // after a reasonable ceiling so a failed background job doesn't poll
-  // forever.
-  React.useEffect(() => {
-    if (!summarizingInBackground) return;
-    let attempts = 0;
-    const interval = setInterval(async () => {
-      attempts += 1;
-      try {
-        const res = await fetch(`/api/entries/${entryId}/summary`);
-        if (res.ok) {
-          const data = (await res.json()) as {
-            summary: { summaryText: string; provider: string | null } | null;
-            tasks: TaskChecklistTask[];
-          };
-          if (data.summary?.summaryText !== summary) {
-            setSummary(data.summary?.summaryText ?? null);
-            setTasks(data.tasks);
-            setSummarizingInBackground(false);
-            return;
-          }
-        }
-      } catch {
-        // Keep polling; a single failed check isn't fatal.
-      }
-      if (attempts >= 10) setSummarizingInBackground(false);
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [summarizingInBackground, entryId]);
-
   async function regenerateSummary() {
     setRegenerating(true);
     const hadSummaryBefore = Boolean(summary);
     try {
+      // Make sure the summary reflects what's on screen, not an older save.
+      await flushAll();
+      summaryStaleRef.current = false;
       const res = await fetch(`/api/entries/${entryId}/summarize`, {
         method: "POST",
       });
@@ -194,7 +424,6 @@ export function EntryDetail({
         toast.success(
           hadSummaryBefore ? "Summary regenerated" : "Summary generated",
         );
-        router.refresh();
       } else {
         toast.error("Nothing to summarize yet.");
       }
@@ -231,6 +460,20 @@ export function EntryDetail({
     }
   }
 
+  async function handleBack() {
+    // Don't navigate away with edits still unsaved.
+    const ok = await flushAll();
+    if (!ok) {
+      toast.error("Your latest changes couldn't be saved yet. Try again.");
+      return;
+    }
+    // router.back() reuses Next.js's Router Cache for the page we came from —
+    // instant, same as the browser's own back button. Only falls back to push()
+    // when there's no in-app history (e.g. a deep link straight to this entry).
+    if (window.history.length > 1) router.back();
+    else router.push("/journal");
+  }
+
   async function toggleTask(taskId: string, isDone: boolean) {
     // Optimistic — a checklist toggle should feel instant, and a failure
     // here is low-stakes enough to just revert on error.
@@ -250,72 +493,83 @@ export function EntryDetail({
     }
   }
 
-  async function handlePhotosSelected(files: File[]) {
-    setUploadingPhoto(true);
+  /** "Add a picture": uploads an inline image; the editor inserts it at the cursor. */
+  async function uploadInlineImage(file: File) {
+    const form = new FormData();
+    form.set("image", file);
+    form.set("kind", "inline");
+    const res = await fetch(`/api/entries/${entryId}/photos`, {
+      method: "POST",
+      body: form,
+    });
+    if (!res.ok) throw new Error("Upload failed");
+    const data = (await res.json()) as { photo: EntryPhoto };
+    return { photoId: data.photo.id, url: data.photo.url };
+  }
+
+  /** "Change cover": a separate action that only affects the cover/thumbnail. */
+  async function changeCover(file: File) {
+    setUploadingCover(true);
     try {
-      // Uploads run in parallel, not one-at-a-time — picking several photos
-      // used to take N times as long as picking one; each upload is fully
-      // independent, so there's no reason to serialize them.
-      const results = await Promise.allSettled(
-        files.map(async (file) => {
-          const form = new FormData();
-          form.set("image", file);
-          const res = await fetch(`/api/entries/${entryId}/photos`, {
-            method: "POST",
-            body: form,
-          });
-          if (!res.ok) throw new Error("Upload failed");
-          const data = (await res.json()) as { photo: PhotoUploaderPhoto };
-          return data.photo;
-        }),
-      );
-      const uploaded = results
-        .filter(
-          (r): r is PromiseFulfilledResult<PhotoUploaderPhoto> =>
-            r.status === "fulfilled",
-        )
-        .map((r) => r.value);
-      if (uploaded.length > 0) {
-        setPhotos((prev) => [...prev, ...uploaded]);
-        router.refresh();
-      }
-      if (uploaded.length < files.length) {
-        toast.error("Couldn't upload one or more photos. Please try again.");
-      }
+      const form = new FormData();
+      form.set("image", file);
+      form.set("kind", "cover");
+      form.set("makeCover", "true");
+      const res = await fetch(`/api/entries/${entryId}/photos`, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = (await res.json()) as { photo: EntryPhoto };
+      setCoverPhotos((prev) => [data.photo, ...prev]);
+      toast.success("Cover updated");
+      router.refresh();
+    } catch {
+      toast.error("Couldn't change the cover. Please try again.");
     } finally {
-      setUploadingPhoto(false);
+      setUploadingCover(false);
     }
   }
 
+  const coverUrl = coverPhotos[0]?.url ?? getDefaultArtworkWide(entryId);
+  const coverInputRef = React.useRef<HTMLInputElement>(null);
+
   return (
-    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
       <header className="flex items-center justify-between gap-2">
         <button
           type="button"
-          onClick={() => {
-            // router.back() reuses Next.js's Router Cache for the page we
-            // came from — instant, same as the browser's own back button.
-            // router.push() to the same URL does NOT get that treatment; it's
-            // a fresh navigation that re-runs the server component. Only
-            // falls back to push() when there's no in-app history to go back
-            // to (e.g. a deep link straight to this entry).
-            if (window.history.length > 1) {
-              router.back();
-            } else {
-              router.push("/journal");
-            }
-          }}
+          onClick={() => void handleBack()}
           aria-label="Back"
-          className="text-foreground hover:bg-accent -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
+          className="text-foreground hover:bg-secondary press -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full transition-colors"
         >
           <ArrowLeft className="size-5" />
         </button>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {source === "voice" && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setTranscriptOpen(true)}
+              aria-label="View transcript"
+            >
+              <FileText />
+              Transcript
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={() => setShareOpen(true)}
+            aria-label={isShared ? "Share (currently shared)" : "Share"}
+          >
+            <Share2 />
+            Share
+          </Button>
           <button
             type="button"
             onClick={toggleArchive}
             aria-label={isArchived ? "Unarchive" : "Archive"}
-            className="text-muted-foreground hover:bg-accent hover:text-foreground flex size-9 items-center justify-center rounded-full transition-colors"
+            className="text-muted-foreground hover:bg-secondary hover:text-foreground press flex size-9 items-center justify-center rounded-full transition-colors"
           >
             {isArchived ? (
               <ArchiveRestore className="size-5" />
@@ -328,33 +582,86 @@ export function EntryDetail({
             onClick={handleTrash}
             disabled={trashing}
             aria-label="Move to Trash"
-            className="text-muted-foreground hover:bg-accent hover:text-destructive flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+            className="text-muted-foreground hover:bg-secondary hover:text-destructive press flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
           >
             <Trash2 className="size-5" />
           </button>
         </div>
       </header>
 
-      <div className="mt-4 flex items-center gap-2">
-        {dateLabel && (
-          <p className="text-muted-foreground text-sm">{dateLabel}</p>
-        )}
-        {isArchived && <Badge variant="neutral">Archived</Badge>}
-      </div>
-
-      <h1 className="text-foreground mt-1 text-2xl font-bold leading-snug tracking-tight">
-        {title || "Untitled entry"}
-      </h1>
-
-      <div className="mt-4">
-        <img
-          src={photos[0]?.url ?? getDefaultArtworkWide(entryId)}
-          alt=""
-          className="h-48 w-full rounded-2xl object-cover"
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {dateLabel && (
+            <p className="text-muted-foreground text-sm">{dateLabel}</p>
+          )}
+          {isArchived && <Badge variant="neutral">Archived</Badge>}
+          {isShared && <Badge variant="accent">Shared</Badge>}
+        </div>
+        <SaveStatus
+          state={overallState}
+          onRetry={() => {
+            void persistText();
+            void persistTitle();
+          }}
         />
       </div>
 
-      <div className="bg-primary/10 mt-4 rounded-2xl p-4">
+      {/* The title is edited in place: no dialog, no separate screen. */}
+      <textarea
+        value={titleValue}
+        onChange={(e) => handleTitleChange(e.target.value.replace(/\n/g, " "))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.preventDefault();
+        }}
+        onBlur={() => void persistTitle()}
+        placeholder="Untitled entry"
+        aria-label="Journal title"
+        rows={1}
+        maxLength={200}
+        spellCheck
+        className="text-foreground placeholder:text-muted-foreground/60 mt-1 block w-full resize-none bg-transparent text-2xl font-bold leading-snug tracking-tight [field-sizing:content] focus-visible:outline-none"
+      />
+
+      <div className="relative mt-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={coverUrl}
+          alt=""
+          className="h-48 w-full rounded-2xl object-cover"
+        />
+        {/* Cover and inline pictures are separate actions: this one only ever
+            changes the cover/thumbnail. "Add a picture" is in the editor. */}
+        <button
+          type="button"
+          onClick={() => coverInputRef.current?.click()}
+          disabled={uploadingCover}
+          aria-label="Change cover image"
+          className="bg-glass border-border text-foreground press hover:bg-card shadow-subtle absolute bottom-3 right-3 flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold disabled:opacity-60"
+        >
+          {uploadingCover ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ImagePlus className="size-4" />
+          )}
+          Change cover
+        </button>
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          data-testid="cover-image-input"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void changeCover(file);
+          }}
+        />
+      </div>
+
+      <div className="border-border bg-card shadow-subtle mt-4 rounded-2xl border p-4">
         <div className="flex items-center justify-between">
           <p className="text-primary flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest">
             <Sparkles className="size-3.5" />
@@ -383,11 +690,9 @@ export function EntryDetail({
           </button>
         </div>
         {summary ? (
-          <>
-            <p className="text-foreground mt-3 whitespace-pre-wrap text-sm leading-relaxed">
-              {summary}
-            </p>
-          </>
+          <p className="text-foreground mt-3 whitespace-pre-wrap text-sm leading-relaxed">
+            {summary}
+          </p>
         ) : (
           <p className="text-primary/70 mt-3 text-sm">
             {status === "pending" || status === "processing"
@@ -405,15 +710,7 @@ export function EntryDetail({
         />
       )}
 
-      <div className="mt-5">
-        {textDirty && (
-          <div className="mb-2 flex justify-end">
-            <Button size="sm" onClick={saveText} disabled={savingText}>
-              {savingText ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        )}
-
+      <div className="mt-6">
         {status === "pending" || status === "processing" ? (
           <div className="text-muted-foreground flex items-center gap-2 text-sm">
             <Loader2 className="size-4 animate-spin" />
@@ -424,29 +721,33 @@ export function EntryDetail({
             This recording couldn&apos;t be transcribed.
           </p>
         ) : (
-          <>
-            <RichTextEditor
-              value={text}
-              onChange={(value) => {
-                setText(value);
-                setTextDirty(true);
-              }}
-              placeholder={
-                type === "journal" ? "Your transcript…" : "Your note…"
-              }
-              textareaClassName="min-h-48"
-              toolbarEnd={
-                <PhotoUploader
-                  photos={photos}
-                  onFilesSelected={(files) => void handlePhotosSelected(files)}
-                  uploading={uploadingPhoto}
-                />
-              }
-            />
-            <PhotoThumbnailStrip photos={photos} className="mt-3" />
-          </>
+          <RichTextEditor
+            value={text}
+            onChange={handleTextChange}
+            placeholder={
+              source === "voice" ? "Your transcript…" : "Start writing…"
+            }
+            textareaClassName="min-h-64"
+            imageUrls={inlineImageUrls}
+            onUploadImage={uploadInlineImage}
+            onImageError={(message) => toast.error(message)}
+          />
         )}
       </div>
+
+      <ShareSheet
+        entryId={entryId}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        onStatusChange={setIsShared}
+      />
+      {source === "voice" && (
+        <TranscriptSheet
+          entryId={entryId}
+          open={transcriptOpen}
+          onOpenChange={setTranscriptOpen}
+        />
+      )}
     </main>
   );
 }

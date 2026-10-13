@@ -42,11 +42,18 @@ export async function PATCH(
   const { entryId } = await params;
   const body = await request.json().catch(() => null);
   const editedText = body?.editedText;
-  if (typeof editedText !== "string" || editedText.trim().length === 0) {
+  // An empty body is a valid edit now: the user may delete everything (the
+  // journal editor supports real editing, including clearing a page).
+  if (typeof editedText !== "string") {
     return NextResponse.json({ error: "Invalid editedText" }, { status: 400 });
   }
+  // Autosave sends resummarize: false so a pause in typing doesn't spend an LLM
+  // call; an explicit save (the default) still refreshes the summary.
+  const resummarize = body?.resummarize !== false;
 
-  const result = await saveMyTranscriptEdit(entryId, editedText);
+  const result = await saveMyTranscriptEdit(entryId, editedText, {
+    resummarize,
+  });
   if (!result) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

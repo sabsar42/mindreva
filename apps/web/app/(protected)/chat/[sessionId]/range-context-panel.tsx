@@ -21,17 +21,22 @@ export function RangeContextPanel({
   entryCount,
   suggestedMin,
   entriesPerMonth,
+  monthRange,
   year,
 }: {
   entryCount: number;
   suggestedMin: number;
   entriesPerMonth: Record<number, number>;
+  /** First and last month (1-12) to chart: a half-year session shows six. */
+  monthRange: [number, number];
   year: number | null;
 }) {
-  const counts = Array.from(
-    { length: 12 },
-    (_, i) => entriesPerMonth[i + 1] ?? 0,
+  const [firstMonth, lastMonth] = monthRange;
+  const months = Array.from(
+    { length: lastMonth - firstMonth + 1 },
+    (_, i) => firstMonth + i,
   );
+  const counts = months.map((m) => entriesPerMonth[m] ?? 0);
   const maxCount = Math.max(...counts, 1);
 
   return (
@@ -52,7 +57,7 @@ export function RangeContextPanel({
                 style={{ height: `${heightPx}px`, opacity }}
               />
               <span className="text-muted-foreground text-[10px] leading-none">
-                {MONTH_INITIALS[i]}
+                {MONTH_INITIALS[months[i]! - 1]}
               </span>
             </div>
           );
@@ -60,7 +65,9 @@ export function RangeContextPanel({
       </div>
 
       <p className="sr-only">
-        {MONTH_INITIALS.map((m, i) => `${m}: ${counts[i]}`).join(", ")}
+        {months
+          .map((m, i) => `${MONTH_INITIALS[m - 1]}: ${counts[i]}`)
+          .join(", ")}
       </p>
 
       <p className="text-foreground mt-3 text-sm font-semibold">

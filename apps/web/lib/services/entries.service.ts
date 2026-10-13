@@ -3,11 +3,13 @@ import { after } from "next/server";
 import {
   EntriesRepository,
   EntryPhotosRepository,
+  EntrySharesRepository,
   EntryTasksRepository,
   SummariesRepository,
   TranscriptsRepository,
   type Entry,
   type EntryListItem,
+  type EntryPhotoKind,
   type EntryTask,
   type EntryType,
   type Summary,
@@ -42,6 +44,8 @@ const PHOTO_SIGNED_URL_EXPIRY_SECONDS = 60 * 60;
 export interface EntryPhotoWithUrl {
   id: string;
   url: string;
+  /** 'cover' photos are the entry's cover set; 'inline' ones live in the body. */
+  kind: EntryPhotoKind;
 }
 
 /** EntryListItem plus a signed URL for its cover photo (first by position),
@@ -210,6 +214,8 @@ export async function getMyEntryDetail(id: string): Promise<{
   summary: Summary | null;
   photos: EntryPhotoWithUrl[];
   tasks: EntryTask[];
+  /** Whether a share link is currently active for this entry. */
+  shared: boolean;
 } | null> {
   const userId = await requireUserId();
 
@@ -220,16 +226,24 @@ export async function getMyEntryDetail(id: string): Promise<{
   // Promise.all, so the Storage round trip overlaps the other four queries
   // instead of starting after all of them. Photo rows are scoped by userId,
   // so a missing or foreign entry signs nothing.
-  const [entry, transcript, summary, photos, tasks] = await Promise.all([
+  const [entry, transcript, summary, photos, tasks, share] = await Promise.all([
     EntriesRepository.getByIdForUser(id, userId),
     TranscriptsRepository.getByEntry(id, userId),
     SummariesRepository.getByEntry(id, userId),
     EntryPhotosRepository.listByEntry(id, userId).then(signPhotoUrls),
     EntryTasksRepository.listByEntry(id, userId),
+    EntrySharesRepository.getByEntry(id, userId),
   ]);
   if (!entry) return null;
 
-  return { entry, transcript, summary, photos, tasks };
+  return {
+    entry,
+    transcript,
+    summary,
+    photos,
+    tasks,
+    shared: Boolean(share && !share.share.revokedAt),
+  };
 }
 
 /** Toggles a single task's done state. Scoped to entries the caller owns via
@@ -245,7 +259,7 @@ export async function toggleMyTask(
 /** Batch-signs storage paths so the detail screen can render <img src> directly
  * without a per-photo round trip. Order is preserved from the input rows. */
 async function signPhotoUrls(
-  rows: { id: string; storagePath: string }[],
+  rows: { id: string; storagePath: string; kind?: EntryPhotoKind }[],
 ): Promise<EntryPhotoWithUrl[]> {
   if (rows.length === 0) return [];
   const supabase = await createClient();
@@ -261,6 +275,7 @@ async function signPhotoUrls(
   return rows.map((r) => ({
     id: r.id,
     url: urlByPath.get(r.storagePath) ?? "",
+    kind: r.kind ?? "cover",
   }));
 }
 
@@ -272,7 +287,14 @@ async function signPhotoUrls(
  */
 export async function addPhotoToEntry(
   entryId: string,
-  input: { image: Buffer; mimeType: string },
+  input: {
+    image: Buffer;
+    mimeType: string;
+    /** 'inline' for a picture inserted into the body; default 'cover'. */
+    kind?: EntryPhotoKind;
+    /** For kind 'cover': make this the entry's cover (Change cover image). */
+    makeCover?: boolean;
+  },
 ): Promise<EntryPhotoWithUrl> {
   const user = await getUser();
   if (!user) throw new Error("Not authenticated");
@@ -291,6 +313,8 @@ export async function addPhotoToEntry(
     entryId,
     userId: user.id,
     storagePath: objectPath,
+    kind: input.kind,
+    makeCover: input.makeCover,
   });
 
   const { data, error: signError } = await supabase.storage
@@ -299,7 +323,19 @@ export async function addPhotoToEntry(
   if (signError)
     throw new Error(`Failed to sign photo URL: ${signError.message}`);
 
-  return { id: photo.id, url: data.signedUrl };
+  return { id: photo.id, url: data.signedUrl, kind: photo.kind };
+}
+
+/** Rename an entry. An empty title clears it (the list falls back to "Untitled entry"). */
+export async function updateMyEntryTitle(
+  id: string,
+  title: string,
+): Promise<Entry | null> {
+  const userId = await requireUserId();
+  const trimmed = title.trim().slice(0, 200);
+  return EntriesRepository.update(id, userId, {
+    title: trimmed.length > 0 ? trimmed : null,
+  });
 }
 
 /** Trash an entry (soft delete). Never a hard delete. */
@@ -425,6 +461,15 @@ export async function getMyEntryTranscript(
 export async function saveMyTranscriptEdit(
   entryId: string,
   editedText: string,
+  options?: {
+    /**
+     * Re-run the LLM summary after saving. Default true (an explicit save).
+     * Autosave passes false: re-summarizing on every pause would burn LLM
+     * quota while someone is simply typing, so the editor asks for one
+     * refresh after the user stops editing instead.
+     */
+    resummarize?: boolean;
+  },
 ): Promise<{
   transcript: Transcript;
   summary: Summary | null;
@@ -446,13 +491,15 @@ export async function saveMyTranscriptEdit(
   // run summarization after the response is sent via next/server's after().
   // The client polls briefly afterward to pick up the fresh result (same
   // pattern already used for transcript-processing status).
-  after(async () => {
-    try {
-      await summarizeEntry(entryId, userId);
-    } catch (err) {
-      console.error(`Background summarize failed for entry ${entryId}:`, err);
-    }
-  });
+  if (options?.resummarize !== false) {
+    after(async () => {
+      try {
+        await summarizeEntry(entryId, userId);
+      } catch (err) {
+        console.error(`Background summarize failed for entry ${entryId}:`, err);
+      }
+    });
+  }
 
   const [summary, tasks] = await Promise.all([
     SummariesRepository.getByEntry(entryId, userId),

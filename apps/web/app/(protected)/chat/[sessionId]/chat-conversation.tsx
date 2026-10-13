@@ -12,6 +12,8 @@ import { Button, Input, cn, toast } from "@mindreva/ui";
 import { NO_RECORD_REPLY } from "@mindreva/llm/persona-chat-prompt";
 import type { ChatRole } from "@mindreva/database";
 import { RangeContextPanel } from "./range-context-panel";
+import { RiverPanel } from "../../river/river-panel";
+import type { RiverData } from "@/lib/services/mindmap.service";
 import { PrefetchLink } from "../../_components/prefetch-link";
 
 interface Message {
@@ -65,7 +67,7 @@ function CitationChips({
         <PrefetchLink
           key={id}
           href={`/entries/${id}`}
-          className="border-border text-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+          className="border-border text-foreground hover:bg-secondary rounded-full border px-3 py-1 text-xs font-medium transition-colors"
         >
           {shortDateLabel(entryDates[id])}
         </PrefetchLink>
@@ -83,27 +85,32 @@ export interface OpeningLine {
 export function ChatConversation({
   sessionId,
   title,
+  rangeLabel,
   yearStart,
-  yearEnd,
   initialMessages,
   initialEntryDates,
   entryCountInRange,
   suggestedMinEntries,
   entriesPerMonth,
+  monthRange,
   isSingleYear,
   openingLine,
+  river,
 }: {
   sessionId: string;
   title: string;
+  /** e.g. "January – June 2026", from the session's own range. */
+  rangeLabel: string;
   yearStart: number | null;
-  yearEnd: number | null;
   initialMessages: Message[];
   initialEntryDates: Record<string, string | null>;
   entryCountInRange: number;
   suggestedMinEntries: number;
   entriesPerMonth: Record<number, number>;
+  monthRange: [number, number];
   isSingleYear: boolean;
   openingLine: OpeningLine | null;
+  river: RiverData;
 }) {
   const router = useRouter();
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
@@ -113,12 +120,6 @@ export function ChatConversation({
   const [sending, setSending] = React.useState(false);
   const [stage, setStage] = React.useState<Stage | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
-
-  const rangeLabel =
-    yearStart && yearEnd && yearStart !== yearEnd
-      ? `${yearStart} – ${yearEnd}`
-      : `Jan 1 – Dec 31, ${yearStart ?? yearEnd}`;
-
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, stage]);
@@ -201,7 +202,7 @@ export function ChatConversation({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen flex-col px-5 py-5 md:max-w-2xl">
+    <main className="mx-auto flex min-h-screen flex-col px-5 py-5">
       <header className="flex items-center gap-3">
         <button
           type="button"
@@ -216,23 +217,34 @@ export function ChatConversation({
             }
           }}
           aria-label="Back"
-          className="text-foreground hover:bg-accent -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors"
+          className="text-foreground hover:bg-secondary press -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full"
         >
           <ArrowLeft className="size-5" />
         </button>
         <div>
-          <h1 className="text-foreground font-serif text-3xl font-bold leading-none tracking-tight">
+          <h1 className="text-foreground text-2xl font-bold leading-none tracking-tight">
             {title}
           </h1>
           <p className="text-muted-foreground mt-1 text-xs">{rangeLabel}</p>
         </div>
       </header>
 
+      {/* Collapsed by default here: the conversation owns this screen, the
+          river is one tap away rather than competing for the space. */}
+      <RiverPanel
+        data={river}
+        collapsible
+        storageKey="mindreva:conversation-river"
+        defaultOpen={false}
+        className="mt-4"
+      />
+
       {isSingleYear && entryCountInRange < suggestedMinEntries && (
         <RangeContextPanel
           entryCount={entryCountInRange}
           suggestedMin={suggestedMinEntries}
           entriesPerMonth={entriesPerMonth}
+          monthRange={monthRange}
           year={yearStart}
         />
       )}
@@ -255,13 +267,19 @@ export function ChatConversation({
 
         {messages.map((m) =>
           m.role === "user" ? (
-            <div key={m.id} className="flex justify-end">
-              <p className="bg-secondary text-secondary-foreground max-w-[85%] rounded-2xl px-4 py-2.5 text-sm">
+            <div
+              key={m.id}
+              className="motion-safe:animate-page-in flex justify-end"
+            >
+              <p className="bg-gradient-primary text-primary-foreground shadow-subtle max-w-[85%] rounded-3xl rounded-br-lg px-4 py-2.5 text-sm leading-relaxed">
                 {m.content}
               </p>
             </div>
           ) : (
-            <div key={m.id} className="flex flex-col items-start">
+            <div
+              key={m.id}
+              className="motion-safe:animate-page-in flex flex-col items-start"
+            >
               <p
                 className={cn(
                   "max-w-[90%] font-serif text-base leading-relaxed",
@@ -294,7 +312,7 @@ export function ChatConversation({
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-border flex items-center gap-2 border-t pt-3">
+      <div className="border-border bg-glass sticky bottom-0 -mx-5 flex items-center gap-2 border-t px-5 py-3">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}

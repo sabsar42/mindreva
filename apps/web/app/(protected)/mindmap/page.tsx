@@ -1,9 +1,7 @@
-import { getMyMindmap } from "@/lib/services/mindmap.service";
-import { MindmapScreen } from "./mindmap-screen";
+import { redirect } from "next/navigation";
 
-export default async function MindmapPage() {
-  // A plain read of the precomputed map — clustering and labeling happen in
-  // the background after summarization, never on page load.
-  const { nodes, links } = await getMyMindmap();
-  return <MindmapScreen nodes={nodes} links={links} />;
+// The Mindmap now lives inside Past Self (compact, with an expand popup), so the
+// old standalone screen is gone. This keeps any bookmark or old link working.
+export default function MindmapPage() {
+  redirect("/chat");
 }

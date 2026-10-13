@@ -7,14 +7,28 @@ import {
   EntriesRepository,
   type ChatMessage,
   type ChatSession,
+  type PersonaHalf,
 } from "@mindreva/database";
 import { getUser } from "@mindreva/auth/server";
+import {
+  halfLabel,
+  rangeLabel,
+  sessionName,
+  windowFor,
+} from "@/lib/past-self/sessions";
 
 const MATCH_LIMIT = 8;
 // A simple cap bounding LLM usage per conversation — see docs/roadmap.md
 // Phase 6 Common mistakes: "No cap on messages per session. A free LLM tier
 // disappears fast if one conversation can run unbounded turns."
 export const MAX_MESSAGES_PER_SESSION = 40;
+
+// Free-tier cap: at most this many conversations per half-year session. A
+// paid tier can raise or remove this later — not configured yet, so for now
+// it's a single constant, not a plan lookup. Starting a conversation that
+// would exceed it soft-deletes the OLDEST live one in that half first, same
+// as entries: never a hard delete.
+export const MAX_FREE_CONVERSATIONS_PER_HALF = 2;
 
 async function requireUserId(): Promise<string> {
   const user = await getUser();
@@ -28,6 +42,13 @@ function dateRangeForSession(session: ChatSession): {
 } {
   const startYear = session.personaYearStart ?? new Date().getFullYear();
   const endYear = session.personaYearEnd ?? startYear;
+  // A half-year session grounds the conversation on exactly six months. The
+  // hard date filter in retrieval uses this same range, so a conversation about
+  // January-June 2026 can never draw on July-December.
+  if (session.personaHalf === 1 || session.personaHalf === 2) {
+    const window = windowFor(startYear, session.personaHalf);
+    return { start: window.start, end: window.end };
+  }
   return { start: `${startYear}-01-01`, end: `${endYear}-12-31` };
 }
 
@@ -36,21 +57,78 @@ export async function listMyChatSessions(): Promise<ChatSession[]> {
   return ChatRepository.listSessions(userId);
 }
 
+/** Soft-delete one conversation. Scoped to the caller's own sessions. */
+export async function deleteMyChatSession(sessionId: string): Promise<void> {
+  const userId = await requireUserId();
+  await ChatRepository.softDeleteSession(sessionId, userId);
+}
+
 export async function startPersonaChatSession(input: {
   yearStart: number;
   yearEnd: number;
+  /** 1 = January-June, 2 = July-December. Requires a single year. */
+  half?: PersonaHalf;
 }): Promise<ChatSession> {
   const userId = await requireUserId();
-  const title =
-    input.yearStart === input.yearEnd
+  const half = input.yearStart === input.yearEnd ? input.half : undefined;
+  const title = half
+    ? `${input.yearStart} · ${halfLabel(half)}`
+    : input.yearStart === input.yearEnd
       ? String(input.yearStart)
       : `${input.yearStart}–${input.yearEnd}`;
+
+  // Only half-year sessions are capped (a whole-year/legacy session has no
+  // single half to count against).
+  if (half) {
+    const existing = await ChatRepository.listSessionsInHalf(
+      userId,
+      input.yearStart,
+      half,
+    );
+    if (existing.length >= MAX_FREE_CONVERSATIONS_PER_HALF) {
+      const toRemove = existing.slice(
+        0,
+        existing.length - MAX_FREE_CONVERSATIONS_PER_HALF + 1,
+      );
+      for (const old of toRemove) {
+        await ChatRepository.softDeleteSession(old.id, userId);
+      }
+    }
+  }
+
   return ChatRepository.createSession({
     userId,
     personaYearStart: input.yearStart,
     personaYearEnd: input.yearEnd,
+    personaHalf: half ?? null,
     title,
   });
+}
+
+/**
+ * What to call a conversation in the UI: a half-year session shows its
+ * descriptive name and date range; an older whole-year or multi-year one shows
+ * its years. Derived from the session's range, never from the stored title.
+ */
+export function describeChatSession(session: ChatSession): {
+  title: string;
+  rangeLabel: string;
+} {
+  const start = session.personaYearStart;
+  const end = session.personaYearEnd ?? start;
+  if (start && session.personaHalf) {
+    return {
+      title: sessionName(start, session.personaHalf),
+      rangeLabel: rangeLabel(start, session.personaHalf),
+    };
+  }
+  if (start && start === end) {
+    return { title: String(start), rangeLabel: `January – December ${start}` };
+  }
+  return {
+    title: start && end ? `${start}–${end}` : "Conversation",
+    rangeLabel: start && end ? `${start} to ${end}` : "",
+  };
 }
 
 export async function getMyChatSession(
@@ -65,6 +143,8 @@ export const SUGGESTED_MIN_ENTRIES = 5;
 
 export interface SessionRangeContext {
   entryCount: number;
+  /** First and last calendar month (1-12) the session covers, for the bar chart. */
+  monthRange: [number, number];
   /** Map of month (1-12) → entry count. Only populated for single-year sessions; empty object for multi-year. */
   entriesPerMonth: Record<number, number>;
   /** Whether the range covers exactly one calendar year, i.e. whether the monthly bar chart applies. */
@@ -92,6 +172,7 @@ export async function getSessionRangeContext(
   if (!session) {
     return {
       entryCount: 0,
+      monthRange: [1, 12],
       entriesPerMonth: {},
       isSingleYear: false,
       openingLine: null,
@@ -115,8 +196,16 @@ export async function getSessionRangeContext(
       }, {})
     : {};
 
+  const monthRange: [number, number] =
+    session.personaHalf === 1
+      ? [1, 6]
+      : session.personaHalf === 2
+        ? [7, 12]
+        : [1, 12];
+
   return {
     entryCount: dates.length,
+    monthRange,
     entriesPerMonth,
     isSingleYear,
     openingLine: earliest ? buildOpeningLine(earliest) : null,

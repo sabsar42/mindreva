@@ -14,10 +14,11 @@ export default async function EntryDetailPage({
   return (
     <EntryDetail
       entryId={entryId}
-      type={detail.entry.type}
+      source={detail.entry.source}
       title={detail.entry.title}
       entryDate={detail.entry.entryDate}
       archived={Boolean(detail.entry.archivedAt)}
+      shared={detail.shared}
       transcriptStatus={detail.transcript?.status ?? null}
       confirmedText={
         detail.transcript?.editedText ?? detail.transcript?.rawText ?? ""
