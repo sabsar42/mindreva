@@ -11,6 +11,41 @@ rather than resolved.
 
 ---
 
+## 2026-10-13 (follow-up) — Journal activity heatmap replaces the date-picker, not a new dashboard element
+
+**What happened:** the brief described a "compact calendar preview within the
+current dashboard" that expands to a full year, but no such persistent,
+always-visible calendar existed — the only calendar in the app was
+`CalendarPicker`, which opens inside a BottomSheet only when the Journal
+screen's "Date" filter pill is tapped, purely to pick one date to filter the
+list by.
+
+**What was decided (confirmed with the user before building):**
+
+- **The heatmap replaces `CalendarPicker` inside that same sheet**, rather
+  than adding a second, separate persistent calendar card to the Journal
+  screen. This keeps "preserve the existing dashboard structure" literally
+  true — the main list, search, and filter pills are untouched — while still
+  giving the brief's compact-preview/expand-to-year behavior a real home.
+  `CalendarPicker` itself is left in place (still used by the dev component
+  gallery) rather than deleted, since nothing else in the app references it
+  and deleting a component outside this task's scope wasn't asked for.
+- **No new schema.** `entries.entry_date` is already indexed on
+  `(user_id, entry_date)`; the heatmap's three shapes (month, year, one
+  day's entries) are three queries against that same column, not new
+  storage.
+- **Selecting a day still updates the underlying list filter** (sets the
+  existing `filter: "date"` state), in addition to showing its inline
+  detail — so closing the sheet after picking a day lands on a list already
+  filtered to it, matching the calendar's pre-existing behavior, on top of
+  the brief's new inline-detail requirement.
+- **Streak is computed, not stored**, by walking backward through the same
+  day-count data already fetched for the grid. The brief said to include a
+  streak "only if the application already supports reliable streak
+  calculations" — none existed, but since a reliable one is trivially
+  derivable from data already being fetched for an unrelated reason (the
+  grid itself), computing it qualifies rather than being skipped.
+
 ## 2026-10-13 (follow-up) — "River of Memories" built on the existing mindmap storage, not new tables
 
 **What happened:** the brief asked for a full redesign of the mindmap into a

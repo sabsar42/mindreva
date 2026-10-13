@@ -7,6 +7,77 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-13 (follow-up) — GitHub-style journal activity heatmap replaces the date-picker calendar
+
+### Added
+
+- **`JournalHeatmap`** (`packages/ui/src/components/journal-heatmap.tsx`): a
+  GitHub-contribution-style activity grid, replacing `CalendarPicker` inside
+  the Journal screen's "Date" filter sheet (now titled "Your activity"). A
+  compact single-month grid by default (weekday rows, rounded cells, month
+  prev/next, an Expand button) that expands in place — no navigation, no
+  modal — into a full continuous Jan-Dec week-column grid for the whole
+  year, with month labels, a year selector, and totals (days written,
+  entries, current streak). Selecting a day shows its details **inline,
+  directly beneath the grid, in normal document flow** — date, entry count,
+  each entry's title/snippet/time, a tap-to-open link, or a quiet "No
+  entries for this day" message — never a popup, tooltip, or overlay, per
+  explicit instruction. Five intensity levels (0 = no entries, 1-4
+  increasing) drawn from the app's own mint scale via plain `bg-mint-*`
+  Tailwind utilities (confirmed these are real generated classes, not just
+  `var(--color-mint-*)` inline styles the way the river graph uses them).
+- **`EntriesRepository.countsByDateForUser`** (new): entry counts grouped by
+  `entry_date`, scoped and filtered identically to the existing
+  `listEntryDatesForUser` (non-deleted, non-archived, optional `type` and an
+  inclusive date range) — no schema change, reuses the already-indexed
+  `(user_id, entry_date)` column.
+- **`lib/services/heatmap.service.ts`** (new): `getMyMonthHeatmap`,
+  `getMyYearHeatmap` (totals + a streak computed purely by walking backward
+  day-by-day from today through the same count data, never stored — "today
+  has nothing yet" doesn't break a streak that's still alive, one full
+  missed day does), and `getMyEntriesForDay` (reuses `listMyEntries`'
+  existing date-range filtering and plain-text snippets rather than a new
+  query shape). One new route, `GET /api/entries/heatmap`, picks between the
+  three shapes via `month=`/`year=`/`date=`.
+- 9 new unit tests (`heatmap.service.test.ts`): intensity bucketing, correct
+  month boundaries including a leap-year February, streak continuity/break/
+  "yesterday still counts" cases, and that a past year never reports a
+  "current" streak.
+- Removed the now-dead `entryDates` prop from `EntryListScreen` and the
+  `entryDatesFrom` helper it was the only caller of, once the heatmap
+  replaced the only thing that used them (the old calendar's dot
+  indicators).
+
+### Fixed
+
+- **The full-year grid initially rendered as entirely blank**, even though
+  the stats footer below it (fed by the same data) was correct — found by
+  checking the DOM directly rather than trusting the screenshot: a cell's
+  computed background color and class were exactly right, just positioned
+  hundreds of pixels to the right of the visible viewport, because the
+  52+-column grid defaults to showing January and nothing auto-scrolled it
+  into view. Fixed by auto-scrolling to the current month (or December, for
+  a past year) when the year view opens — the same lesson as the River of
+  Memories work earlier this session: a wide horizontally-scrolling SVG/grid
+  needs an explicit initial scroll position, or real data silently reads as
+  empty.
+
+### Verified
+
+Live, with a throwaway seeded account (deleted after): a 3-day current
+streak, a 3-entry "busy day," and two scattered single-entry days produced
+exactly the month/year grid intensities and stats (6 days written, 8
+entries, 3-day streak) the fixture was built to produce. Interaction-tested
+via real DOM queries, not just screenshots: clicking a day cell opens its
+inline detail with the right entries and times; clicking an empty day shows
+the quiet "No entries for this day" message after a brief load; month
+prev/next and year prev/next both refetch and re-render correctly; a past
+year with zero activity shows all-neutral cells and a 0-day streak, never a
+manufactured pattern. `pnpm lint`/`typecheck`/`test` (75 pass)/`build`
+green; `/journal`'s bundle is 185kB — essentially unchanged (if anything
+smaller, since `react-day-picker`'s lazy chunk is no longer loaded there at
+all; `JournalHeatmap` has no heavy dependency).
+
 ## 2026-10-13 (follow-up) — "River of Memories" replaces the bubble mindmap; "Past Self" renamed "Re-live Me"
 
 ### Added

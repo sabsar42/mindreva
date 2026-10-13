@@ -116,3 +116,9 @@ export {
   journalImageWrapperClass,
   type JournalImageProps,
 } from "./components/journal-image";
+export {
+  JournalHeatmap,
+  type HeatmapDay,
+  type HeatmapEntrySummary,
+  type JournalHeatmapProps,
+} from "./components/journal-heatmap";

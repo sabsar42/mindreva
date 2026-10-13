@@ -1,20 +1,23 @@
 "use client";
 
 import * as React from "react";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Search, Archive, FileText, LayoutGrid, Calendar } from "lucide-react";
 import { trashSwipeAction } from "./swipe-actions";
 import {
   BottomSheet,
   BottomSheetContent,
+  BottomSheetDescription,
   BottomSheetTitle,
   FilterPills,
   Input,
+  JournalHeatmap,
   LeafMark,
   NoteCard,
   SwipeableRow,
   toast,
+  type HeatmapDay,
+  type HeatmapEntrySummary,
   type FilterPillOption,
 } from "@mindreva/ui";
 import {
@@ -33,21 +36,6 @@ import { TranscriptionWatcher } from "./transcription-watcher";
 import { useEntryThumbnails } from "./use-entry-thumbnails";
 import { PrefetchLink } from "./prefetch-link";
 import { getDefaultArtwork } from "@/lib/default-artwork";
-
-// CalendarPicker pulls in react-day-picker (~164kB, confirmed by measuring
-// the real deployed /journal bundle) for a component that sits inside a
-// BottomSheet closed by default — most page visits never open it. Deferred
-// to its own chunk, fetched only once the sheet is actually opened, the same
-// isolation pattern used for @mindreva/ui/rich-text-editor.
-const CalendarPicker = dynamic(
-  () => import("@mindreva/ui/calendar-picker").then((m) => m.CalendarPicker),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="bg-muted h-72 w-full animate-pulse rounded-xl" />
-    ),
-  },
-);
 
 type FilterValue = "all" | "today" | "date";
 
@@ -68,12 +56,10 @@ export function EntryListScreen({
   type,
   heading,
   entries,
-  entryDates,
 }: {
   type: EntryType;
   heading: string;
   entries: EntryListItemWithThumbnail[];
-  entryDates: string[];
 }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -89,27 +75,131 @@ export function EntryListScreen({
   const [confirmTrashId, setConfirmTrashId] = React.useState<string | null>(
     null,
   );
-  // Fetched lazily, only once the date-picker sheet is actually opened for
-  // the first time — the calendar's day-cell cover photos are a real
-  // Supabase Storage round trip, and the sheet is closed by default, so
-  // there's no reason to pay that cost on every list-screen navigation.
-  const [dayThumbnails, setDayThumbnails] = React.useState<
-    Record<string, string>
-  >({});
-  const dayThumbnailsLoadedRef = React.useRef(false);
 
+  // --- Activity heatmap state (replaces the old CalendarPicker in this sheet) ---
+  const [heatmapMonth, setHeatmapMonth] = React.useState(() => new Date());
+  const [heatmapYear, setHeatmapYear] = React.useState(() =>
+    new Date().getFullYear(),
+  );
+  const [heatmapExpanded, setHeatmapExpanded] = React.useState(false);
+  const [monthDays, setMonthDays] = React.useState<Record<string, HeatmapDay>>(
+    {},
+  );
+  const [yearDays, setYearDays] = React.useState<Record<
+    string,
+    HeatmapDay
+  > | null>(null);
+  const [yearStats, setYearStats] = React.useState<{
+    totalDaysJournaled: number;
+    totalEntries: number;
+    currentStreak: number;
+  } | null>(null);
+  const [loadingYear, setLoadingYear] = React.useState(false);
+  const [heatmapSelectedDate, setHeatmapSelectedDate] = React.useState<
+    string | null
+  >(null);
+  const [selectedDayEntries, setSelectedDayEntries] = React.useState<
+    HeatmapEntrySummary[] | null
+  >(null);
+  const [loadingSelectedDay, setLoadingSelectedDay] = React.useState(false);
+
+  function monthParam(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  // Fetch the visible month's counts whenever the sheet is open and the
+  // compact view is showing — lazy, same reasoning as the old day-thumbnails
+  // fetch: most page visits never open this sheet at all.
   React.useEffect(() => {
-    if (!datePickerOpen || dayThumbnailsLoadedRef.current) return;
-    dayThumbnailsLoadedRef.current = true;
-    void fetch(`/api/entries/day-thumbnails?type=${type}`)
+    if (!datePickerOpen || heatmapExpanded) return;
+    let cancelled = false;
+    void fetch(
+      `/api/entries/heatmap?type=${type}&month=${monthParam(heatmapMonth)}`,
+    )
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { dayThumbnails: Record<string, string> } | null) => {
-        if (data) setDayThumbnails(data.dayThumbnails);
+      .then((data: { days: Record<string, HeatmapDay> } | null) => {
+        if (!cancelled && data) setMonthDays(data.days);
       })
       .catch(() => {
-        // Non-fatal — the calendar just falls back to plain dot indicators.
+        // Non-fatal — the grid just shows as empty until the next successful fetch.
       });
-  }, [datePickerOpen, type]);
+    return () => {
+      cancelled = true;
+    };
+  }, [datePickerOpen, heatmapExpanded, type, heatmapMonth]);
+
+  // Fetch the whole year's counts once the full-year view opens.
+  React.useEffect(() => {
+    if (!datePickerOpen || !heatmapExpanded) return;
+    let cancelled = false;
+    setLoadingYear(true);
+    void fetch(`/api/entries/heatmap?type=${type}&year=${heatmapYear}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(
+        (
+          data: {
+            days: Record<string, HeatmapDay>;
+            totalDaysJournaled: number;
+            totalEntries: number;
+            currentStreak: number;
+          } | null,
+        ) => {
+          if (cancelled || !data) return;
+          setYearDays(data.days);
+          setYearStats({
+            totalDaysJournaled: data.totalDaysJournaled,
+            totalEntries: data.totalEntries,
+            currentStreak: data.currentStreak,
+          });
+        },
+      )
+      .catch(() => {
+        // Non-fatal — the year grid just stays empty until the next successful fetch.
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingYear(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [datePickerOpen, heatmapExpanded, type, heatmapYear]);
+
+  // Fetch the selected day's entries for the inline detail panel.
+  React.useEffect(() => {
+    if (!heatmapSelectedDate) {
+      setSelectedDayEntries(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingSelectedDay(true);
+    void fetch(`/api/entries/heatmap?type=${type}&date=${heatmapSelectedDate}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { entries: EntryListItemWithThumbnail[] } | null) => {
+        if (cancelled) return;
+        setSelectedDayEntries(
+          (data?.entries ?? []).map((e) => ({
+            id: e.id,
+            title: e.title,
+            snippet: e.snippet,
+            timeLabel: e.createdAt
+              ? new Date(e.createdAt).toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+              : null,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedDayEntries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSelectedDay(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [heatmapSelectedDate, type]);
 
   // Keep local state in sync when the server re-provides entries (e.g. after
   // router.refresh()) — otherwise a swipe-removed row could reappear stale.
@@ -138,32 +228,6 @@ export function EntryListScreen({
     toast.success("Moved to Trash");
     router.refresh();
   }
-
-  const calendarDates = React.useMemo(
-    () => entryDates.map((d) => new Date(`${d}T00:00:00`)),
-    [entryDates],
-  );
-
-  // Build a date→entryId map from the first entry per date so the calendar
-  // cell and the NoteCard for that date use the same deterministic artwork.
-  const firstEntryIdByDate = React.useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const e of localEntries) {
-      if (e.entryDate && !map[e.entryDate]) map[e.entryDate] = e.id;
-    }
-    return map;
-  }, [localEntries]);
-
-  // Merge real cover photos with default artworks so every date that has an
-  // entry shows something. Real photos win (spread last).
-  const mergedDayThumbnails = React.useMemo(() => {
-    const defaults: Record<string, string> = {};
-    for (const dateStr of entryDates) {
-      const seed = firstEntryIdByDate[dateStr] ?? dateStr;
-      defaults[dateStr] = getDefaultArtwork(seed);
-    }
-    return { ...defaults, ...dayThumbnails };
-  }, [entryDates, firstEntryIdByDate, dayThumbnails]);
 
   const filtered = React.useMemo(() => {
     if (filter === "all") return localEntries;
@@ -331,29 +395,56 @@ export function EntryListScreen({
             ))}
         </div>
 
-        <BottomSheet open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+        <BottomSheet
+          open={datePickerOpen}
+          onOpenChange={(open) => {
+            setDatePickerOpen(open);
+            if (!open) {
+              // Collapse back to the compact month view and clear the
+              // inline detail each time the sheet is reopened fresh.
+              setHeatmapExpanded(false);
+              setHeatmapSelectedDate(null);
+            }
+          }}
+        >
           <BottomSheetContent>
-            <BottomSheetTitle>Pick a date</BottomSheetTitle>
+            <BottomSheetTitle>Your activity</BottomSheetTitle>
+            <BottomSheetDescription className="sr-only">
+              A calendar of how often you&apos;ve journaled. Select a day to see
+              what you wrote, or expand to see the whole year.
+            </BottomSheetDescription>
             <div className="mt-3">
-              <CalendarPicker
-                selected={selectedDate}
-                onSelect={(d) => {
-                  if (!d) return;
-                  setSelectedDate(d);
-                  setFilter("date");
-                  setDatePickerOpen(false);
+              <JournalHeatmap
+                monthDays={monthDays}
+                yearDays={yearDays}
+                yearStats={yearStats}
+                loadingYear={loadingYear}
+                month={heatmapMonth}
+                onMonthChange={(m) => {
+                  setHeatmapMonth(m);
+                  setHeatmapSelectedDate(null);
                 }}
-                entryDates={calendarDates}
-                dayThumbnails={mergedDayThumbnails}
-                onClear={() => {
-                  setSelectedDate(undefined);
-                  setFilter("all");
-                  setDatePickerOpen(false);
+                year={heatmapYear}
+                onYearChange={(y) => {
+                  setHeatmapYear(y);
+                  setHeatmapSelectedDate(null);
                 }}
-                onToday={() => {
-                  setSelectedDate(new Date());
+                expanded={heatmapExpanded}
+                onExpandedChange={setHeatmapExpanded}
+                selectedDate={heatmapSelectedDate}
+                onSelectDay={(date) => {
+                  setHeatmapSelectedDate((prev) =>
+                    prev === date ? null : date,
+                  );
+                  const [y, m, d] = date.split("-").map(Number);
+                  setSelectedDate(new Date(y!, (m ?? 1) - 1, d ?? 1));
                   setFilter("date");
+                }}
+                selectedDayEntries={selectedDayEntries}
+                loadingSelectedDay={loadingSelectedDay}
+                onOpenEntry={(id) => {
                   setDatePickerOpen(false);
+                  router.push(`/entries/${id}`);
                 }}
               />
             </div>

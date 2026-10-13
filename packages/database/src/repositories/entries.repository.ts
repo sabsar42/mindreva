@@ -142,6 +142,40 @@ export const EntriesRepository = {
     return rows.map((r) => r.entryDate!).filter(Boolean);
   },
 
+  /**
+   * Entry counts per calendar day — the activity heatmap's raw material.
+   * Same scoping as listEntryDatesForUser (non-deleted, non-archived), with
+   * an optional inclusive date range so the caller can ask for just one
+   * year at a time rather than a user's whole history.
+   */
+  async countsByDateForUser(
+    userId: string,
+    options: { type?: EntryType; dateFrom?: string; dateTo?: string } = {},
+  ): Promise<{ entryDate: string; count: number }[]> {
+    const conditions = [
+      eq(entries.userId, userId),
+      isNull(entries.deletedAt),
+      isNull(entries.archivedAt),
+      isNotNull(entries.entryDate),
+    ];
+    if (options.type) conditions.push(eq(entries.type, options.type));
+    if (options.dateFrom)
+      conditions.push(gte(entries.entryDate, options.dateFrom));
+    if (options.dateTo) conditions.push(lte(entries.entryDate, options.dateTo));
+
+    const rows = await getDb()
+      .select({
+        entryDate: entries.entryDate,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(entries)
+      .where(and(...conditions))
+      .groupBy(entries.entryDate);
+    return rows
+      .filter((r) => r.entryDate)
+      .map((r) => ({ entryDate: r.entryDate!, count: r.count }));
+  },
+
   async listArchivedForUser(
     userId: string,
     type?: EntryType,

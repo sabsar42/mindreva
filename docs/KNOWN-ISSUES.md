@@ -6,6 +6,25 @@ things still outstanding.
 
 ---
 
+## Journal activity heatmap: open items
+
+**No lazy loading.** `CalendarPicker` was previously deferred behind
+`next/dynamic` because `react-day-picker` is a real ~164kB dependency.
+`JournalHeatmap` has no comparable dependency, so it's imported straight from
+the barrel with no deferral — not an issue today, but if a future revision
+adds a heavier charting dependency to this component, it should get the same
+lazy-loading treatment the old calendar had.
+
+**Week always starts Monday**, matching the rest of the app's calendar
+convention, with no per-user locale setting. A user whose locale expects a
+Sunday-first week sees Monday-first here, same as everywhere else journal
+dates are shown.
+
+**Not independently checked:** dark mode, desktop width, and a year with
+enough days at the same intensity level to make the four-level bucketing
+feel coarse (only tested with a handful of entries, matching normal
+journaling volume, not a power-user's hundreds of entries in one year).
+
 ## River of Memories: open items
 
 **No month-density scaling in the axis itself.** The time axis spaces months
