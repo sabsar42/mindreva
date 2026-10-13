@@ -74,21 +74,6 @@ export async function listMyEntries(options?: {
   return withPlainSnippets(entries);
 }
 
-/** entry_date of every active entry, for the calendar's dot indicators.
- * Derived from an already-fetched entries list rather than a separate DB
- * round trip — `listMyEntries({ type })` already excludes archived entries
- * the same way this used to, so the date set is identical. Prefer this over
- * `listMyEntryDates` whenever the caller is already fetching entries
- * (journal/notes list pages); use `listMyEntryDates` only when dates are the
- * *only* thing needed (e.g. the chat screen's "which years have entries"). */
-export function entryDatesFrom(
-  entries: { entryDate: string | null }[],
-): string[] {
-  return Array.from(
-    new Set(entries.map((e) => e.entryDate).filter((d): d is string => !!d)),
-  );
-}
-
 /** entry_date of every active entry, for callers that don't already have a
  * full entries list to derive dates from (e.g. chat/page.tsx's "available
  * years" — it never fetches entries otherwise, so a dedicated query is

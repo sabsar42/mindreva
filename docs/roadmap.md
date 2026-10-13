@@ -1435,6 +1435,31 @@ apps/web/
 
 ---
 
+## Phase 6.11: GitHub-Style Journal Activity Heatmap
+
+**Objective:** replace the date-picker calendar with a GitHub-contribution-style activity heatmap — a compact monthly grid that expands in place into a full year, with inline (never popup) day detail. Unplanned addition; judgment calls are in docs/DECISIONS.md (2026-10-13).
+
+**Priority:** P2
+**Dependencies:** none beyond the existing `entries.entry_date` column
+
+### Checklist
+
+- [x] `EntriesRepository.countsByDateForUser`: entry counts per day, same scoping as the existing date-list query
+- [x] `getMyMonthHeatmap` / `getMyYearHeatmap` (totals + computed streak) / `getMyEntriesForDay`
+- [x] `GET /api/entries/heatmap` (month/year/date, one route)
+- [x] `JournalHeatmap`: compact month grid, expands in place to a full year, month/year navigation
+- [x] Inline day-detail panel in normal document flow — no popup, tooltip, or modal
+- [x] Legend + year totals (days written, entries, current streak)
+- [x] Replaces `CalendarPicker` inside the Journal screen's existing "Date" filter sheet
+
+### Common mistakes
+
+- **A wide horizontally-scrolling grid needs an explicit initial scroll position.** A 52+-column year grid defaults to showing its first column (January); without auto-scrolling to the relevant month, real data can be computed correctly and still look completely empty on screen — confirmed via a direct DOM/computed-style check, not just a screenshot, when this happened.
+- **Check that a custom Tailwind color scale actually generates utility classes** (`bg-mint-600`) before assuming you need `style={{ background: "var(--color-mint-600)" }}` instead — this project's `@theme` block does generate them.
+- **A streak must never claim to be "current" for a past year.** Compute it only against the current year's trailing edge.
+
+---
+
 ## Phase 7: CI/CD & Free-Tier Deployment
 
 **Objective:** automated checks on every PR, safe preview deployments, a live production app on Vercel Hobby, and just enough observability to know when something breaks.
