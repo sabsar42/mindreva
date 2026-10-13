@@ -6,8 +6,9 @@ import { IconTile, Switch } from "@mindreva/ui";
 import { applyTheme, isDarkNow } from "@/lib/theme";
 
 /**
- * The dark-mode switch. The saved choice (or the OS setting) is applied by a
- * script in <head> before first paint; this just reflects it and changes it.
+ * The dark-mode switch. The saved choice (light if none is saved — the app
+ * does not follow the OS setting) is applied by a script in <head> before
+ * first paint; this just reflects it and changes it.
  */
 export function ThemeSwitchRow() {
   // null until mounted: the real theme is only known in the browser (it comes

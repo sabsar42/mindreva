@@ -4,10 +4,12 @@ export type ThemeChoice = "light" | "dark";
 
 /**
  * Runs in <head> before first paint (see app/layout.tsx), so the page never
- * flashes the wrong theme. No saved choice means follow the OS setting.
+ * flashes the wrong theme. No saved choice means light — the app does not
+ * follow the OS's prefers-color-scheme, so a visitor on a dark-mode system
+ * still lands on light by default and has to opt into dark explicitly.
  * Kept as a string because it must execute before React hydrates.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_STORAGE_KEY}");var d=t?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;if(d)document.documentElement.classList.add("dark");}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_STORAGE_KEY}");if(t==="dark")document.documentElement.classList.add("dark");}catch(e){}})();`;
 
 export function isDarkNow(): boolean {
   return document.documentElement.classList.contains("dark");
