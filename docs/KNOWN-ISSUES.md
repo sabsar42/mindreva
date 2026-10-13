@@ -6,6 +6,84 @@ things still outstanding.
 
 ---
 
+## OpenRouter free-tier model availability
+
+**`OPENROUTER_MODEL` can go stale without warning.** OpenRouter's free-tier
+model lineup rotates as models get retired or added; on 2026-10-13 the
+previously-working `nvidia/nemotron-nano-9b-v2:free` started returning 404
+"No endpoints found" with zero prior warning, silently breaking both
+summarization and Chat-with-Past-Self (anything going through
+`LLMProvider.complete()`) until noticed. Replaced with
+`nvidia/nemotron-3-super-120b-a12b:free`, verified live. There is no
+monitoring/alerting on this — a future retirement will again surface only as
+a user-visible "summarization doesn't work" report. If this happens again:
+check https://openrouter.ai/models?max_price=0 for the current free lineup,
+and test a candidate against the real prompts before swapping (several free
+Nemotron variants return `finish_reason: "length"` with null/truncated
+content because they spend the whole token budget on hidden reasoning even
+with `reasoning: { exclude: true }` set — cheap "does it return 200" checks
+are not enough).
+
+**Who owns this Supabase project is unclear.** The live project's `auth.users`
+table has three accounts, none matching the owner's own email
+(`shakibatwork@gmail.com`). The owner identified `kakasama71@gmail.com` (20
+live conversations at the time) from a screenshot of its own screen as the
+account to clear, but the bulk soft-delete itself needs to be run with
+explicit approval (the auto-mode classifier declined to run a direct SQL
+bulk-update as an "unverifiable deletion scope" even after that
+confirmation) — see the owner-facing summary for the exact command.
+
+## Past Self / editor / sharing: open items
+
+**Service-role key is required in production for shared pictures.** Public shared
+pages sign Storage URLs with `SUPABASE_SERVICE_ROLE_KEY`. If it isn't set in
+Vercel, shared pages show text but no pictures. Set it as a server-only variable.
+
+**Removed inline pictures stay in Storage.** Deleting a picture from the text only
+removes the token; the `entry_photos` row and file remain (and aren't re-shown).
+A cleanup sweep for unreferenced inline photos hasn't been built.
+
+**Share links have no rate limiting.** Tokens are 256-bit so guessing is not
+realistic, but `/s/[token]` can be requested without limit.
+
+**Adding timestamps re-runs ASR.** For old recordings, "Add timestamps" calls the
+speech provider again (counts against its free tier). It only writes segments.
+If the provider still returns none, the panel says so.
+
+**Editor picture URLs expire after an hour.** An editor tab left open longer than
+that will show broken pictures until reload; saved content is unaffected.
+
+**Legacy conversation placement is a guess.** Whole-year conversations from before
+half-year sessions appear under the half they were created in, which may not match
+what they discussed.
+
+**Title field relies on `field-sizing: content`.** Browsers without it show a
+fixed-height title box (still editable). A JS auto-resize fallback isn't added.
+
+**Not independently checked:** a real microphone recording storing segments end to
+end (fixtures used seeded segments), and the new screens in desktop-frame and dark
+mode.
+
+## Redesign: items that need product input
+
+**Status:** Open.
+
+- **Google Calendar.** UI and architecture are ready; nothing connects. Needed:
+  OAuth scopes, what is written to the calendar (and from which entries), one-way
+  vs two-way sync, where tokens are stored (new table with RLS), consent/
+  disconnect behaviour. Implement in
+  `apps/web/lib/integrations/providers/google-calendar.ts`.
+- **Plans, upgrade, top-up and billing** appear in the references but are not
+  built (Phase 9).
+- **Standalone Mindmap tab.** Kept alongside the embedded map; confirm whether it
+  should stay (see DECISIONS.md, 2026-10-13).
+- **Not yet checked on a physical phone or the deployed site:** the layout was
+  verified in headless Edge (390px and 1280px). Worth a real-device pass for swipe
+  gestures, the floating tab bar over the iOS home indicator, and the live
+  recorder.
+
+---
+
 ## CI's push trigger watches `main`, but the repo's default branch is `master`
 
 **Status:** Open.

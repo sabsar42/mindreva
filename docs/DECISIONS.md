@@ -11,6 +11,128 @@ rather than resolved.
 
 ---
 
+## 2026-10-13 (follow-up) — Nav icons, conversation cap, OpenRouter model swap
+
+**What was decided:**
+
+- **Past Self dropped its Entries section entirely**, on direct user feedback
+  ("why are you showing entries in the past self screen"); entries stay
+  discoverable only via /journal. `PastSelfSession.entries` still exists on
+  the data (it still gates whether "Ask your past self" shows, since a
+  session with no entries has nothing to ground a conversation on), it's just
+  not rendered as a list anymore.
+- **Conversations per half-year session are capped at 2 on the free tier**
+  (`MAX_FREE_CONVERSATIONS_PER_HALF`), per direct instruction: "this half
+  timeline can only have 2 conversation and if needed more than 2 then need
+  to delete one (unless they are on paid...)". Implemented as auto-eviction
+  of the oldest live conversation in that half (soft-deleted, never hard)
+  rather than blocking creation outright — the user said "need to delete
+  one," and silently evicting the oldest means the UI never has to show a
+  blocking error for something that will keep happening on every normal use
+  of a free account. The constant is a single top-level value, not a
+  plan-lookup table, since paid-tier limits aren't configured yet.
+- **Bottom nav bar replaced by top-right icons** (Hourglass/Puzzle, left of
+  the avatar) on a literal screenshot match from the user, not a redesign
+  judgment call.
+- **OpenRouter's free chat model needed replacing mid-project** when the
+  previously-pinned one was retired upstream with no warning — see
+  docs/KNOWN-ISSUES.md "OpenRouter free-tier model availability" for the
+  mechanics and what to do if it recurs.
+
+## 2026-10-13 — Past Self sessions, inline pictures, sharing and transcripts: judgment calls
+
+**What happened:** one brief asked for half-year sessions, an inline-image editor,
+real sharing and a transcript view. The brief left several choices open.
+
+**What was decided:**
+
+- **Sessions are derived, not stored.** There is no sessions table. A session is a
+  (year, half) computed from entry dates; a conversation records its half in
+  `chat_sessions.persona_half` and is grounded on exactly that six-month window.
+  Old whole-year conversations are shown under the half they were created in
+  (or the year's last half if created later), and keep working.
+- **Session names** come from two fixed 12-name pools picked by `year % 12`, so a
+  name is stable across visits and unique within a year.
+- **Pictures live in the Markdown body as tokens** referencing `entry_photos.id`,
+  never URLs (signed URLs expire in an hour). `@mindreva/types` is the only
+  place that parses the token, so the editor, the shared page and plain-text
+  stripping can't drift. Removing a picture from the text leaves its file in
+  Storage (see KNOWN-ISSUES).
+- **Cover vs inline** is `entry_photos.kind`; list thumbnails and the cover only
+  ever look at `cover`.
+- **Autosave never re-summarises on each keystroke** (`resummarize: false`, to
+  protect the LLM free-tier quota); one summary refresh runs after 25s idle.
+- **Sharing model:** one share row per entry; 32-byte base64url token; revoke sets
+  `revoked_at`, and sharing again issues a _new_ token so an old leaked link never
+  comes back. Unknown, revoked, malformed and trashed all look identical (404).
+  Private links need sign-in and a listed email (case-insensitive); the owner can
+  always open their own link. The public page is noindex, no-referrer, dynamic.
+  There is no share-token write path at all.
+- **Public pictures need the service-role key.** Anonymous viewers can't sign
+  URLs for the private `photos` bucket, so the server signs them with
+  `SUPABASE_SERVICE_ROLE_KEY` (server only, never sent to the browser). Without
+  it the shared page renders text but no pictures.
+- **Transcript timestamps:** ASR segments are stored in `transcripts.segments` and
+  grouped into ~30s blocks for display. Older transcripts have none; rather than
+  inventing times, the panel says so and offers to re-run ASR on the stored
+  recording, writing only segments and never overwriting edited text.
+- **Home:** Week removed, Today kept, no new date controls.
+
+## 2026-10-13 (follow-up) — Phone-width column on every screen; green only for actions
+
+**What happened:** After the redesign shipped for review, the product owner
+pointed out that it read as "everything green" and that the web version should
+look like the phone version (matching the reference screenshots, which show the
+phone layout centred on a white page on desktop).
+
+**What was decided:**
+
+- **Colour discipline:** neutral surfaces and text; green only on actions and
+  accents. Encoded in `tokens.css` so components don't choose per-case.
+- **One layout.** This deliberately reverses the 2026-09-24 responsive desktop
+  and tablet layout (sidebar, widened containers, centred sheets). The app is a
+  30rem column everywhere; on wide screens it's centred on a white canvas.
+  Rationale: one design to maintain and verify, identical behaviour on phone and
+  web, and it matches the Capacitor/PWA direction in Phase 8. If a real desktop
+  layout is wanted later, it should be designed as its own thing rather than
+  re-adding `md:` overrides to individual screens.
+
+---
+
+## 2026-10-13 — Apple-inspired redesign: scope and judgment calls
+
+**What happened:** A redesign was requested from reference screens of a different
+(purple) app. Several things in the references don't exist in Mindreva or conflict
+with the brief, so scope was decided deliberately.
+
+**What was decided:**
+
+- **Navigation.** The brief names three experiences (Voice/Home, Past Self,
+  Mindmap) and also asks for the Mindmap to sit above Past Self "instead of a
+  button in the dashboard". Resolved as: three tabs (Home, Past Self, Mindmap),
+  the map embedded in Past Self (collapsible), and `/mindmap` kept as the full
+  view reachable from the panel. Account moved behind the avatar, as in the
+  references. If the standalone Mindmap tab should go, remove it from
+  `_components/nav-items.ts` and the swipe order.
+- **Not built (no backing feature in Mindreva):** phone/OTP sign-in, date of
+  birth and "Manage profile" tabs, plans/upgrade/top-up and billing, an
+  English/Bangla UI language switch, per-recording summary style. Billing and
+  quota enforcement are Phase 9; the UI language switch needs real i18n.
+- **Integrations without a migration.** No table was added: with no OAuth
+  requirements yet, there is nothing meaningful to store, and the schema should
+  follow the spec (scopes, tokens, sync direction). The provider interface is the
+  seam; the Google Calendar provider reports "not configured". An unavailable
+  integration answers instantly in the UI; the API still returns 501 as a guard.
+- **Account data as a promise.** An `async` layout awaiting the profile would
+  serialize that query ahead of every page, undoing the 2026-10-12 latency work,
+  so the layout passes an un-awaited promise to Suspense-wrapped consumers.
+- **Dark mode is real, not a stub.** The existing local-only "Preferences"
+  switches on the Account page remain stubs; the new dark-mode switch persists.
+- **Pill/rounded direction kept** (see the 2026-09-24 entry); the references
+  also use pills, so that question is still the product owner's to confirm.
+
+---
+
 ## 2026-10-12 — Don't move the database; cache tab pages on the client instead
 
 **What happened:** The deployed app felt slow, and moving the Supabase

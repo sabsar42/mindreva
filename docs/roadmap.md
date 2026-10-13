@@ -1350,6 +1350,61 @@ apps/web/
 
 ---
 
+## Phase 6.8: Apple-Inspired Redesign (Unified Past Self + Mindmap, Integrations)
+
+**Objective:** a cohesive, Apple-inspired visual and interaction language in Mindreva's own green-and-white identity, with the Mindmap embedded above Past Self as one reflective workspace, an Integrations entry point (Google Calendar first, UI and architecture only), and real dark mode. Unplanned addition; scope decisions are in docs/DECISIONS.md (2026-10-13).
+
+**Priority:** P2
+**Dependencies:** Phases 2, 6 and 6.7
+
+### Checklist
+
+- [x] Design tokens: soft elevation, brand gradients, motion curves, reduced-motion guard
+- [x] Shared components: IconTile, ExpandablePanel, ProcessingSteps, richer EmptyState, ink button
+- [x] Mindmap panel above Past Self (collapsible), full /mindmap kept
+- [x] Navigation: Home, Past Self, Mindmap; account behind the avatar
+- [x] Home, recording, transcribing, auth and account screens restyled
+- [x] Integrations: provider interface, registry, service, API, screen, every card state
+- [x] Persisted dark mode with no flash
+- [ ] Google Calendar OAuth and sync (blocked on requirements)
+
+### Common mistakes
+
+- Awaiting account/profile data in a layout serializes it ahead of every page. Pass a promise and resolve it in Suspense.
+- New protected routes must be added to the middleware's protected prefixes.
+- Layout math that uses `Math.hypot` must be rounded before rendering, or the server and browser disagree in the last digit and React reports a hydration mismatch.
+- Use `backwards` (not `both`) fill-mode on entrance animations so no transform lingers and traps fixed/sticky children.
+
+---
+
+## Phase 6.9: Past Self Sessions, Journal Editor, Sharing & Transcript View
+
+**Objective:** Past Self organised into two six-month sessions per year with the mindmap embedded; a fully editable journal with inline pictures; real public/private sharing; a transcript-only view with timestamps. Unplanned addition; judgment calls are in docs/DECISIONS.md (2026-10-13).
+
+**Priority:** P2
+**Dependencies:** Phases 4, 5, 6, 6.5, 6.7 and 6.8
+
+### Checklist
+
+- [x] Nav reduced to Integrations and Past Self; Home drops Week
+- [x] Compact mindmap in Past Self with an animated expand popup
+- [x] Half-year sessions (derived), conversations grounded on the half
+- [x] Inline title and body editing with autosave, Saved indicator, leave guard
+- [x] Inline pictures at the cursor (size, align, move, caption, remove); cover separate
+- [x] Sharing: public/private, tokens, recipients, revoke, read-only shared page
+- [x] Transcript view with timestamps and jump-to-time; backfill for old recordings
+- [x] Additive migrations 0010 and 0011
+
+### Common mistakes
+
+- Never store signed URLs in the body; store the photo id and sign on read.
+- Server components must not import client modules' functions (use `button-variants`, not `button`).
+- Share management routes must scope by owner; the token is read-only access, never a write credential.
+- Re-sharing must rotate the token.
+- Don't re-summarise on every autosave.
+
+---
+
 ## Phase 7: CI/CD & Free-Tier Deployment
 
 **Objective:** automated checks on every PR, safe preview deployments, a live production app on Vercel Hobby, and just enough observability to know when something breaks.

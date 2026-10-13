@@ -7,6 +7,195 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-13 (follow-up) — Top-right tab icons, chat soft-delete column, OpenRouter model swap
+
+### Fixed
+
+- **Summarization and Chat-with-Past-Self were both broken end to end.**
+  `OPENROUTER_MODEL=nvidia/nemotron-nano-9b-v2:free` now 404s on OpenRouter
+  ("No endpoints found" — the model has been retired upstream); every call
+  through `OpenRouterLLMProvider.complete()` failed, which is both of these
+  features (embeddings were unaffected — a different model/endpoint).
+  Switched `OPENROUTER_MODEL` to `nvidia/nemotron-3-super-120b-a12b:free` in
+  `.env.local` and `.env.example`, after confirming live against OpenRouter
+  that it (a) actually completes instead of burning its whole budget on
+  hidden reasoning like the other free Nemotron variants do, and (b) produces
+  correct output against the real summarize prompt (summary + `===TASKS===`
+  block) and the real grounded persona-chat prompt. Verified against the
+  live app with a throwaway seeded entry: `/api/entries/[id]/summarize` and
+  a `/api/chat/[sessionId]/messages` call both succeeded with correct,
+  properly-cited output.
+
+### Changed
+
+- **Bottom nav bar removed.** Past Self and Integrations are now icons at the
+  top right of Home/Past Self/Integrations, just left of the account avatar
+  (`TabHeaderActions`, shared by all three screens), matching a direct
+  screenshot from the user. Icons changed to Hourglass (Past Self) and Puzzle
+  (Integrations) to read more clearly as distinct destinations. Swipe-between-
+  tabs navigation is unaffected.
+- Added `chat_sessions.deleted_at` (migration `0012`, additive) and filtered
+  it into every `ChatRepository` read, so conversations can be soft-deleted
+  like entries.
+- **Past Self no longer lists entries**, only conversations — entries stay on
+  /journal. `SessionCard` drops the whole Entries section; a session's
+  "empty" state is now judged on conversations for collapsing, but "Ask your
+  past self" still only shows when the session actually has entries to
+  ground on.
+- **Free-tier cap: 2 conversations per half-year session.**
+  `MAX_FREE_CONVERSATIONS_PER_HALF` in `persona-chat.service.ts`; starting a
+  3rd soft-deletes the oldest live one in that half automatically (never a
+  hard delete). Not configurable per plan yet — see docs/DECISIONS.md.
+  Conversations can also be removed individually via swipe-to-delete (new
+  `DELETE /api/chat/[sessionId]` route, `ChatRepository.softDeleteSession`).
+  Verified live: creating a 3rd conversation in the same half auto-dropped
+  the oldest, leaving exactly 2; the UI shows "x/2 on the free plan".
+
+## 2026-10-13 (Past Self + journal editor) — Half-year sessions, inline pictures, sharing, transcript view
+
+### Added
+
+- **Bottom nav is only Integrations and Past Self.** Mindmap lives inside Past
+  Self (compact panel with an Expand button that opens an animated popup; closing
+  it returns to the same scroll position and focus). `/mindmap` redirects to
+  `/chat`. Home keeps Today and drops Week.
+- **Past Self sessions.** Each year shows exactly two six-month sessions
+  (January – June, July – December), each with a descriptive unique name, the
+  year and date range, expandable/collapsible, newest year first. Entries are
+  assigned by date, empty sessions are shown but not expandable, there is no cap.
+  Conversations are grounded on exactly that half-year (`chat_sessions.persona_half`).
+- **Fully editable journal.** Inline-editable title, autosaving body with a
+  Saved indicator, flush on Back/tab-hide/unmount, and a leave-page guard.
+- **Inline pictures** inserted at the cursor (`Add a picture`), sized S/M/L/Full,
+  aligned left/centre/right (small left/right pictures let text wrap), moved,
+  captioned, removed. The cover stays a separate action (`Change cover`).
+  Stored as `![alt](mindreva-photo:<photo id>?size=&align=)` in the Markdown body;
+  no URLs are saved, so nothing expires.
+- **Sharing.** Share button with an explicit Private/Public choice, copyable link,
+  per-person access for private links, Stop sharing, and a status badge.
+  `/s/[token]` is a read-only page that shows inline pictures.
+- **Transcript view** for audio journals: timestamped, chronological blocks,
+  jump-to-time, text only (no audio player). New recordings store ASR segments;
+  older ones can be given timestamps by re-running ASR on the stored recording.
+- Migrations `0010` (additive: `entry_photos.kind`, `transcripts.segments`,
+  `chat_sessions.persona_half`, `entry_shares`, `entry_share_recipients`) and
+  `0011` (RLS, owner policies and grants for the two share tables).
+
+### Fixed
+
+- A server component calling `buttonVariants` from the client `button.tsx` crashed
+  both `/s/[token]` and its not-found page; the variants now live in
+  `button-variants.tsx` (importable from server code).
+- Adding a share recipient as a non-owner returned 201 without doing anything;
+  it now returns 404.
+- Timestamp backfill for an entry with no recording returns 404 instead of 500.
+- `@mindreva/types` no longer relies on `URLSearchParams`/`matchAll` (that package
+  has no DOM lib, so `pnpm typecheck` failed).
+
+### Verified
+
+Unit tests (55 pass, including session grouping, transcript segments and the share
+access rules), and headless-browser runs against the live Supabase project with
+throwaway users: Past Self 22/22, editor 17/17, sharing 18/18, transcript 7/7.
+`pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` green. The throwaway
+users, their rows and storage objects were deleted afterwards.
+
+## 2026-10-13 (follow-up) — Neutral surfaces, one phone-width column everywhere
+
+Direct feedback on the redesign: it read as "everything green", and the web
+version should look like the phone version.
+
+### Changed
+
+- **Colour roles.** Surfaces and text are neutral again: warm off-white page
+  (`#f8f6f2`), white cards, near-black ink (`#15181c`), grey secondary text
+  (`#5d636d`, 5.3-6.0:1), warm-grey hairlines. Green is reserved for actions and
+  accents (primary buttons, active tab, avatar, focus ring, icon tiles, selected
+  tint, the logo). Shadows are neutral grey instead of green-tinted. Dark mode
+  follows the same rule (neutral near-black surfaces, mint actions).
+- Removed the green card washes (record card, mindmap area, empty states),
+  mint hover states (now neutral), mint calendar day cells, and the green-tinted
+  summary card on the entry screen (now a white card; its label keeps the green).
+- **Web = phone.** The app is one phone-width column (30rem) at every screen
+  size. On a wide screen it sits centred on a white canvas with hairline sides
+  (`.app-frame`, new `--canvas` token). The desktop sidebar and every `md:`/`lg:`
+  responsive rule were removed; the floating tab bar and avatar are the same
+  everywhere, and bottom sheets stay bottom sheets instead of becoming centred
+  dialogs.
+
+### Removed
+
+- `side-nav.tsx` and the `bg-gradient-halo` token/utility.
+
+## 2026-10-13 — Apple-inspired redesign: unified Past Self + Mindmap, Integrations, dark mode
+
+Reference screens in `docs/new-design-reference/` (a purple app) were used for
+layout, hierarchy and interaction patterns only; everything is rendered in
+Mindreva's green-and-white palette with Mindreva's leaf mark. Not on the
+roadmap, so it is recorded here and in DECISIONS.md.
+
+### Added
+
+- **Past Self + Mindmap as one workspace.** New `MindmapExplorer` (graph, theme
+  sheet, empty state) and `MindmapPanel` (collapsible card, animated, choice
+  remembered per device, graph mounted lazily on first open). `/chat` shows the
+  panel above the period picker, open by default; `/chat/[sessionId]` shows it
+  above the conversation, collapsed by default. `/mindmap` stays as the full
+  view and uses the same explorer. Chat pages load the map in parallel and fall
+  back to an empty map if that query fails.
+- **Integrations.** `/integrations` screen, `IntegrationCard` (coming soon,
+  connecting, connected + settings area, disconnecting, info/success/error
+  feedback), `GET /api/integrations`, `POST /api/integrations/[id]/connect`,
+  `DELETE /api/integrations/[id]`, `integrations.service.ts`, and an
+  `IntegrationProvider` interface + registry in `apps/web/lib/integrations/`.
+  Google Calendar is a deliberately inert provider (`isConfigured() === false`):
+  no OAuth, no token storage, no sync. `/integrations` added to the middleware's
+  protected prefixes.
+- **Account menu.** Avatar opens a sheet (profile, recording-time usage,
+  Integrations, Account & settings, dark-mode switch, sign out). The layout
+  passes the account as an un-awaited promise resolved in Suspense, so pages are
+  not held back by the profile query. `getMyProfile` is now request-cached.
+- **Dark mode**, real and persisted (`mindreva:theme`, else the OS setting),
+  applied by a `<head>` script before first paint so there is no flash.
+- **Shared UI:** `IconTile`, `ExpandablePanel`, `ProcessingSteps`; richer
+  `EmptyState`; `ink` button variant; brand gradient/halo/glass utilities;
+  `press` feedback; soft two-level shadows; `animate-page-in` route entrance via
+  `(protected)/template.tsx`; global `prefers-reduced-motion` guard.
+- `/dev/redesign` (non-production) shows every new component and state with
+  sample data.
+
+### Changed
+
+- **Navigation is now the three core experiences:** Home, Past Self, Mindmap
+  (floating frosted tab bar on mobile, sidebar on desktop, one shared config).
+  Account moved behind the avatar; swipe order and tab prefetching updated.
+- **Home:** date eyebrow, weekday title, time-of-day greeting, Integrations and
+  avatar buttons, halo record card, empty state with icon.
+- **Recording screen:** live indicator, large elapsed time, red stop button in a
+  halo, "Discard recording". **Transcribing** is a stepped card driven by the
+  real transcript status (`pending` = Queued, `processing` = Transcribing); the
+  failure state uses the same card.
+- **Auth screens:** brand tile, large heading, dark Google button, no card chrome.
+- **Account page:** back button, Integrations and Appearance rows, red sign out;
+  selected option cards use a soft tint instead of a solid mint block.
+- Past Self conversation: gradient user bubbles, frosted sticky composer.
+- Dark-mode destructive colour lightened (`#b91c1c` was 1.95:1 on the dark
+  background, now 4.55:1).
+
+### Fixed
+
+- Mindmap layout produced last-digit float differences between the server's Node
+  and the browser (`Math.hypot`), causing a hydration mismatch. Coordinates are
+  now rounded to 2dp. The layout is also centred and trimmed, so a handful of
+  themes no longer sit under a tall empty canvas.
+
+### Verification
+
+`pnpm lint` (only the pre-existing `<img>` warning), `pnpm typecheck`,
+`pnpm test` (2/2) and `pnpm build` pass. UI checked in headless Edge at 390px and
+1280px, light and dark, signed in as a temporary test user with seeded entries
+and clusters (deleted afterwards, cascade confirmed), with zero console errors.
+
 ## 2026-10-12 — Perf: tab navigation served from the Router Cache, Chat no longer wipes it
 
 Reported directly: the deployed app feels slow; question was whether the
