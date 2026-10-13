@@ -11,6 +11,50 @@ rather than resolved.
 
 ---
 
+## 2026-10-13 (follow-up) — "River of Memories" built on the existing mindmap storage, not new tables
+
+**What happened:** the brief asked for a full redesign of the mindmap into a
+"river" timeline visualization, with gap/return/intersection behavior,
+without specifying how it should be stored.
+
+**What was decided:**
+
+- **No schema change.** `mindmap_clusters` is already one row per (theme
+  label, month) with an `entry_count`; that is already a theme-by-month
+  matrix, which is exactly the raw material a streamgraph needs. The river is
+  a new read/shape layer (`getMyRiver()`) and a new UI over the identical
+  storage and identical `recomputeMindmapForUser` clustering/labeling
+  pipeline from Phase 6.7 — nothing about how themes get clustered or
+  labeled changed.
+- **Theme identity is exact label match, not fuzzy/semantic grouping**
+  (confirmed with the user before building the layout engine, since getting
+  this wrong would have meant redoing it). Two month-clusters are "the same
+  theme" iff their labels are byte-identical — the same guarantee the old
+  bubble map already relied on for stable tint and label reuse. This also
+  satisfies the brief's "distinguish themes explicitly mentioned... from
+  connections supported by themes appearing together... never invent
+  relationships" directly: merging "Home" and "Home life" because they sound
+  related would be exactly the kind of invented connection that rule forbids.
+- **Time-range filtering fetches once, slices client-side** (confirmed with
+  the user). The full history is small (a handful of themes × months), so
+  there's no accuracy cost to doing it client-side, and it keeps every range
+  switch instant with no loading state — in keeping with the existing
+  "opening this view is a plain DB read" philosophy from Phase 6.7.
+- **Expand reuses the existing Dialog/modal popup pattern** (confirmed with
+  the user), not a new route. The brief's "include a clear way to return to
+  the Past Self journal history" is exactly what the existing
+  `MindmapModal`-style popup already gives for free: closing it returns to
+  the same scroll position with no navigation involved.
+- **The one insight shown ("a theme that returned") is computed from the same
+  gap data the river already derives**, not a separate LLM call, and only
+  above a 2-month gap threshold — a one-month gap is normal writing cadence,
+  not something worth calling out as "returned."
+- **"Past Self" → "Re-live Me" is a pure rename of user-facing text.** The
+  `/chat` route, `past-self.service.ts`, `lib/past-self/sessions.ts`, and
+  every internal identifier are untouched; only what a person actually reads
+  on screen changed. Renaming the internals too would have been a large,
+  purely-cosmetic refactor across many files for zero user-visible benefit.
+
 ## 2026-10-13 (follow-up) — Nav icons, conversation cap, OpenRouter model swap
 
 **What was decided:**

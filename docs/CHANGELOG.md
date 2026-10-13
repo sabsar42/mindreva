@@ -7,6 +7,98 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-13 (follow-up) — "River of Memories" replaces the bubble mindmap; "Past Self" renamed "Re-live Me"
+
+### Added
+
+- **River of Memories visualization** (`apps/web/app/(protected)/river/`: `river-graph.tsx`,
+  `river-explorer.tsx`, `river-panel.tsx`, `river-modal.tsx`), replacing the old
+  circle-and-force-layout mindmap entirely (`mindmap-graph.tsx`,
+  `mindmap-explorer.tsx`, `mindmap-panel.tsx`, `mindmap-modal.tsx` deleted). Each
+  recurring theme is one smoothly-curved, organic path flowing left to right
+  across a real calendar timeline, split into separate visible segments
+  wherever the theme actually went quiet for a month or more (never a straight
+  line glossing over silence); line thickness scales with how many entries
+  that month had; small dots mark individual journal entries, with a larger
+  hollow ring for a theme's first-ever appearance or its return after a gap;
+  a dashed connector plus a marker shows where two themes' paths crossed
+  because a real entry belonged to both in the same month. No clustering or
+  labeling changed — this reuses the exact same `mindmap_clusters` /
+  `mindmap_cluster_entries` rows and recompute pipeline from Phase 6.7, only
+  the read/shape layer and the UI are new.
+- **`getMyRiver()`** (`lib/services/mindmap.service.ts`, replacing
+  `getMyMindmap()`) groups a user's clusters by **exact label match** into one
+  "theme" per distinct label spanning every month it appears in (never a
+  fuzzy/semantic merge — a theme named "Home" and one named "Home life" stay
+  two separate paths, so a connection is never invented). From that it derives,
+  purely from stored dates with no LLM call: each month's point and milestones,
+  which milestone is a theme's first appearance, which is a return after a
+  real calendar gap (and what the previous active month was), every
+  cross-theme intersection in a shared month, and at most one evidence-grounded
+  insight (the most recent "returned after a gap" moment, skipping anything
+  under a 2-month gap). `MindmapRepository.listClusterEntryDetailsForUser`
+  (new) fetches every entry across every cluster for a user in one query.
+- **Time-range selector** (3 months / 6 months / 1 year / all time) fetches the
+  whole history once and slices it client-side for instant switching, per the
+  existing "opening this view is a plain DB read" philosophy. The cutoff is
+  anchored on the most recent month the user actually wrote in, not the
+  device's current date — otherwise anyone whose last entry isn't from the
+  last few real-world months would see "last 3/6 months" come back empty.
+- **Detail panel** (BottomSheet) for all three tappable things the brief asked
+  for: a theme (first/most-recent appearance plus every entry), a milestone
+  (date, excerpt, link to the full entry, and "returned after a gap" context
+  when applicable), and an intersection (which two themes, which entries,
+  worded as "a connection the data supports, not an interpretation of why").
+- **"Past Self" renamed "Re-live Me"** everywhere user-facing (screen heading,
+  bottom-nav/top-right label, aria-labels). Internal module/function names
+  (`past-self.service.ts`, `lib/past-self/sessions.ts`, the `/chat` route)
+  are unchanged — purely a renaming of user-visible text, not the underlying
+  session feature.
+- Unit tests (`lib/services/mindmap.service.test.ts`, 11 new) covering exact
+  grouping, first-appearance/gap-return detection (including "only the
+  month's first entry gets the gap-return flag, not every entry that month"),
+  intersection detection (including never-self, never-cross-month), insight
+  selection (threshold and most-recent-wins), and month collection for the
+  time axis.
+
+### Fixed
+
+- A theme's inline label (drawn beside its path) could render partly or
+  entirely off the left edge of the SVG canvas, since no space was reserved
+  for it. Fixed by reserving a label gutter sized to the longest label
+  actually present, rather than drawing labels into whatever space happened
+  to be left of month 1.
+- A theme active in only one visible month rendered as an invisible
+  zero-length path segment. Fixed by drawing a single-point segment as a
+  short visible stub instead.
+- The time-range cutoff computed "N months ago" from the device's current
+  date rather than the most recent real entry, so the compact preview (and
+  any range) could render almost empty for a user whose writing isn't recent
+  by wall-clock time. Both found and fixed via a live check with seeded data
+  spanning January–June, which is "in the past" relative to October 2026.
+- An intersection's dashed connector line sat on top of nearby milestone
+  dots in z-order and silently absorbed clicks meant for them (confirmed via
+  `elementFromPoint` at the dot's exact screen coordinates returning the
+  line, not the dot). Fixed by making the connector line and a milestone
+  dot's background halo both `pointer-events: none`, so only the actual
+  interactive circle underneath is ever hit-tested.
+
+### Verified
+
+Live, with throwaway seeded accounts (deleted after, cascade confirmed on
+`entries` and `mindmap_clusters`): a known shape (Work active Jan–Mar; Home
+active Jan then June with a 5-month gap; Gratitude appearing only in June,
+sharing June's entry with Home) produced the river, insight text, and
+cutoff-anchored preview this session expected. Interaction-tested, not just
+rendered: a real `elementFromPoint`-verified mouse click that lands on the
+path itself (away from any dot) opens the theme sheet with the right three
+entries; a click on a milestone dot opens that exact entry's detail; a click
+on an intersection marker opens the right two-theme explanation; an account
+with zero history shows the gentle empty state, never a manufactured
+pattern. `pnpm lint`, `typecheck`, `test` (66 pass) and `build` green;
+`/chat` and `/chat/[sessionId]` bundle size unchanged from the old mindmap
+(186kB / 183kB).
+
 ## 2026-10-13 (follow-up) — Top-right tab icons, chat soft-delete column, OpenRouter model swap
 
 ### Fixed

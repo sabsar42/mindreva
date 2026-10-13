@@ -355,6 +355,7 @@ export function RiverGraph({
                           cy={point.y}
                           r={r + 2}
                           fill="var(--color-card)"
+                          pointerEvents="none"
                         />
                         <circle
                           cx={point.x}
@@ -423,6 +424,7 @@ export function RiverGraph({
                     strokeWidth={1.5}
                     strokeDasharray="2 3"
                     opacity={0.7}
+                    pointerEvents="none"
                   />
                   <circle
                     cx={ax}

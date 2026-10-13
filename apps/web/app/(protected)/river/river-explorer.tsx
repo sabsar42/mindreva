@@ -28,18 +28,26 @@ const RANGE_OPTIONS: { value: RiverRange; label: string }[] = [
   { value: "all", label: "All time" },
 ];
 
-function monthsAgo(n: number): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() - n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+/** "2026-06" minus n months -> "2026-01" (n=5). Pure string/calendar math. */
+function monthsBefore(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  const total = y * 12 + (m - 1) - n;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
 }
 
-/** Slices the already-fetched river down to the months a range covers. Client-side, so switching ranges is instant. */
+/**
+ * Slices the already-fetched river down to the months a range covers.
+ * Client-side, so switching ranges is instant. Anchored on the most recent
+ * month the user actually wrote in, NOT the device's current date — writing
+ * stopped a while ago (or simply isn't from "real time", e.g. a future-dated
+ * fixture) must not silently empty out "last 3/6 months", which would make
+ * the preview and every range look broken for no reason evidence-wise.
+ */
 function monthsForRange(allMonths: string[], range: RiverRange): string[] {
   if (range === "all" || allMonths.length === 0) return allMonths;
+  const mostRecent = allMonths[allMonths.length - 1]!;
   const spanMonths = range === "3m" ? 3 : range === "6m" ? 6 : 12;
-  const cutoff = monthsAgo(spanMonths - 1);
+  const cutoff = monthsBefore(mostRecent, spanMonths - 1);
   return allMonths.filter((m) => m >= cutoff);
 }
 

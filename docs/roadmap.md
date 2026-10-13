@@ -1405,6 +1405,36 @@ apps/web/
 
 ---
 
+## Phase 6.10: "River of Memories" Redesign of the Mindmap; "Past Self" Renamed "Re-live Me"
+
+**Objective:** replace the circle-and-force-layout mindmap with an organic, evidence-grounded "river" timeline — one flowing path per recurring theme, with milestones, gap/return behavior, and cross-theme intersections — and rename the "Past Self" screen "Re-live Me". Unplanned addition; judgment calls are in docs/DECISIONS.md (2026-10-13).
+
+**Priority:** P2
+**Dependencies:** Phase 6.7 (reuses its clustering/storage/labeling entirely)
+
+### Checklist
+
+- [x] `getMyRiver()`: groups existing clusters by exact label into one theme per label, across every month
+- [x] First-appearance and return-after-a-gap detection, purely from stored dates, no LLM call
+- [x] Cross-theme intersections (shared entry, same month) with the supporting entries
+- [x] One evidence-grounded insight (most recent gap-return, 2+ month threshold)
+- [x] SVG river graph: organic curved paths, reserved label gutter, visible single-month stubs, milestone dots with notable/first/return styling
+- [x] Time-range selector (3m/6m/1y/all), anchored on the most recent real entry, not wall-clock "now"
+- [x] Detail BottomSheet for theme / milestone / intersection taps
+- [x] Compact preview + expand-to-modal, same pattern as the old mindmap panel
+- [x] "Past Self" renamed "Re-live Me" in all user-facing text
+- [x] Old bubble-mindmap files deleted; `/api/mindmap` now returns the river shape
+
+### Common mistakes
+
+- **Reserve real space for inline labels.** A label drawn to the left of the first data point with no reserved gutter will clip off the SVG's edge — size the gutter to the longest label actually present.
+- **A single-point path segment is invisible, not just short.** Draw it as an explicit short stub instead of a zero-length `M...L`.
+- **Anchor "last N months" on the data, not the device clock.** Computing the cutoff from `new Date()` silently breaks for any dataset whose most recent entry isn't from the last few real-world months — anchor on the most recent month actually present in the data.
+- **A decorative connector line needs `pointer-events: none`.** A dashed line drawn after (and so visually on top of) a milestone dot will silently absorb clicks meant for the dot underneath it, confirmed via `elementFromPoint` at the dot's own coordinates.
+- **Never merge themes by anything other than exact label match.** A fuzzy/semantic merge would be exactly the kind of invented connection the brief's evidence-and-transparency rule forbids.
+
+---
+
 ## Phase 7: CI/CD & Free-Tier Deployment
 
 **Objective:** automated checks on every PR, safe preview deployments, a live production app on Vercel Hobby, and just enough observability to know when something breaks.

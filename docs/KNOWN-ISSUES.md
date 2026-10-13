@@ -6,6 +6,30 @@ things still outstanding.
 
 ---
 
+## River of Memories: open items
+
+**No month-density scaling in the axis itself.** The time axis spaces months
+evenly regardless of how many themes/milestones land in a given month;
+a month with far more writing than its neighbors doesn't get visually more
+room. Not a problem in any tested case (handful of themes, a few months) but
+could look cramped for someone with dozens of themes active in the same
+stretch.
+
+**No virtualization for a very long "All time" history.** The whole history
+renders into one wide SVG, scrolled horizontally. Fine at the scale tested
+(a few months); not verified at multi-year scale with many themes, where the
+SVG could get very wide.
+
+**Server-computed insight only, never refreshed mid-session.** The single
+"a theme that returned" insight is computed once per `getMyRiver()` call
+(on page load). It is correct as of that load, but doesn't update if new
+data lands without a refresh — same freshness model as the rest of this
+precomputed view.
+
+**Not independently checked:** the river in dark mode, and at desktop widths
+(verified at phone width in light mode only, with a headless browser and
+seeded fixtures covering a known gap/return/intersection shape).
+
 ## OpenRouter free-tier model availability
 
 **`OPENROUTER_MODEL` can go stale without warning.** OpenRouter's free-tier
