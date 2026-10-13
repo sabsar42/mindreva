@@ -5,9 +5,12 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
+  smallint,
   text,
   timestamp,
+  unique,
   uuid,
   vector,
 } from "drizzle-orm/pg-core";
@@ -94,11 +97,19 @@ export const entryPhotos = pgTable(
     // Display order within the entry. Computed server-side as the current
     // photo count at upload time — see EntryPhotosRepository.create.
     position: integer("position").notNull().default(0),
+    // 'cover' photos are the entry's cover/thumbnail set (what attaching a
+    // photo did before inline images existed, so every existing row is
+    // 'cover'). 'inline' photos are referenced from the journal body by id
+    // (see packages/types journal-markdown) and are never used as a cover.
+    kind: text("kind").notNull().default("cover").$type<EntryPhotoKind>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("entry_photos_entry_idx").on(t.entryId, t.position)],
+  (t) => [
+    check("entry_photos_kind_check", sql`${t.kind} in ('cover','inline')`),
+    index("entry_photos_entry_idx").on(t.entryId, t.position),
+  ],
 );
 
 export const entryTasks = pgTable(
@@ -128,6 +139,10 @@ export const transcripts = pgTable(
     editedText: text("edited_text"),
     provider: text("provider"),
     language: text("language"),
+    // Timed ASR segments ({text,startMs,endMs}[]) for the transcript view.
+    // Null for transcripts made before segments were stored, and for ASR
+    // providers that return none (see TranscriptSegmentRow).
+    segments: jsonb("segments").$type<TranscriptSegmentRow[]>(),
     status: text("status")
       .notNull()
       .default("pending")
@@ -184,18 +199,33 @@ export const embeddings = pgTable(
   (t) => [index("embeddings_entry_idx").on(t.entryId)],
 );
 
-export const chatSessions = pgTable("chat_sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => profiles.id, { onDelete: "cascade" }),
-  personaYearStart: integer("persona_year_start"),
-  personaYearEnd: integer("persona_year_end"),
-  title: text("title"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const chatSessions = pgTable(
+  "chat_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    personaYearStart: integer("persona_year_start"),
+    personaYearEnd: integer("persona_year_end"),
+    // 1 = Jan-Jun, 2 = Jul-Dec of persona_year_start (single-year sessions
+    // only). Null = the whole year or year range, which is how every session
+    // created before half-year sessions behaves.
+    personaHalf: smallint("persona_half").$type<PersonaHalf>(),
+    title: text("title"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // Soft delete, like entries: a conversation is hidden, never hard-deleted.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    check(
+      "chat_sessions_half_check",
+      sql`${t.personaHalf} is null or ${t.personaHalf} in (1,2)`,
+    ),
+  ],
+);
 
 export const chatMessages = pgTable(
   "chat_messages",
@@ -267,6 +297,58 @@ export const mindmapClusterEntries = pgTable(
   (t) => [index("mindmap_cluster_entries_cluster_idx").on(t.clusterId)],
 );
 
+/**
+ * One share row per entry. `token` is the unguessable path segment of the share
+ * link; revoking sets `revoked_at`, and sharing again rotates the token so an
+ * old link can never come back to life. `visibility`:
+ *   'public'  - anyone with the link can read the entry;
+ *   'private' - only the owner and signed-in users whose email is in
+ *               entry_share_recipients can read it.
+ * Read access for non-owners is enforced in the server (never in the client).
+ */
+export const entryShares = pgTable(
+  "entry_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => entries.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    visibility: text("visibility").notNull().$type<ShareVisibility>(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "entry_shares_visibility_check",
+      sql`${t.visibility} in ('public','private')`,
+    ),
+    unique("entry_shares_entry_unique").on(t.entryId),
+    unique("entry_shares_token_unique").on(t.token),
+  ],
+);
+
+export const entryShareRecipients = pgTable(
+  "entry_share_recipients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    shareId: uuid("share_id")
+      .notNull()
+      .references(() => entryShares.id, { onDelete: "cascade" }),
+    // Stored lower-cased; compared lower-cased against the viewer's auth email.
+    email: text("email").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [unique("entry_share_recipients_unique").on(t.shareId, t.email)],
+);
+
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
 export type Entry = typeof entries.$inferSelect;
@@ -287,6 +369,9 @@ export type ChatSession = typeof chatSessions.$inferSelect;
 export type NewChatSession = typeof chatSessions.$inferInsert;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type NewChatMessage = typeof chatMessages.$inferInsert;
+export type EntryShare = typeof entryShares.$inferSelect;
+export type NewEntryShare = typeof entryShares.$inferInsert;
+export type EntryShareRecipient = typeof entryShareRecipients.$inferSelect;
 export type MindmapCluster = typeof mindmapClusters.$inferSelect;
 export type NewMindmapCluster = typeof mindmapClusters.$inferInsert;
 export type MindmapClusterEntry = typeof mindmapClusterEntries.$inferSelect;
@@ -296,3 +381,12 @@ export type EntryType = "journal" | "note";
 export type EntrySource = "voice" | "text";
 export type TranscriptStatus = "pending" | "processing" | "done" | "failed";
 export type ChatRole = "user" | "assistant";
+export type EntryPhotoKind = "cover" | "inline";
+export type ShareVisibility = "public" | "private";
+export type PersonaHalf = 1 | 2;
+/** One timed piece of an ASR transcript, as stored in transcripts.segments. */
+export interface TranscriptSegmentRow {
+  text: string;
+  startMs: number;
+  endMs: number;
+}

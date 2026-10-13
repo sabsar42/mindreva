@@ -1,0 +1,1 @@
+ALTER TABLE "chat_sessions" ADD COLUMN "deleted_at" timestamp with time zone;

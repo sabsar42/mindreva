@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../client";
 import {
   chatMessages,
@@ -6,6 +6,7 @@ import {
   type ChatMessage,
   type ChatRole,
   type ChatSession,
+  type PersonaHalf,
 } from "../schema";
 
 /** Past-self chat sessions and messages (Phase 6), scoped by userId. */
@@ -14,6 +15,8 @@ export const ChatRepository = {
     userId: string;
     personaYearStart?: number | null;
     personaYearEnd?: number | null;
+    /** 1 = Jan-Jun, 2 = Jul-Dec of personaYearStart; omit for a whole year. */
+    personaHalf?: PersonaHalf | null;
     title?: string | null;
   }): Promise<ChatSession> {
     const rows = await getDb()
@@ -22,17 +25,79 @@ export const ChatRepository = {
         userId: input.userId,
         personaYearStart: input.personaYearStart ?? null,
         personaYearEnd: input.personaYearEnd ?? null,
+        personaHalf: input.personaHalf ?? null,
         title: input.title ?? null,
       })
       .returning();
     return rows[0]!;
   },
 
+  /**
+   * How many live sessions this user already has for a given single-year
+   * half (1 = Jan-Jun, 2 = Jul-Dec). Used to enforce the free-tier cap of two
+   * conversations per half before creating a new one.
+   */
+  async countSessionsInHalf(
+    userId: string,
+    year: number,
+    half: PersonaHalf,
+  ): Promise<number> {
+    const rows = await getDb()
+      .select({ id: chatSessions.id })
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.userId, userId),
+          eq(chatSessions.personaYearStart, year),
+          eq(chatSessions.personaYearEnd, year),
+          eq(chatSessions.personaHalf, half),
+          isNull(chatSessions.deletedAt),
+        ),
+      );
+    return rows.length;
+  },
+
+  /**
+   * The user's live sessions for a half, oldest first — so a caller enforcing
+   * a cap can soft-delete the oldest ones first.
+   */
+  async listSessionsInHalf(
+    userId: string,
+    year: number,
+    half: PersonaHalf,
+  ): Promise<ChatSession[]> {
+    return getDb()
+      .select()
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.userId, userId),
+          eq(chatSessions.personaYearStart, year),
+          eq(chatSessions.personaYearEnd, year),
+          eq(chatSessions.personaHalf, half),
+          isNull(chatSessions.deletedAt),
+        ),
+      )
+      .orderBy(asc(chatSessions.createdAt));
+  },
+
+  /** Soft-delete, like entries: never a hard DELETE. */
+  async softDeleteSession(sessionId: string, userId: string): Promise<void> {
+    await getDb()
+      .update(chatSessions)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, userId)),
+      );
+  },
+
   async listSessions(userId: string): Promise<ChatSession[]> {
     return getDb()
       .select()
       .from(chatSessions)
-      .where(eq(chatSessions.userId, userId))
+      .where(
+        and(eq(chatSessions.userId, userId), isNull(chatSessions.deletedAt)),
+      )
       .orderBy(desc(chatSessions.createdAt));
   },
 
@@ -44,7 +109,11 @@ export const ChatRepository = {
       .select()
       .from(chatSessions)
       .where(
-        and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, userId)),
+        and(
+          eq(chatSessions.id, sessionId),
+          eq(chatSessions.userId, userId),
+          isNull(chatSessions.deletedAt),
+        ),
       )
       .limit(1);
     return rows[0] ?? null;
@@ -64,6 +133,7 @@ export const ChatRepository = {
         and(
           eq(chatSessions.id, input.sessionId),
           eq(chatSessions.userId, input.userId),
+          isNull(chatSessions.deletedAt),
         ),
       )
       .limit(1);
@@ -91,7 +161,11 @@ export const ChatRepository = {
       .select({ id: chatSessions.id })
       .from(chatSessions)
       .where(
-        and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, userId)),
+        and(
+          eq(chatSessions.id, sessionId),
+          eq(chatSessions.userId, userId),
+          isNull(chatSessions.deletedAt),
+        ),
       )
       .limit(1);
     if (!owned[0]) return [];

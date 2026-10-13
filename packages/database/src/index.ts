@@ -14,6 +14,10 @@ export {
 export { RecordingsRepository } from "./repositories/recordings.repository";
 export { EntryPhotosRepository } from "./repositories/entry-photos.repository";
 export { EntryTasksRepository } from "./repositories/entry-tasks.repository";
+export {
+  EntrySharesRepository,
+  type ShareWithRecipients,
+} from "./repositories/entry-shares.repository";
 export { TranscriptsRepository } from "./repositories/transcripts.repository";
 export { SummariesRepository } from "./repositories/summaries.repository";
 export {
@@ -60,6 +64,9 @@ export type {
   NewChatSession,
   ChatMessage,
   NewChatMessage,
+  EntryShare,
+  NewEntryShare,
+  EntryShareRecipient,
   MindmapCluster,
   NewMindmapCluster,
   MindmapClusterEntry,
@@ -68,4 +75,8 @@ export type {
   EntrySource,
   TranscriptStatus,
   ChatRole,
+  EntryPhotoKind,
+  ShareVisibility,
+  PersonaHalf,
+  TranscriptSegmentRow,
 } from "./schema";

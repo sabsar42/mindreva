@@ -197,6 +197,44 @@ export const MindmapRepository = {
       .orderBy(mindmapClusters.month, mindmapClusters.label);
   },
 
+  /**
+   * Every entry inside every one of this user's clusters, in one query —
+   * the raw material for the river view's milestones (one dot per real
+   * entry) and its cross-theme intersections. Unlike getClusterWithEntries
+   * (one cluster at a time, for the old tap-a-node sheet), this fetches the
+   * whole user's cluster membership at once since the river needs all of it
+   * to lay out every theme's path.
+   */
+  async listClusterEntryDetailsForUser(userId: string): Promise<
+    {
+      clusterId: string;
+      entryId: string;
+      entryDate: string | null;
+      title: string | null;
+      snippet: string | null;
+    }[]
+  > {
+    return getDb()
+      .select({
+        clusterId: mindmapClusterEntries.clusterId,
+        entryId: entries.id,
+        entryDate: entries.entryDate,
+        title: entries.title,
+        snippet: sql<
+          string | null
+        >`coalesce(${transcripts.editedText}, ${transcripts.rawText})`,
+      })
+      .from(mindmapClusterEntries)
+      .innerJoin(
+        mindmapClusters,
+        eq(mindmapClusters.id, mindmapClusterEntries.clusterId),
+      )
+      .innerJoin(entries, eq(entries.id, mindmapClusterEntries.entryId))
+      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
+      .where(and(eq(mindmapClusters.userId, userId), isNull(entries.deletedAt)))
+      .orderBy(entries.entryDate);
+  },
+
   /** A single cluster with the entries inside it — what tapping a node opens. */
   async getClusterWithEntries(
     clusterId: string,

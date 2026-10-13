@@ -4,6 +4,7 @@ import {
   entries,
   transcripts,
   type Transcript,
+  type TranscriptSegmentRow,
   type TranscriptStatus,
 } from "../schema";
 
@@ -66,6 +67,7 @@ export const TranscriptsRepository = {
       rawText?: string | null;
       language?: string | null;
       provider?: string | null;
+      segments?: TranscriptSegmentRow[] | null;
     },
   ): Promise<Transcript | null> {
     // Guard ownership through the parent entry.
@@ -80,6 +82,32 @@ export const TranscriptsRepository = {
     const rows = await getDb()
       .update(transcripts)
       .set(patch)
+      .where(eq(transcripts.id, id))
+      .returning();
+    return rows[0] ?? null;
+  },
+
+  /**
+   * Store timed segments without touching raw_text or edited_text. Used both
+   * when a transcript is first produced and to backfill timestamps onto a
+   * transcript made before segments were stored.
+   */
+  async setSegments(
+    id: string,
+    userId: string,
+    segments: TranscriptSegmentRow[],
+  ): Promise<Transcript | null> {
+    const owned = await getDb()
+      .select({ id: transcripts.id })
+      .from(transcripts)
+      .innerJoin(entries, eq(entries.id, transcripts.entryId))
+      .where(and(eq(transcripts.id, id), eq(entries.userId, userId)))
+      .limit(1);
+    if (!owned[0]) return null;
+
+    const rows = await getDb()
+      .update(transcripts)
+      .set({ segments })
       .where(eq(transcripts.id, id))
       .returning();
     return rows[0] ?? null;
