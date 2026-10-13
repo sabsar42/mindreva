@@ -38,7 +38,21 @@ pnpm-debug.log*
 
 # design reference screenshots (kept local only)
 docs/design-reference
-
+docs/new-design-reference
+docs\new-design-reference
 # claude
 .claude/
 graphify-out/
+docs/new-design-reference/image.png
+docs/new-design-reference/Screenshot 2026-10-13 161855.png
+docs/new-design-reference/Screenshot 2026-10-13 161836.png
+docs/new-design-reference/Screenshot 2026-10-13 162024.png
+docs/new-design-reference/Screenshot 2026-10-13 162036.png
+docs/new-design-reference/Screenshot 2026-10-13 162112.png
+docs/new-design-reference/Screenshot 2026-10-13 162130.png
+docs/new-design-reference/Screenshot 2026-10-13 162140.png
+docs/new-design-reference/Screenshot 2026-10-13 162156.png
+docs/new-design-reference/Screenshot 2026-10-13 162212.png
+docs/new-design-reference/Screenshot 2026-10-13 162259.png
+docs/new-design-reference/Screenshot 2026-10-13 162304.png
+docs/new-design-reference/Screenshot 2026-10-13 162312.png
