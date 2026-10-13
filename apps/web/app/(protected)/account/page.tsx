@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Trash2, RefreshCw } from "lucide-react";
+import { Archive, Plug, RefreshCw, Trash2 } from "lucide-react";
 import {
   Avatar,
   AvatarFallback,
@@ -13,7 +13,8 @@ import { getUser } from "@mindreva/auth/server";
 import { getMyProfile, type UseCase } from "@/lib/services/profile.service";
 import { countMyEntries } from "@/lib/services/entries.service";
 import { PrefetchLink } from "../_components/prefetch-link";
-import { SwipeNav } from "../_components/swipe-nav";
+import { PageHeader } from "../_components/page-header";
+import { ThemeSwitchRow } from "../_components/theme-switch-row";
 import {
   LanguagesCard,
   PreferenceToggles,
@@ -36,11 +37,9 @@ export default async function AccountPage() {
   const summaryStyle = (profile?.summaryStyle as UseCase) ?? "general";
 
   return (
-    <SwipeNav>
-      <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
-        <h1 className="text-foreground mb-6 text-xl font-bold tracking-tight">
-          Account
-        </h1>
+    <>
+      <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
+        <PageHeader back="/journal" title="Account" className="mb-6" />
 
         <div className="space-y-4">
           {/* Profile */}
@@ -88,6 +87,14 @@ export default async function AccountPage() {
               title="Cloud sync"
               description={`${noteCount} ${noteCount === 1 ? "note" : "notes"} kept · Free`}
             />
+            <PrefetchLink href="/integrations">
+              <SettingsRow
+                icon={<Plug />}
+                title="Integrations"
+                description="Connect Google Calendar and more"
+                chevron
+              />
+            </PrefetchLink>
             <PrefetchLink href="/archive">
               <SettingsRow
                 icon={<Archive />}
@@ -104,6 +111,10 @@ export default async function AccountPage() {
                 chevron
               />
             </PrefetchLink>
+          </Card>
+
+          <Card className="p-4">
+            <ThemeSwitchRow />
           </Card>
 
           <PreferenceToggles />
@@ -135,6 +146,6 @@ export default async function AccountPage() {
           </div>
         </div>
       </main>
-    </SwipeNav>
+    </>
   );
 }

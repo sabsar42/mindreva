@@ -35,9 +35,9 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         className={cn(
-          "bg-card border-border flex items-center gap-3 rounded-xl border p-5",
+          "bg-card border-border shadow-subtle flex items-center gap-3 rounded-2xl border p-5",
           interactive &&
-            "hover:bg-accent focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2",
+            "press hover:bg-secondary focus-visible:ring-ring cursor-pointer focus-visible:outline-none focus-visible:ring-2",
           className,
         )}
         {...props}

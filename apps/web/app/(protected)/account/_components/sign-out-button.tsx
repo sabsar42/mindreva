@@ -9,7 +9,7 @@ export function SignOutButton() {
   return (
     <Button
       type="button"
-      variant="primary"
+      variant="destructive"
       size="default"
       disabled={pending}
       className="w-full"

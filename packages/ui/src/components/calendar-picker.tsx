@@ -120,9 +120,9 @@ function CalendarPicker({
           caption_label: "text-sm font-semibold text-foreground",
           nav: "absolute inset-x-0 top-0 flex items-center justify-between",
           button_previous:
-            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
           button_next:
-            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            "inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
           month_grid: "w-full border-collapse border-spacing-1",
           weekdays: "flex",
           weekday:
@@ -130,7 +130,7 @@ function CalendarPicker({
           week: "mt-1 flex w-full gap-1",
           day: "flex-1 p-0 text-center",
           day_button:
-            "relative mx-auto flex size-9 items-center justify-center rounded-lg bg-accent text-sm text-foreground transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "relative mx-auto flex size-9 items-center justify-center rounded-lg bg-secondary text-sm text-foreground transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           today: "[&>button]:ring-2 [&>button]:ring-primary",
           selected:
             "[&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:font-semibold",
@@ -171,7 +171,7 @@ function CalendarPicker({
                 setMonth(today);
                 onToday();
               }}
-              className="bg-secondary text-secondary-foreground hover:bg-accent"
+              className="bg-secondary text-secondary-foreground hover:bg-secondary"
             >
               Today
             </Button>

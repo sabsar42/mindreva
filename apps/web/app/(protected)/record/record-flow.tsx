@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Pause, Play } from "lucide-react";
+import { Loader2, Pause, Play } from "lucide-react";
 import {
-  RecordButton,
   WaveformVisualizer,
   cn,
   toast,
@@ -294,18 +293,9 @@ export function RecordFlow() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [state]);
 
-  const canControl = state === "recording" || state === "paused";
-  // The big button always means "finish" while control is possible — even
-  // when paused — so it keeps showing the stop-square visual rather than
-  // RecordButton's built-in "paused = tap to resume" affordance, which would
-  // contradict the separate pause/resume toggle rendered beside it.
-  const bigButtonState: RecordButtonState =
-    state === "paused" ? "recording" : state;
-  const bigButtonLabel = state === "paused" ? "Tap to finish" : undefined;
-
   if (micError) {
     return (
-      <main className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center md:max-w-2xl">
+      <main className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-foreground">{micError}</p>
         <div className="flex gap-3">
           <button
@@ -327,53 +317,68 @@ export function RecordFlow() {
     );
   }
 
-  return (
-    <main className="mx-auto flex min-h-screen flex-col px-6 py-5 md:max-w-2xl">
-      <header className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={cancel}
-          disabled={state === "processing"}
-          className="text-foreground text-sm font-medium disabled:opacity-40"
-        >
-          Cancel
-        </button>
-        <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-          {state === "paused" ? "Paused" : "Recording"}
-        </span>
-        <span className="w-12" aria-hidden />
-      </header>
+  const live = state === "recording" || state === "paused";
+  const busy = state === "preparing" || state === "processing";
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6">
-        <div className="flex items-center gap-2">
+  return (
+    <main className="motion-safe:animate-page-in mx-auto flex min-h-screen flex-col px-6 py-5">
+      <header className="flex items-center justify-between">
+        <span
+          className={cn(
+            "flex items-center gap-2 text-xs font-bold uppercase tracking-widest",
+            state === "paused" ? "text-muted-foreground" : "text-destructive",
+          )}
+        >
           <span
+            aria-hidden
             className={cn(
               "size-2 rounded-full",
-              state === "recording" && "bg-destructive animate-pulse",
-              state === "preparing" && "bg-warning",
+              state === "recording" &&
+                "bg-destructive motion-safe:animate-pulse",
+              state === "preparing" && "bg-warning motion-safe:animate-pulse",
               state === "paused" && "bg-muted-foreground",
-              state === "processing" && "bg-primary",
+              state === "processing" && "bg-primary motion-safe:animate-pulse",
             )}
           />
-          <span className="text-muted-foreground text-sm">
-            {statusCopy[state]}
-          </span>
-        </div>
+          {state === "paused"
+            ? "Paused"
+            : state === "processing"
+              ? "Saving"
+              : state === "preparing"
+                ? "Getting ready"
+                : "Live recording"}
+        </span>
+      </header>
 
-        <div className="text-foreground font-mono text-5xl tabular-nums">
-          {formatTimer(elapsedMs)}
+      <div className="flex flex-1 flex-col items-center justify-center gap-7">
+        <div className="text-center">
+          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+            Elapsed time
+          </p>
+          <div
+            className="text-foreground mt-2 font-mono text-7xl font-bold tabular-nums tracking-tight"
+            role="timer"
+            aria-live="off"
+          >
+            {formatTimer(elapsedMs)}
+          </div>
         </div>
 
         <WaveformVisualizer
           amplitudes={state === "recording" ? amplitudes : undefined}
           active={state === "recording"}
-          className="w-full max-w-xs"
+          className="text-primary w-full max-w-xs"
         />
 
-        <p className="text-muted-foreground max-w-xs text-center text-sm">
-          Keep this tab open. Closing it ends the recording. Your transcript is
-          ready to review once you finish.
-        </p>
+        <div className="text-center">
+          <p className="text-foreground text-lg font-bold tracking-tight">
+            {statusCopy[state]}
+          </p>
+          <p className="text-muted-foreground mt-1 max-w-xs text-sm">
+            Keep this screen open. Closing it ends the recording, and your
+            transcript is ready to review once you finish.
+          </p>
+        </div>
 
         {uploadFailed && (
           <button
@@ -386,30 +391,56 @@ export function RecordFlow() {
         )}
       </div>
 
-      <div className="flex items-center justify-center gap-6 pb-8">
-        {canControl && (
-          <button
-            type="button"
-            onClick={state === "recording" ? pause : resume}
-            aria-label={state === "recording" ? "Pause" : "Resume"}
-            className={cn(
-              "border-border bg-card hover:bg-accent focus-visible:ring-ring focus-visible:ring-offset-background flex size-14 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-              state === "paused" ? "text-primary" : "text-foreground",
-            )}
-          >
-            {state === "recording" ? (
-              <Pause className="size-5 fill-current" />
-            ) : (
-              <Play className="size-5 fill-current" />
-            )}
-          </button>
-        )}
-        <RecordButton
-          state={bigButtonState}
-          label={bigButtonLabel}
-          onClick={canControl ? finish : undefined}
-          size="lg"
-        />
+      <div className="flex flex-col items-center gap-4 pb-6">
+        <div className="flex items-center justify-center gap-6">
+          {live && (
+            <button
+              type="button"
+              onClick={state === "recording" ? pause : resume}
+              aria-label={state === "recording" ? "Pause" : "Resume"}
+              className={cn(
+                "border-border bg-card shadow-subtle press hover:bg-secondary focus-visible:ring-ring focus-visible:ring-offset-background flex size-14 items-center justify-center rounded-full border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                state === "paused" ? "text-primary" : "text-foreground",
+              )}
+            >
+              {state === "recording" ? (
+                <Pause className="size-5 fill-current" />
+              ) : (
+                <Play className="size-5 fill-current" />
+              )}
+            </button>
+          )}
+
+          {/* Stop: a red square in a soft red halo, the universal "end" mark.
+              Disabled (spinner) while the mic warms up or the upload runs. */}
+          <div className="bg-destructive/10 flex size-28 items-center justify-center rounded-full">
+            <button
+              type="button"
+              onClick={live ? finish : undefined}
+              disabled={!live}
+              aria-label="Stop and save recording"
+              className="bg-gradient-danger shadow-elevated press focus-visible:ring-ring focus-visible:ring-offset-background flex size-20 items-center justify-center rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 disabled:cursor-default"
+            >
+              {busy ? (
+                <Loader2 className="size-7 animate-spin" />
+              ) : (
+                <span className="size-6 rounded-md bg-white" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+          {live ? "Tap to stop & save" : "Please wait"}
+        </p>
+        <button
+          type="button"
+          onClick={cancel}
+          disabled={state === "processing"}
+          className="text-muted-foreground hover:text-foreground text-sm font-medium underline underline-offset-4 disabled:opacity-40"
+        >
+          Discard recording
+        </button>
       </div>
     </main>
   );

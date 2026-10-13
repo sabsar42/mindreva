@@ -39,7 +39,7 @@ export function TrashList({
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
       <PageHeader back="/account" title="Trash" />
       <p className="text-muted-foreground mt-1 text-sm">
         Restore a note, or leave it here. Nothing is permanently deleted yet.

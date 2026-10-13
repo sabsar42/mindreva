@@ -54,10 +54,15 @@
   --radius-lg: 1rem; /* 16px — cards, panels */
   --radius-xl: 1.25rem; /* 20px */
   --radius-2xl: 1.75rem; /* 28px — record button / big surfaces */
+  --radius-3xl: 2.25rem; /* 36px — hero cards, sheets */
 
-  /* ---- Elevation — none; depth is created by bg contrast alone -------- */
-  --shadow-subtle: none;
-  --shadow-elevated: none;
+  /* ---- Elevation — soft, neutral, layered ------------------------------
+     Two levels, very low opacity so a list of cards never looks heavy. Kept
+     neutral on purpose: green is for actions and accents, not for surfaces. */
+  --shadow-subtle:
+    0 1px 2px rgb(20 22 26 / 0.04), 0 6px 16px -10px rgb(20 22 26 / 0.12);
+  --shadow-elevated:
+    0 2px 4px rgb(20 22 26 / 0.04), 0 18px 40px -16px rgb(20 22 26 / 0.22);
 
   /* ---- Fonts (wired to next/font CSS variables in apps/web) ----------- */
   --font-sans:
@@ -70,8 +75,14 @@
   --animate-fade-in: fade-in 150ms ease-out;
   --animate-fade-out: fade-out 150ms ease-in;
   --animate-scale-in: scale-in 150ms ease-out;
-  --animate-slide-up: slide-up 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-slide-up: slide-up 320ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-slide-down: slide-down 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* Route-to-route entrance. Opacity plus a few px of rise: enough to feel
+     fluid, short enough that it never reads as the app waiting on itself. */
+  --animate-page-in: page-in 220ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  --animate-pop-in: pop-in 280ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
   --animate-mic-pulse: mic-pulse 1.8s ease-in-out infinite;
+  --animate-halo: halo 3.2s ease-in-out infinite;
   --animate-waveform: waveform 900ms ease-in-out infinite;
   /* Mindmap: a newly-formed theme node easing into the map. Deliberately slow
      and gentle — revisiting the map should feel like watching your own history
@@ -80,76 +91,108 @@
 }
 
 /**
- * Semantic tokens — 4-color system.
- *   #fbfaf7  background (near-white)
- *   #b2efce  accent (hover / selected surfaces)
- *   #26623f  primary (action — buttons, rings, active states)
- *   #26372d  foreground (text / dark surface)
+ * Semantic tokens.
  *
- * Secondary, muted, border, and card values are derived from this set.
- * To swap the palette: replace the four hex values above and re-derive
- * the others proportionally — no component code needs to change.
+ * Surfaces and text are NEUTRAL (warm off-white page, white cards, near-black
+ * ink, grey hairlines) so the page never reads as "green". Mindreva's green is
+ * reserved for actions and accents: `primary` (buttons, active tab, focus
+ * ring), `accent` (selected tint, icon tiles) and the logo.
+ *
+ *   #f8f6f2  background (warm off-white page)
+ *   #ffffff  card / canvas outside the phone-width column on desktop
+ *   #15181c  foreground (ink)
+ *   #26623f  primary (brand green)
  */
 :root {
-  --background: #fbfaf7;
-  --foreground: #26372d;
+  --canvas: #ffffff;
+  --background: #f8f6f2;
+  --foreground: #15181c;
 
   --card: #ffffff;
-  --card-foreground: #26372d;
+  --card-foreground: #15181c;
 
   --popover: #ffffff;
-  --popover-foreground: #26372d;
+  --popover-foreground: #15181c;
 
   --primary: #26623f;
   --primary-foreground: #ffffff;
 
-  --secondary: #eaf3ee;
-  --secondary-foreground: #26372d;
+  --secondary: #f1efea;
+  --secondary-foreground: #15181c;
 
-  --muted: #eaf3ee;
-  --muted-foreground: #4d6b5a; /* ≥4.5:1 on both --background and --muted */
+  --muted: #f1efea;
+  --muted-foreground: #5d636d; /* ≥4.5:1 on both --background and --muted */
 
   --accent: #b2efce;
-  --accent-foreground: #26372d;
+  --accent-foreground: #15181c;
 
   --destructive: var(--color-danger);
   --destructive-foreground: var(--color-danger-foreground);
 
-  --border: #c8e0d0;
-  --input: #c8e0d0;
+  --border: #e6e3dd;
+  --input: #e1ded7;
   --ring: #26623f;
+
+  /* Brand surfaces. The primary gradient is a gentle top-lit green (lighter at
+     the top edge), the same depth cue Apple uses on its filled controls. */
+  --gradient-primary: linear-gradient(180deg, #2f7650 0%, #26623f 100%);
+  --gradient-primary-pressed: linear-gradient(180deg, #26623f 0%, #1c4d31 100%);
+  --gradient-ink: linear-gradient(180deg, #2b2f35 0%, #14171b 100%);
+  --gradient-danger: linear-gradient(180deg, #d4413f 0%, #b91c1c 100%);
+  /* Soft green glow behind the record button only (never a card background). */
+  --halo: rgb(178 239 206 / 0.55);
+  --glass: rgb(255 255 255 / 0.74);
 
   --radius: var(--radius-lg);
 }
 
 .dark {
-  --background: #26372d;
-  --foreground: #fbfaf7;
+  --canvas: #0d0e0f;
+  --background: #151617;
+  --foreground: #f4f2ed;
 
-  --card: #2d4237;
-  --card-foreground: #fbfaf7;
+  --card: #1e2022;
+  --card-foreground: #f4f2ed;
 
-  --popover: #2d4237;
-  --popover-foreground: #fbfaf7;
+  --popover: #1e2022;
+  --popover-foreground: #f4f2ed;
 
   --primary: #b2efce;
-  --primary-foreground: #26372d;
+  --primary-foreground: #0f2a1b;
 
-  --secondary: #334a3e;
-  --secondary-foreground: #c8e0d0;
+  --secondary: #272a2d;
+  --secondary-foreground: #f4f2ed;
 
-  --muted: #334a3e;
-  --muted-foreground: #7fb595;
+  --muted: #272a2d;
+  --muted-foreground: #a3a8af;
 
   --accent: #26623f;
-  --accent-foreground: #fbfaf7;
+  --accent-foreground: #f4f2ed;
 
-  --destructive: var(--color-danger);
-  --destructive-foreground: var(--color-danger-foreground);
+  /* The light-mode red is too dark to read as text on dark surfaces (about 2:1).
+     A lighter red keeps destructive text, badges and tints legible; filled
+     buttons use --gradient-danger instead. */
+  --destructive: #f87171;
+  --destructive-foreground: #2a0f0f;
 
-  --border: #3d5447;
-  --input: #3d5447;
+  --border: #2f3337;
+  --input: #2f3337;
   --ring: #b2efce;
+
+  /* In dark mode the primary action is the light mint, so its gradient runs
+     light-to-slightly-deeper mint and the label stays dark ink. */
+  --gradient-primary: linear-gradient(180deg, #c4f5da 0%, #9fe3bd 100%);
+  --gradient-primary-pressed: linear-gradient(180deg, #9fe3bd 0%, #7fcfa4 100%);
+  --gradient-ink: linear-gradient(180deg, #3b3f44 0%, #2a2d31 100%);
+  --gradient-danger: linear-gradient(180deg, #ef5b58 0%, #d03a37 100%);
+  --halo: rgb(178 239 206 / 0.2);
+  --glass: rgb(30 32 34 / 0.74);
+
+  /* Shadows on dark surfaces need to be darker. */
+  --shadow-subtle:
+    0 1px 2px rgb(0 0 0 / 0.25), 0 6px 16px -10px rgb(0 0 0 / 0.5);
+  --shadow-elevated:
+    0 2px 4px rgb(0 0 0 / 0.25), 0 18px 40px -16px rgb(0 0 0 / 0.6);
 }
 
 /**
@@ -158,6 +201,7 @@
  * `inline` keeps them as var() references so `.dark` overrides win.
  */
 @theme inline {
+  --color-canvas: var(--canvas);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -249,5 +293,102 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* A slow breathing glow behind the idle record button. Opacity-only so it is
+   cheap to composite and never moves layout. */
+@keyframes halo {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+/* Brand surfaces as utilities, so components never inline the raw gradient. */
+@utility bg-gradient-primary {
+  background-image: var(--gradient-primary);
+}
+
+@utility bg-gradient-primary-pressed {
+  background-image: var(--gradient-primary-pressed);
+}
+
+@utility bg-gradient-ink {
+  background-image: var(--gradient-ink);
+}
+
+@utility bg-gradient-danger {
+  background-image: var(--gradient-danger);
+}
+
+@utility bg-halo {
+  background-color: var(--halo);
+}
+
+@utility bg-glass {
+  background-color: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+
+/* Press feedback shared by every tappable surface: a small, quick scale-down
+   that springs back, like a physical key. Opt in with `press`. */
+@utility press {
+  transition-property: transform, background-color, opacity, box-shadow;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Honor the OS "reduce motion" setting everywhere: every animation and
+   transition collapses to an instant state change, and scroll stops easing.
+   State changes still happen — only the movement between them is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

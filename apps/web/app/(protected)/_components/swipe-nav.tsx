@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
 
-const TAB_ORDER = ["/journal", "/chat", "/mindmap", "/account"];
+const TAB_ORDER = ["/journal", "/chat", "/integrations"];
 const SWIPE_THRESHOLD = 60;
 const LOCK_RATIO = 1.5;
 

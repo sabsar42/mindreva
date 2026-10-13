@@ -61,7 +61,7 @@ function PhotoUploader({
         onClick={openPicker}
         disabled={uploading || !canAddMore}
         aria-label="Add photo"
-        className="hover:bg-accent hover:text-foreground text-muted-foreground flex size-8 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+        className="hover:bg-secondary hover:text-foreground text-muted-foreground flex size-8 items-center justify-center rounded-md transition-colors disabled:opacity-40"
       >
         {uploading ? (
           <Loader2 className="size-4 animate-spin" />

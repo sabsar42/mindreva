@@ -2,12 +2,11 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SideNav } from "./side-nav";
-import { BottomNav } from "./bottom-nav";
 import { prefetchFull } from "./use-full-prefetch";
+import { AccountProvider, type AccountSummary } from "./account-context";
 
-// Flows with their own exit (Cancel/Back/Save). Nav is hidden here because
-// leaving /record through it would unmount the recorder and discard the audio.
+// Flows with their own exit (Cancel/Back/Save). They don't prefetch the tabs,
+// so the work they're doing isn't competing with background requests.
 const FOCUSED_ROUTES = [
   /^\/record(\/|$)/,
   /^\/entries\/[^/]+\/review(\/|$)/,
@@ -24,9 +23,15 @@ const FOCUSED_ROUTES = [
 // full prefetch there would show the list without that change. Those tabs'
 // mutations already invalidate the cache (account's server actions call
 // revalidatePath; chat-home refreshes after a new session).
-const PREFETCHED_TABS = ["/chat", "/mindmap", "/account"];
+const PREFETCHED_TABS = ["/chat", "/integrations"];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  account,
+  children,
+}: {
+  account: Promise<AccountSummary | null>;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const focused = FOCUSED_ROUTES.some((r) => r.test(pathname));
@@ -44,13 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [focused, pathname, router, children]);
 
-  if (focused) return <>{children}</>;
-
-  return (
-    <>
-      <SideNav />
-      <div className="md:ml-14 lg:ml-56">{children}</div>
-      <BottomNav />
-    </>
-  );
+  // The tab icons live in each tab screen header now (TabHeaderActions), so the
+  // shell only provides the account context.
+  return <AccountProvider account={account}>{children}</AccountProvider>;
 }

@@ -12,6 +12,7 @@ const PROTECTED_PREFIXES = [
   "/chat",
   "/entries",
   "/mindmap",
+  "/integrations",
 ];
 const ONBOARDING_PREFIX = "/onboarding";
 

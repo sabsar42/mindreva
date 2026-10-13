@@ -43,7 +43,7 @@ const SettingsRow = React.forwardRef<HTMLDivElement, SettingsRowProps>(
         className={cn(
           "flex items-center gap-3.5 px-5 py-4",
           interactive &&
-            "hover:bg-accent focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
+            "hover:bg-secondary focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
           className,
         )}
         {...props}

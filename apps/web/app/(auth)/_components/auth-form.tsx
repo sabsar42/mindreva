@@ -91,19 +91,24 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <div className="border-border bg-card rounded-2xl border p-6">
+    <div>
       <div className="text-center">
-        <h1 className="text-foreground text-lg font-semibold">{c.title}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{c.subtitle}</p>
+        <h1 className="text-foreground text-balance text-4xl font-bold leading-[1.1] tracking-tight">
+          {c.title}
+        </h1>
+        <p className="text-muted-foreground mt-3 text-balance text-base leading-relaxed">
+          {c.subtitle}
+        </p>
       </div>
 
       <Button
         type="button"
-        variant="secondary"
-        className="mt-6 w-full"
+        variant="ink"
+        size="lg"
+        className="mt-8 w-full"
         onClick={handleGoogle}
       >
-        <GoogleIcon className="size-4" />
+        <GoogleIcon className="size-5" />
         Continue with Google
       </Button>
 
@@ -117,7 +122,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <div className="space-y-1.5">
           <label
             htmlFor="email"
-            className="text-foreground text-sm font-medium"
+            className="text-foreground text-sm font-semibold"
           >
             Email address
           </label>
@@ -134,7 +139,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <div className="space-y-1.5">
           <label
             htmlFor="password"
-            className="text-foreground text-sm font-medium"
+            className="text-foreground text-sm font-semibold"
           >
             Password
           </label>
@@ -166,7 +171,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             </button>
           </div>
         </div>
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending && <Loader2 className="size-4 animate-spin" />}
           {pending ? "Please wait…" : c.submit}
         </Button>

@@ -35,8 +35,8 @@ const OptionCard = React.forwardRef<HTMLButtonElement, OptionCardProps>(
           "flex w-full items-center gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors",
           "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
           selected
-            ? "border-foreground bg-accent"
-            : "border-border bg-card hover:bg-accent",
+            ? "border-primary bg-accent/35 shadow-subtle"
+            : "border-border bg-card hover:bg-secondary",
           className,
         )}
         {...props}

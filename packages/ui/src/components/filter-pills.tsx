@@ -48,7 +48,7 @@ function FilterPills({
               "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1.5 text-sm font-medium transition-colors sm:px-3",
               "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
               selected
-                ? "bg-card text-foreground"
+                ? "bg-card text-foreground shadow-subtle"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

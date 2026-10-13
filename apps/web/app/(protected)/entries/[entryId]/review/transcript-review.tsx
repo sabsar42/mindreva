@@ -2,11 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { AudioLines, CircleAlert } from "lucide-react";
 import {
   Button,
+  IconTile,
   PhotoUploader,
   PhotoThumbnailStrip,
+  ProcessingSteps,
   Textarea,
   toast,
   type PhotoUploaderPhoto,
@@ -126,35 +128,75 @@ export function TranscriptReview({
   }
 
   if (status === "pending" || status === "processing") {
+    // Driven by the real transcript status, never a timer: "pending" means
+    // saved and waiting its turn, "processing" means actively transcribing.
+    const processing = status === "processing";
     return (
-      <main className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center md:max-w-2xl">
-        <Loader2 className="text-primary size-8 animate-spin" />
-        <p className="text-foreground">Transcribing your recording…</p>
-        <p className="text-muted-foreground text-sm">
-          This usually only takes a few seconds.
-        </p>
+      <main className="motion-safe:animate-page-in mx-auto flex min-h-screen flex-col justify-center px-6">
+        <div
+          role="status"
+          className="border-border bg-card shadow-elevated flex flex-col items-center rounded-3xl border px-6 py-10 text-center"
+        >
+          <IconTile size="lg" className="motion-safe:animate-pulse">
+            <AudioLines />
+          </IconTile>
+          <h1 className="text-foreground mt-5 text-xl font-bold tracking-tight">
+            {processing ? "Transcribing" : "Getting started"}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {processing
+              ? "Listening through your recording."
+              : "Your recording is saved and waiting its turn."}
+          </p>
+          <ProcessingSteps
+            className="mt-6"
+            steps={["Saved", "Queued", "Transcribing", "Ready"]}
+            current={processing ? 2 : 1}
+          />
+          <p className="text-muted-foreground mt-6 text-xs">
+            This usually only takes a few seconds.
+          </p>
+          <Button
+            variant="secondary"
+            className="mt-6 w-full"
+            onClick={() => router.push("/journal")}
+          >
+            Back to Home
+          </Button>
+        </div>
       </main>
     );
   }
 
   if (status === "failed") {
     return (
-      <main className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center md:max-w-2xl">
-        <p className="text-foreground">
-          We couldn&apos;t transcribe this recording.
-        </p>
-        <p className="text-muted-foreground text-sm">
-          It&apos;s still saved. You can find it in your journal.
-        </p>
-        <Button variant="secondary" onClick={() => router.push("/journal")}>
-          Back to journal
-        </Button>
+      <main className="motion-safe:animate-page-in mx-auto flex min-h-screen flex-col justify-center px-6">
+        <div
+          role="alert"
+          className="border-border bg-card shadow-elevated flex flex-col items-center rounded-3xl border px-6 py-10 text-center"
+        >
+          <IconTile size="lg" tone="danger">
+            <CircleAlert />
+          </IconTile>
+          <h1 className="text-foreground mt-5 text-xl font-bold tracking-tight">
+            We couldn&apos;t transcribe this
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            It&apos;s still saved. You can find it on Home.
+          </p>
+          <Button
+            className="mt-6 w-full"
+            onClick={() => router.push("/journal")}
+          >
+            Back to Home
+          </Button>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen flex-col gap-4 px-6 py-6 md:max-w-2xl">
+    <main className="mx-auto flex min-h-screen flex-col gap-4 px-6 py-6">
       <div>
         <h1 className="text-foreground text-xl font-bold tracking-tight">
           Review your transcript

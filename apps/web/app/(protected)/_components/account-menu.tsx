@@ -1,0 +1,171 @@
+"use client";
+
+import * as React from "react";
+import { ChevronRight, Plug, Settings2 } from "lucide-react";
+import {
+  Avatar,
+  AvatarFallback,
+  BottomSheet,
+  BottomSheetContent,
+  BottomSheetDescription,
+  BottomSheetTitle,
+  BottomSheetTrigger,
+  Badge,
+  Button,
+  IconTile,
+  ProgressBar,
+  cn,
+  initialsFromName,
+} from "@mindreva/ui";
+import { signOutAction } from "../account/actions";
+import { useAccount } from "./account-context";
+import { PrefetchLink } from "./prefetch-link";
+import { ThemeSwitchRow } from "./theme-switch-row";
+
+/** Matches the quota shown on the full Account page. */
+const MONTHLY_MINUTES = 60;
+
+/**
+ * The avatar button and the sheet it opens: who you are, how much you've used,
+ * and the controls that are about you rather than about your entries.
+ * The full settings (summary style, languages, archive, trash) stay on
+ * /account; this is the quick version.
+ */
+function AccountMenuInner({ className }: { className?: string }) {
+  const account = useAccount();
+  const [open, setOpen] = React.useState(false);
+  const [signingOut, startSignOut] = React.useTransition();
+
+  if (!account) return null;
+
+  const close = () => setOpen(false);
+  const minutes = Math.min(account.minutesUsed, MONTHLY_MINUTES);
+
+  return (
+    <BottomSheet open={open} onOpenChange={setOpen}>
+      <BottomSheetTrigger asChild>
+        <button
+          type="button"
+          aria-label="Open account menu"
+          className={cn(
+            "press ring-border focus-visible:ring-ring rounded-full ring-2 ring-offset-2 ring-offset-transparent focus-visible:outline-none focus-visible:ring-2",
+            className,
+          )}
+        >
+          <Avatar className="size-10">
+            <AvatarFallback>{initialsFromName(account.name)}</AvatarFallback>
+          </Avatar>
+        </button>
+      </BottomSheetTrigger>
+
+      <BottomSheetContent>
+        <BottomSheetTitle className="sr-only">Account</BottomSheetTitle>
+        <BottomSheetDescription className="sr-only">
+          Your profile, usage and quick settings.
+        </BottomSheetDescription>
+
+        <div className="flex items-center gap-3">
+          <Avatar className="size-14">
+            <AvatarFallback className="text-lg">
+              {initialsFromName(account.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground truncate text-lg font-bold leading-tight">
+              {account.name}
+            </p>
+            <p className="text-muted-foreground truncate text-sm">
+              {account.email}
+            </p>
+          </div>
+          <Badge variant="neutral" className="capitalize">
+            {account.plan}
+          </Badge>
+        </div>
+
+        <div className="border-border bg-card shadow-subtle mt-5 rounded-2xl border p-4">
+          <ProgressBar
+            label="Recording time this month"
+            valueLabel={`${minutes}m of ${MONTHLY_MINUTES}m`}
+            current={minutes}
+            max={MONTHLY_MINUTES}
+          />
+        </div>
+
+        <div className="border-border bg-card shadow-subtle mt-3 divide-y overflow-hidden rounded-2xl border">
+          <PrefetchLink
+            href="/integrations"
+            onClick={close}
+            className="hover:bg-secondary flex items-center gap-3 p-3.5 transition-colors"
+          >
+            <IconTile size="sm">
+              <Plug />
+            </IconTile>
+            <span className="min-w-0 flex-1">
+              <span className="text-foreground block text-sm font-semibold">
+                Integrations
+              </span>
+              <span className="text-muted-foreground block text-xs">
+                Connect Google Calendar and more
+              </span>
+            </span>
+            <ChevronRight className="text-muted-foreground size-4" />
+          </PrefetchLink>
+          <PrefetchLink
+            href="/account"
+            onClick={close}
+            className="hover:bg-secondary flex items-center gap-3 p-3.5 transition-colors"
+          >
+            <IconTile size="sm" tone="neutral">
+              <Settings2 />
+            </IconTile>
+            <span className="min-w-0 flex-1">
+              <span className="text-foreground block text-sm font-semibold">
+                Account &amp; settings
+              </span>
+              <span className="text-muted-foreground block text-xs">
+                Summary style, languages, archive, trash
+              </span>
+            </span>
+            <ChevronRight className="text-muted-foreground size-4" />
+          </PrefetchLink>
+        </div>
+
+        <div className="mt-3">
+          <ThemeSwitchRow />
+        </div>
+
+        <Button
+          variant="destructive"
+          size="lg"
+          className="mt-5 w-full"
+          disabled={signingOut}
+          onClick={() => startSignOut(() => signOutAction())}
+        >
+          {signingOut ? "Signing out…" : "Sign out"}
+        </Button>
+      </BottomSheetContent>
+    </BottomSheet>
+  );
+}
+
+/** Same footprint as the loaded avatar, so nothing shifts when it resolves. */
+function AvatarPlaceholder({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "bg-muted block size-10 animate-pulse rounded-full",
+        className,
+      )}
+    />
+  );
+}
+
+export function AccountMenu({ className }: { className?: string }) {
+  return (
+    <React.Suspense fallback={<AvatarPlaceholder className={className} />}>
+      <AccountMenuInner className={className} />
+    </React.Suspense>
+  );
+}

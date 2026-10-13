@@ -26,7 +26,7 @@ export function PageHeader({
   const router = useRouter();
 
   const backBtnClass =
-    "text-foreground hover:bg-accent -ml-2 rounded-full p-2 transition-colors";
+    "text-foreground hover:bg-secondary -ml-2 rounded-full p-2 transition-colors";
 
   const backEl =
     typeof back === "string" ? (

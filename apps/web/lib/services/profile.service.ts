@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { ProfilesRepository, type Profile } from "@mindreva/database";
 import { getUser } from "@mindreva/auth/server";
 
@@ -23,10 +24,15 @@ async function requireUserId(): Promise<string> {
   return user.id;
 }
 
-export async function getMyProfile(): Promise<Profile | null> {
+/**
+ * Request-scoped via React's cache(): the protected layout (for the avatar
+ * menu) and the page itself both read the profile in one render, so it costs
+ * one query, not two.
+ */
+export const getMyProfile = cache(async (): Promise<Profile | null> => {
   const userId = await requireUserId();
   return ProfilesRepository.getById(userId);
-}
+});
 
 /** Save the onboarding language + use-case selections. */
 export async function saveOnboarding(input: {

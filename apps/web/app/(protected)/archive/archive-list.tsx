@@ -52,7 +52,7 @@ export function ArchiveList({
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+    <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
       <PageHeader back="/account" title="Archived" />
 
       <div className="mt-6 space-y-4">

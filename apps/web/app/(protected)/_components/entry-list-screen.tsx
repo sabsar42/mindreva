@@ -3,13 +3,7 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import {
-  Search,
-  Archive,
-  LayoutGrid,
-  Calendar,
-  CalendarDays,
-} from "lucide-react";
+import { Search, Archive, FileText, LayoutGrid, Calendar } from "lucide-react";
 import { trashSwipeAction } from "./swipe-actions";
 import {
   BottomSheet,
@@ -31,6 +25,7 @@ import {
 import { useHydrated } from "@/lib/use-hydrated";
 import { ConfirmTrashDialog } from "./confirm-trash-dialog";
 import { EmptyState } from "./empty-state";
+import { HomeHeader } from "./home-header";
 import { SwipeNav } from "./swipe-nav";
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
@@ -54,23 +49,13 @@ const CalendarPicker = dynamic(
   },
 );
 
-type FilterValue = "all" | "today" | "week" | "date";
+type FilterValue = "all" | "today" | "date";
 
 const FILTER_OPTIONS: FilterPillOption[] = [
   { value: "all", label: "All", icon: <LayoutGrid className="size-3.5" /> },
   { value: "today", label: "Today", icon: <Calendar className="size-3.5" /> },
-  { value: "week", label: "Week", icon: <CalendarDays className="size-3.5" /> },
   { value: "date", label: "Date", icon: <Calendar className="size-3.5" /> },
 ];
-
-function startOfWeekMonday(d: Date): Date {
-  const day = d.getDay(); // 0=Sun..6=Sat
-  const diff = (day === 0 ? -6 : 1) - day; // shift to Monday
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diff);
-  monday.setHours(0, 0, 0, 0);
-  return monday;
-}
 
 function toDateKey(d: Date): string {
   const y = d.getFullYear();
@@ -186,17 +171,6 @@ export function EntryListScreen({
       const key = toDateKey(new Date());
       return localEntries.filter((e) => e.entryDate === key);
     }
-    if (filter === "week") {
-      const monday = startOfWeekMonday(new Date());
-      const mondayKey = toDateKey(monday);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const sundayKey = toDateKey(sunday);
-      return localEntries.filter(
-        (e) =>
-          e.entryDate && e.entryDate >= mondayKey && e.entryDate <= sundayKey,
-      );
-    }
     if (filter === "date" && selectedDate) {
       const key = toDateKey(selectedDate);
       return localEntries.filter((e) => e.entryDate === key);
@@ -244,44 +218,29 @@ export function EntryListScreen({
   const visibleIds = React.useMemo(() => visible.map((e) => e.id), [visible]);
   const entryThumbnails = useEntryThumbnails(visibleIds);
 
-  const dateStamp = hydrated
-    ? new Date()
-        .toLocaleDateString("en-US", {
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-        .toUpperCase()
-    : DATE_PLACEHOLDER;
-
   return (
     <SwipeNav>
-      <main className="mx-auto min-h-screen px-5 pb-24 pt-6 md:max-w-2xl md:pb-10">
+      <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
         <TranscriptionWatcher />
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-widest">
-              {dateStamp}
-            </p>
-            <h1 className="text-foreground mt-0.5 text-4xl font-bold tracking-tight">
-              {heading}
-            </h1>
-          </div>
-        </div>
+        <HomeHeader />
 
         {type === "journal" && (
-          <PrefetchLink href="/record" className="mt-5 block">
-            <div className="bg-card border-border hover:bg-accent rounded-2xl border p-6 text-center transition-colors">
-              {/* Static outer ring (always visible) + pulsing animation layer */}
-              <div className="relative mx-auto mb-5 flex size-32 items-center justify-center">
-                <div className="bg-primary/10 absolute inset-0 rounded-full" />
-                <span className="bg-primary/10 animate-mic-pulse absolute inset-0 rounded-full" />
-                <div className="bg-primary relative flex size-20 items-center justify-center rounded-full">
+          <PrefetchLink
+            href="/record"
+            aria-label="Start recording"
+            className="group mt-6 block focus-visible:outline-none"
+          >
+            <div className="bg-card border-border shadow-elevated group-focus-visible:ring-ring press rounded-[2rem] border p-7 text-center group-focus-visible:ring-2">
+              {/* Breathing halo behind the leaf; the button itself stays still
+                  so it reads as solid, with a press-down on tap. */}
+              <div className="relative mx-auto mb-5 flex size-36 items-center justify-center">
+                <div className="bg-halo animate-halo absolute inset-0 rounded-full" />
+                <div className="bg-halo absolute inset-5 rounded-full opacity-70" />
+                <div className="bg-gradient-primary shadow-elevated relative flex size-20 items-center justify-center rounded-full transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105">
                   <LeafMark className="text-primary-foreground size-10" />
                 </div>
               </div>
-              <h2 className="text-foreground text-xl font-bold">
+              <h2 className="text-foreground text-xl font-bold tracking-tight">
                 Start recording
               </h2>
               <p className="text-muted-foreground mt-1 text-sm">
@@ -318,12 +277,20 @@ export function EntryListScreen({
 
           {!searching && visible.length === 0 && (
             <EmptyState
+              icon={searchResults ? <Search /> : <FileText />}
+              title={
+                searchResults
+                  ? "No matches"
+                  : filter === "all"
+                    ? `No ${heading.toLowerCase()} entries yet`
+                    : "Nothing for this filter"
+              }
               message={
                 searchResults
-                  ? "No matches."
+                  ? "Try a different word or phrase."
                   : filter === "all"
-                    ? "Nothing here yet."
-                    : "Nothing for this filter."
+                    ? "Tap record to capture your first entry."
+                    : "Try another date range, or clear the filter."
               }
             />
           )}

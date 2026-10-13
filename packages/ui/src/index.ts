@@ -1,6 +1,7 @@
 export { cn, initialsFromName } from "./lib/utils";
 
-export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { Button, type ButtonProps } from "./components/button";
+export { buttonVariants } from "./components/button-variants";
 export { Input } from "./components/input";
 export { Textarea } from "./components/textarea";
 export {
@@ -97,3 +98,21 @@ export {
   type LogoProps,
   type LeafMarkProps,
 } from "./components/logo";
+export {
+  IconTile,
+  iconTileVariants,
+  type IconTileProps,
+} from "./components/icon-tile";
+export {
+  ExpandablePanel,
+  type ExpandablePanelProps,
+} from "./components/expandable-panel";
+export {
+  ProcessingSteps,
+  type ProcessingStepsProps,
+} from "./components/processing-steps";
+export {
+  JournalImage,
+  journalImageWrapperClass,
+  type JournalImageProps,
+} from "./components/journal-image";
