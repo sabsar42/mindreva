@@ -6,6 +6,24 @@ things still outstanding.
 
 ---
 
+## Photos uploaded before 2026-10-14 are still full-size
+
+**Status:** Open.
+
+**What's wrong:** Resizing now happens before upload (see docs/DECISIONS.md,
+2026-10-14), so existing photos keep their original size; one measured cover
+is a 2.4MB PNG. They load fast on revisits within a session (signed URLs are
+reused), but the first view per session, and every view after a full page
+reload, still downloads the whole file. Those older objects also have no
+`cache-control`.
+
+**To revisit:** a one-off backfill script that downloads each existing photo,
+resizes it the same way, uploads it under a new path with `cacheControl`,
+and updates `entry_photos.storage_path`. Or, more simply, re-upload a cover
+from the entry page.
+
+---
+
 ## Journal activity heatmap: open items
 
 **No lazy loading.** `CalendarPicker` was previously deferred behind
@@ -149,11 +167,15 @@ the branch to `main` to match the trigger.
 **What's wrong:** Every dynamic request from Bangladesh pays ~230ms just to
 reach the `hnd1` function, before auth (~50ms) and DB (~70ms). The
 2026-10-12 caching changes hide this for tab switches but not for first
-visits, entry detail, or `/journal`.
+visits, entry detail, or `/journal` after its 30s cache window.
 
-**To revisit:** after the 2026-10-12 changes deploy, re-run the Playwright
-tab-navigation measurement. If first visits still feel slow, consider
-co-locating in Mumbai: a new free Supabase project in `ap-south-1` plus
+**Re-measured 2026-10-14 after the caching changes deployed:** tab switches
+now land at 15-33ms with no request (see docs/CHANGELOG.md, 2026-10-12
+entry). First page loads still take ~440-450ms and returning to Journal
+after 30s ~490ms, which is this floor plus real work.
+
+**To revisit:** if first visits still feel slow, consider co-locating in
+Mumbai: a new free Supabase project in `ap-south-1` plus
 `"regions": ["bom1"]`. Moving only the database would not help.
 
 ---
