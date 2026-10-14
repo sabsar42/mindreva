@@ -46,6 +46,18 @@ const LEVEL_CLASSES: Record<0 | 1 | 2 | 3 | 4, string> = {
   4: "bg-mint-800",
 };
 
+/** Day-number colour per level. Keyed to the cell's own shade, not the theme:
+ * the mint scale is the same hex in light and dark, so `text-foreground`
+ * (near-white in dark mode) vanished on the light level 1-2 cells. Only
+ * level 0 follows the theme, because `bg-secondary` does too. */
+const LEVEL_TEXT_CLASSES: Record<0 | 1 | 2 | 3 | 4, string> = {
+  0: "text-foreground/70",
+  1: "text-mint-900",
+  2: "text-mint-900",
+  3: "text-mint-50",
+  4: "text-mint-50",
+};
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -206,8 +218,9 @@ function MonthGrid({
               className={cn(
                 "press focus-visible:ring-ring aspect-square rounded-[6px] text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2",
                 LEVEL_CLASSES[level],
-                level >= 3 ? "text-mint-50" : "text-foreground/70",
-                isSelected && "ring-primary ring-2 ring-offset-1",
+                LEVEL_TEXT_CLASSES[level],
+                isSelected &&
+                  "ring-primary ring-offset-background ring-2 ring-offset-1",
               )}
             >
               {day}

@@ -501,7 +501,14 @@ function RichTextEditor({
   const initialConfig = {
     namespace: "RichTextEditor",
     nodes: [JournalImageNode],
-    theme: { paragraph: "mb-3 last:mb-0" },
+    // Text format classes are required, not cosmetic: Lexical renders a run's
+    // formats through one tag, and for bold+italic that tag is <strong>, so
+    // without the `italic` class the italic half never showed. The data was
+    // fine all along (it round-trips as ***text***).
+    theme: {
+      paragraph: "mb-3 last:mb-0",
+      text: { bold: "font-bold", italic: "italic" },
+    },
     onError(error: Error) {
       throw error;
     },

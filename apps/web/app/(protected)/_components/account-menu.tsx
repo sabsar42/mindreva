@@ -44,16 +44,22 @@ function AccountMenuInner({ className }: { className?: string }) {
   return (
     <BottomSheet open={open} onOpenChange={setOpen}>
       <BottomSheetTrigger asChild>
+        {/* Same 40px tap box as the tab icons beside it. The avatar plus its
+            ring and offset (32 + 2·4) fills that box exactly, and ml-2.5
+            makes the visible gap to the neighbouring icon match the 24px
+            between the 20px icon glyphs. */}
         <button
           type="button"
           aria-label="Open account menu"
           className={cn(
-            "press ring-border focus-visible:ring-ring rounded-full ring-2 ring-offset-2 ring-offset-transparent focus-visible:outline-none focus-visible:ring-2",
+            "press focus-visible:ring-ring ml-2.5 flex size-10 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2",
             className,
           )}
         >
-          <Avatar className="size-10">
-            <AvatarFallback>{initialsFromName(account.name)}</AvatarFallback>
+          <Avatar className="ring-border size-8 ring-2 ring-offset-2 ring-offset-transparent">
+            <AvatarFallback className="text-xs">
+              {initialsFromName(account.name)}
+            </AvatarFallback>
           </Avatar>
         </button>
       </BottomSheetTrigger>
@@ -155,10 +161,12 @@ function AvatarPlaceholder({ className }: { className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "bg-muted block size-10 animate-pulse rounded-full",
+        "ml-2.5 flex size-10 items-center justify-center",
         className,
       )}
-    />
+    >
+      <span className="bg-muted block size-8 animate-pulse rounded-full" />
+    </span>
   );
 }
 

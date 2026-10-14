@@ -7,6 +7,81 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-14 — UI fix pass: header spacing, dark-mode heatmap digits, bold+italic, photo loading, trash confirmation
+
+Five issues reported against the deployed app.
+
+### Fixed
+
+- **Header icons unevenly spaced** (`account-menu.tsx`). The Re-live and
+  Integrations icons are 20px glyphs in 40px tap boxes (24px visible gap),
+  but the avatar was a solid 40px circle with a 2px ring + 2px offset, so it
+  read as 48px wide and sat ~10px from its neighbour. The avatar is now 32px
+  inside the same 40px tap box (ring and offset fill it exactly) with
+  `ml-2.5`, giving a measured 24px visible gap on both sides. The loading
+  placeholder keeps the same footprint.
+- **Heatmap day numbers invisible in dark mode on low-activity days**
+  (`journal-heatmap.tsx`). Levels 0-2 used `text-foreground/70`, which turns
+  near-white in dark mode, while the mint scale is the same hex in both
+  themes, so level 1 was ~1.4:1. The digit colour now follows the cell
+  shade: `mint-900` on levels 1-2, `mint-50` on 3-4, theme foreground only
+  on level 0 (whose `bg-secondary` also follows the theme). Measured dark-mode
+  contrast: 9.75, 4.65, 6.58 and 11.16 for levels 1-4. The selected day's
+  ring offset now uses the page background instead of Tailwind's default
+  white.
+- **Bold and italic couldn't be combined** (`rich-text-editor.tsx`). Lexical
+  renders a run's formats through a single tag, and for bold+italic that tag
+  is `<strong>`; italic only shows through a theme class, and the editor's
+  theme defined none. Added `text: { bold, italic }` theme classes. The stored
+  Markdown was already correct: a headless round-trip test confirmed
+  `***text***` saves and reloads as bold+italic with the existing
+  transformers, so they were left unchanged, and `stripFormatting` already
+  strips it.
+- **Photos re-downloaded on every visit (1-2s)**. Measured live: the same
+  2.4MB PNG cover was downloaded three times in three visits, each under a new
+  signed-URL token, and Storage served it with no `cache-control`.
+  - New `lib/photo-url-cache.ts`: hands out the first signed URL seen per
+    Storage object while its token is valid (swapping 5 minutes before
+    expiry), so revisits render the browser's cached image. Browser-only; on
+    the server it's a pass-through, so URLs are never shared across users.
+  - `use-entry-thumbnails.ts`: list thumbnails already seen this session render
+    immediately and skip the `/api/entries/thumbnails` call; only missing ids
+    are fetched. Changing an entry's cover updates this memory, so the list
+    never shows the old cover.
+  - `entry-detail.tsx`: cover and inline pictures go through the same cache.
+  - New `lib/prepare-image-upload.ts`: photos are resized in the browser
+    before upload (longest edge 1600px, WebP, JPEG where WebP encoding isn't
+    available). Falls back to the original for anything it can't decode or
+    shrink. Used by entry detail (cover + inline) and transcript review.
+  - Photo uploads now set `cacheControl: "31536000"` (paths are fresh UUIDs,
+    never overwritten).
+- **Trash from an entry had no confirmation** (`entry-detail.tsx`). The
+  header trash icon now opens the existing themed `ConfirmTrashDialog` (the
+  one the list's swipe-to-trash already uses) instead of trashing on one tap.
+
+### Verified
+
+- Local visual checks at phone width in light and dark mode, using a
+  temporary `/dev` harness (deleted before commit): header gaps measured
+  24px/24px; heatmap contrast as above; a stored `***bold and italic***` run
+  renders bold+italic, and selecting a word then pressing Bold and Italic in
+  the real toolbar renders both and saves `***word***`; the confirm dialog
+  follows the theme.
+- `prepareImageForUpload` in a real browser: 10.4MB 4000×3000 PNG → 746KB
+  1600×1200 WebP (305ms); 3.1MB transparent PNG → 751KB WebP; a 358KB JPEG
+  left untouched. (Synthetic noise images, the worst case for compression.)
+- `photo-url-cache` behaviour checked in the browser: same object reuses its
+  first URL; a URL within 5 minutes of expiry is replaced; non-signed URLs
+  pass through; a cover change replaces the remembered list thumbnail.
+- `pnpm lint` (no warnings), `pnpm typecheck` 7/7, `pnpm test` (73 passed,
+  2 skipped), `pnpm build` all pass.
+
+### Not independently verified
+
+- Photo load times on the live deploy (needs this branch deployed).
+- Photos uploaded before this change stay full-size; see
+  docs/KNOWN-ISSUES.md.
+
 ## 2026-10-13 (follow-up) — GitHub-style journal activity heatmap replaces the date-picker calendar
 
 ### Added
@@ -419,11 +494,35 @@ team's location (Bangladesh), signed in to a real account.
   `pnpm typecheck` 7/7, and `pnpm build` with CI's placeholder env vars all
   pass; route sizes unchanged (176-180kB First Load JS).
 
+### Verified live (2026-10-14)
+
+Re-measured on the production deploy with the same Playwright method (same
+location, same account, taps dispatched without hover so prefetch gets no
+head start, as on a phone). The build was confirmed live first by checking
+for strings only the new code contains. By then the navigation had been
+redesigned to Journal (home), Chat and Integrations, and `PREFETCHED_TABS`
+updated to `["/chat", "/integrations"]` to match, so the tab tests use
+those routes.
+
+| Scenario                                         | Before (2026-10-12)                    | After (2026-10-14)            |
+| ------------------------------------------------ | -------------------------------------- | ----------------------------- |
+| Tap a tab from Journal, then Back                | 300-830ms each                         | 15-33ms, no server request    |
+| Second round of taps, after opening Chat         | 360-400ms (Chat had emptied the cache) | 15-27ms, cache intact         |
+| Chat tab after 35s idle                          | ~450ms                                 | 27ms (5-minute full prefetch) |
+| Sign-in → Journal content                        | ~2.3s, 3 `/journal` requests           | 1.48s, 1 `/journal` request   |
+| Back to Journal after 35s idle                   | ~450ms                                 | 493ms (unchanged by design)   |
+| Server time per page (journal, chat, account, …) | ~445-460ms                             | ~440-450ms (not targeted)     |
+
+Opening Chat no longer re-fetches `/chat` twice or invalidates other tabs.
+Server time per page is unchanged, as expected: these fixes avoid round
+trips rather than make them faster.
+
 ### Not independently verified
 
-- The live effect of these changes: measured before the fix only, since
-  the fix isn't deployed yet. Re-run the same Playwright tab-navigation test
-  against the deploy once it ships.
+- The `getMyEntryDetail` photo-signing overlap: the test account has no
+  entries with photos.
+- A new chat session appearing on return to Chat (the one-shot refresh
+  flag): not exercised live, to avoid creating data in a real account.
 
 ## 2026-09-27 — Fix pass on the UI redesign (`feature/ui-update`)
 

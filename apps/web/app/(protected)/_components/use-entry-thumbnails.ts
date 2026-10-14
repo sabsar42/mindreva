@@ -1,6 +1,10 @@
 "use client";
 
 import * as React from "react";
+import {
+  knownEntryThumbnails,
+  rememberEntryThumbnail,
+} from "@/lib/photo-url-cache";
 
 /**
  * Cover-photo thumbnail URLs, fetched client-side after the entry list has
@@ -11,20 +15,25 @@ import * as React from "react";
  * load (see docs/CHANGELOG.md's 2026-08-16 entry for the measured cost this
  * used to add to every journal/notes/archive/trash visit).
  *
- * Only fetches ids it doesn't already have a thumbnail for, so switching
- * filters or re-rendering with the same visible entries doesn't re-fetch.
+ * Thumbnails already seen this session start out filled in (and keep their
+ * exact URL, so the browser shows the cached image instead of downloading it
+ * again — see lib/photo-url-cache.ts). Only ids still missing are fetched.
  */
 export function useEntryThumbnails(
   visibleIds: string[],
 ): Record<string, string> {
-  const [thumbnails, setThumbnails] = React.useState<Record<string, string>>(
-    {},
-  );
   const idsKey = visibleIds.join(",");
+  const [thumbnails, setThumbnails] = React.useState<Record<string, string>>(
+    () => knownEntryThumbnails(visibleIds),
+  );
 
   React.useEffect(() => {
     const ids = idsKey ? idsKey.split(",") : [];
-    const missing = ids.filter((id) => !(id in thumbnails));
+    const known = knownEntryThumbnails(ids);
+    const missing = ids.filter((id) => !(id in known));
+    if (Object.keys(known).length > 0) {
+      setThumbnails((prev) => ({ ...prev, ...known }));
+    }
     if (missing.length === 0) return;
     void fetch("/api/entries/thumbnails", {
       method: "POST",
@@ -34,14 +43,17 @@ export function useEntryThumbnails(
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { thumbnails: Record<string, string> } | null) => {
         if (!data) return;
-        setThumbnails((prev) => ({ ...prev, ...data.thumbnails }));
+        const stable = Object.fromEntries(
+          Object.entries(data.thumbnails).map(([id, url]) => [
+            id,
+            rememberEntryThumbnail(id, url),
+          ]),
+        );
+        setThumbnails((prev) => ({ ...prev, ...stable }));
       })
       .catch(() => {
         // Non-fatal — rows just render without a cover photo.
       });
-    // thumbnails intentionally excluded: it's what this effect writes to,
-    // and including it would refire on every partial result.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsKey]);
 
   return thumbnails;

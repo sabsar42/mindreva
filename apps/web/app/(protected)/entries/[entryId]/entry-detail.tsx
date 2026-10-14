@@ -31,6 +31,9 @@ import type {
   TranscriptStatus,
 } from "@mindreva/database";
 import { getDefaultArtworkWide } from "@/lib/default-artwork";
+import { prepareImageForUpload } from "@/lib/prepare-image-upload";
+import { rememberEntryThumbnail, stablePhotoUrl } from "@/lib/photo-url-cache";
+import { ConfirmTrashDialog } from "../../_components/confirm-trash-dialog";
 import { ShareSheet } from "./share-sheet";
 import { TranscriptSheet } from "./transcript-sheet";
 
@@ -146,8 +149,14 @@ export function EntryDetail({
   const [regenerating, setRegenerating] = React.useState(false);
   const [isArchived, setIsArchived] = React.useState(archived);
   const [trashing, setTrashing] = React.useState(false);
+  const [confirmTrashOpen, setConfirmTrashOpen] = React.useState(false);
+  // Signed URLs are re-issued on every render with a new token; reuse the one
+  // already loaded this session so the browser shows its cached image instead
+  // of downloading the photo again (see lib/photo-url-cache.ts).
   const [coverPhotos, setCoverPhotos] = React.useState<EntryPhoto[]>(() =>
-    initialPhotos.filter((p) => p.kind === "cover"),
+    initialPhotos
+      .filter((p) => p.kind === "cover")
+      .map((p) => ({ ...p, url: stablePhotoUrl(p.url) })),
   );
   const [uploadingCover, setUploadingCover] = React.useState(false);
   const [tasks, setTasks] = React.useState<TaskChecklistTask[]>(initialTasks);
@@ -164,7 +173,7 @@ export function EntryDetail({
       Object.fromEntries(
         initialPhotos
           .filter((p) => p.kind === "inline")
-          .map((p) => [p.id, p.url]),
+          .map((p) => [p.id, stablePhotoUrl(p.url)]),
       ),
     [initialPhotos],
   );
@@ -496,7 +505,7 @@ export function EntryDetail({
   /** "Add a picture": uploads an inline image; the editor inserts it at the cursor. */
   async function uploadInlineImage(file: File) {
     const form = new FormData();
-    form.set("image", file);
+    form.set("image", await prepareImageForUpload(file));
     form.set("kind", "inline");
     const res = await fetch(`/api/entries/${entryId}/photos`, {
       method: "POST",
@@ -512,7 +521,7 @@ export function EntryDetail({
     setUploadingCover(true);
     try {
       const form = new FormData();
-      form.set("image", file);
+      form.set("image", await prepareImageForUpload(file));
       form.set("kind", "cover");
       form.set("makeCover", "true");
       const res = await fetch(`/api/entries/${entryId}/photos`, {
@@ -521,7 +530,10 @@ export function EntryDetail({
       });
       if (!res.ok) throw new Error("Upload failed");
       const data = (await res.json()) as { photo: EntryPhoto };
-      setCoverPhotos((prev) => [data.photo, ...prev]);
+      // Also replaces the journal list's remembered thumbnail, so going back
+      // shows the new cover rather than the old one from memory.
+      const url = rememberEntryThumbnail(entryId, data.photo.url);
+      setCoverPhotos((prev) => [{ ...data.photo, url }, ...prev]);
       toast.success("Cover updated");
       router.refresh();
     } catch {
@@ -579,7 +591,7 @@ export function EntryDetail({
           </button>
           <button
             type="button"
-            onClick={handleTrash}
+            onClick={() => setConfirmTrashOpen(true)}
             disabled={trashing}
             aria-label="Move to Trash"
             className="text-muted-foreground hover:bg-secondary hover:text-destructive press flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
@@ -748,6 +760,13 @@ export function EntryDetail({
           onOpenChange={setTranscriptOpen}
         />
       )}
+      {/* Same confirmation as the list's swipe-to-trash: the header icon
+          used to trash the entry on a single tap. */}
+      <ConfirmTrashDialog
+        open={confirmTrashOpen}
+        onOpenChange={setConfirmTrashOpen}
+        onConfirm={() => void handleTrash()}
+      />
     </main>
   );
 }

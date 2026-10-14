@@ -11,6 +11,33 @@ rather than resolved.
 
 ---
 
+## 2026-10-14 — Fix slow photos client-side: reuse signed URLs, resize before upload
+
+**What happened:** Photos took 1-2s on every visit. Measured: each render
+re-signed the photo with a new token, so the browser never reused its cached
+copy, and the files were full-size originals (a 2.4MB PNG as a card cover).
+
+**Why:** The usual fixes are paid or don't fit. Supabase image
+transformations aren't on the free plan. `next/image` optimization would
+count every new signed URL as a new source image against Vercel Hobby's
+quota. Public buckets would give stable URLs but would expose private
+journal photos.
+
+**What was decided:**
+
+- Keep signing server-side, but reuse the first signed URL per Storage object
+  in the browser while it's valid (`lib/photo-url-cache.ts`). Kept in memory
+  only, not `localStorage`, so a usable photo URL never outlives the tab.
+  This covers moving in and out of entries (the reported case); a full page
+  reload still downloads once.
+- Resize new uploads in the browser to a 1600px longest edge, as WebP (JPEG
+  fallback). This is a deliberate quality trade: originals above 1600px are
+  no longer stored. 1600px covers the largest display size (desktop cover)
+  and 2x density on phone layouts.
+- Existing full-size photos are not backfilled (see docs/KNOWN-ISSUES.md).
+
+---
+
 ## 2026-10-13 (follow-up) — Journal activity heatmap replaces the date-picker, not a new dashboard element
 
 **What happened:** the brief described a "compact calendar preview within the
