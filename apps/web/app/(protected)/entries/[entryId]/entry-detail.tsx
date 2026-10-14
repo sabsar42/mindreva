@@ -33,6 +33,7 @@ import type {
 import { getDefaultArtworkWide } from "@/lib/default-artwork";
 import { prepareImageForUpload } from "@/lib/prepare-image-upload";
 import { rememberEntryThumbnail, stablePhotoUrl } from "@/lib/photo-url-cache";
+import { ConfirmTrashDialog } from "../../_components/confirm-trash-dialog";
 import { ShareSheet } from "./share-sheet";
 import { TranscriptSheet } from "./transcript-sheet";
 
@@ -148,6 +149,7 @@ export function EntryDetail({
   const [regenerating, setRegenerating] = React.useState(false);
   const [isArchived, setIsArchived] = React.useState(archived);
   const [trashing, setTrashing] = React.useState(false);
+  const [confirmTrashOpen, setConfirmTrashOpen] = React.useState(false);
   // Signed URLs are re-issued on every render with a new token; reuse the one
   // already loaded this session so the browser shows its cached image instead
   // of downloading the photo again (see lib/photo-url-cache.ts).
@@ -589,7 +591,7 @@ export function EntryDetail({
           </button>
           <button
             type="button"
-            onClick={handleTrash}
+            onClick={() => setConfirmTrashOpen(true)}
             disabled={trashing}
             aria-label="Move to Trash"
             className="text-muted-foreground hover:bg-secondary hover:text-destructive press flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
@@ -758,6 +760,13 @@ export function EntryDetail({
           onOpenChange={setTranscriptOpen}
         />
       )}
+      {/* Same confirmation as the list's swipe-to-trash: the header icon
+          used to trash the entry on a single tap. */}
+      <ConfirmTrashDialog
+        open={confirmTrashOpen}
+        onOpenChange={setConfirmTrashOpen}
+        onConfirm={() => void handleTrash()}
+      />
     </main>
   );
 }
