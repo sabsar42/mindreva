@@ -287,9 +287,15 @@ export async function addPhotoToEntry(
   const objectPath = `${user.id}/${entryId}/${crypto.randomUUID()}.${extensionFromMimeType(input.mimeType)}`;
 
   const supabase = await createClient();
+  // The object path is a fresh UUID and is never overwritten, so the browser
+  // may keep it for a year. Without this, Storage served photos with no
+  // cache-control at all, leaving the browser to guess and re-check.
   const { error: uploadError } = await supabase.storage
     .from("photos")
-    .upload(objectPath, input.image, { contentType: input.mimeType });
+    .upload(objectPath, input.image, {
+      contentType: input.mimeType,
+      cacheControl: "31536000",
+    });
   if (uploadError) {
     throw new Error(`Photo upload failed: ${uploadError.message}`);
   }

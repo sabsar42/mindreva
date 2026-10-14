@@ -14,6 +14,7 @@ import {
   type PhotoUploaderPhoto,
 } from "@mindreva/ui";
 import type { TranscriptStatus } from "@mindreva/database";
+import { prepareImageForUpload } from "@/lib/prepare-image-upload";
 
 interface TranscriptResponse {
   status: TranscriptStatus;
@@ -100,7 +101,7 @@ export function TranscriptReview({
       const results = await Promise.allSettled(
         files.map(async (file) => {
           const form = new FormData();
-          form.set("image", file);
+          form.set("image", await prepareImageForUpload(file));
           const res = await fetch(`/api/entries/${entryId}/photos`, {
             method: "POST",
             body: form,
