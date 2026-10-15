@@ -8,9 +8,10 @@ const SWIPE_THRESHOLD = 60;
 const LOCK_RATIO = 1.5;
 
 // Horizontal gestures that start here belong to the element itself (row
-// swipe actions, text selection/caret movement), not to tab switching.
+// swipe actions, horizontal scrollers, text selection/caret movement), not
+// to tab switching.
 const IGNORE_SELECTOR =
-  "[data-swipeable-row], input, textarea, select, [contenteditable='true'], [role='dialog']";
+  "[data-swipeable-row], [data-swipe-nav-ignore], input, textarea, select, [contenteditable='true'], [role='dialog']";
 
 export function SwipeNav({ children }: { children: React.ReactNode }) {
   const router = useRouter();

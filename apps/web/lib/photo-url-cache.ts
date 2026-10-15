@@ -84,6 +84,21 @@ export function knownEntryThumbnails(
  * shows the old one from memory. Returns the URL to render. */
 export function rememberEntryThumbnail(entryId: string, url: string): string {
   const stable = stablePhotoUrl(url);
-  if (typeof window !== "undefined") thumbnailByEntry.set(entryId, stable);
+  if (typeof window !== "undefined") {
+    thumbnailByEntry.set(entryId, stable);
+    entriesWithoutCover.delete(entryId);
+  }
   return stable;
+}
+
+// Entries known (this session) to have no cover, so a revisit can show the
+// default artwork immediately instead of a placeholder that then swaps.
+const entriesWithoutCover = new Set<string>();
+
+export function rememberNoCover(entryId: string): void {
+  if (typeof window !== "undefined") entriesWithoutCover.add(entryId);
+}
+
+export function isKnownWithoutCover(entryId: string): boolean {
+  return entriesWithoutCover.has(entryId);
 }

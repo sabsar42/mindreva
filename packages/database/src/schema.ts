@@ -333,6 +333,30 @@ export const entryShares = pgTable(
   ],
 );
 
+/**
+ * One row per user per calendar day they opened the app — the "visited"
+ * signal for the activity heatmap's lighter tier (the darker tier is an
+ * entry recorded that day, read from `entries` as before; this table adds
+ * nothing to that). Upserted on page load (insert-if-missing), so a day with
+ * many visits still costs one row. `day` is a plain date, not a timestamp:
+ * the heatmap only ever needs "did they open the app this calendar day",
+ * never a time-of-day.
+ */
+export const appLogins = pgTable(
+  "app_logins",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    day: date("day").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [unique("app_logins_user_day_unique").on(t.userId, t.day)],
+);
+
 export const entryShareRecipients = pgTable(
   "entry_share_recipients",
   {
@@ -372,6 +396,7 @@ export type NewChatMessage = typeof chatMessages.$inferInsert;
 export type EntryShare = typeof entryShares.$inferSelect;
 export type NewEntryShare = typeof entryShares.$inferInsert;
 export type EntryShareRecipient = typeof entryShareRecipients.$inferSelect;
+export type AppLogin = typeof appLogins.$inferSelect;
 export type MindmapCluster = typeof mindmapClusters.$inferSelect;
 export type NewMindmapCluster = typeof mindmapClusters.$inferInsert;
 export type MindmapClusterEntry = typeof mindmapClusterEntries.$inferSelect;

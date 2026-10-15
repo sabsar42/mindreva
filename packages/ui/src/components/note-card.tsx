@@ -11,6 +11,9 @@ export interface NoteCardProps extends React.ComponentProps<"div"> {
   /** First photo (by position) on the entry, if any. Omit rather than pass
    * a broken/empty src — the trailing thumbnail simply doesn't render. */
   thumbnailUrl?: string;
+  /** Cover not known yet: reserve the slot with a neutral tile rather than
+   * showing artwork that's about to be replaced. */
+  thumbnailPending?: boolean;
 }
 
 const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
@@ -22,6 +25,7 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
       durationLabel,
       snippet,
       thumbnailUrl,
+      thumbnailPending,
       onClick,
       ...props
     },
@@ -68,12 +72,23 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
           )}
         </div>
 
-        {thumbnailUrl && (
-          <img
-            src={thumbnailUrl}
-            alt=""
-            className="size-20 shrink-0 rounded-lg object-cover"
+        {thumbnailPending ? (
+          <div
+            aria-hidden
+            className="bg-secondary size-20 shrink-0 rounded-lg"
           />
+        ) : (
+          thumbnailUrl && (
+            <img
+              src={thumbnailUrl}
+              alt=""
+              width={80}
+              height={80}
+              loading="lazy"
+              decoding="async"
+              className="bg-secondary size-20 shrink-0 rounded-lg object-cover"
+            />
+          )
         )}
       </div>
     );

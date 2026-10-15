@@ -26,7 +26,7 @@ export function ArchiveList({
     null,
   );
   const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
-  const thumbnails = useEntryThumbnails(entryIds);
+  const { thumbnails, resolved } = useEntryThumbnails(entryIds);
   const hydrated = useHydrated();
 
   async function unarchive(id: string) {
@@ -81,6 +81,7 @@ export function ArchiveList({
                     : DATE_PLACEHOLDER
                 }
                 snippet={entry.snippet ?? undefined}
+                thumbnailPending={!resolved(entry.id)}
                 thumbnailUrl={
                   thumbnails[entry.id] ??
                   entry.thumbnailUrl ??

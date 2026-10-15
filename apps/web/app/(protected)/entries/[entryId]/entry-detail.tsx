@@ -31,7 +31,10 @@ import type {
   TranscriptStatus,
 } from "@mindreva/database";
 import { getDefaultArtworkWide } from "@/lib/default-artwork";
-import { prepareImageForUpload } from "@/lib/prepare-image-upload";
+import {
+  appendPhotoToForm,
+  prepareImageForUpload,
+} from "@/lib/prepare-image-upload";
 import { rememberEntryThumbnail, stablePhotoUrl } from "@/lib/photo-url-cache";
 import { ConfirmTrashDialog } from "../../_components/confirm-trash-dialog";
 import { ShareSheet } from "./share-sheet";
@@ -521,7 +524,7 @@ export function EntryDetail({
     setUploadingCover(true);
     try {
       const form = new FormData();
-      form.set("image", await prepareImageForUpload(file));
+      await appendPhotoToForm(form, file);
       form.set("kind", "cover");
       form.set("makeCover", "true");
       const res = await fetch(`/api/entries/${entryId}/photos`, {

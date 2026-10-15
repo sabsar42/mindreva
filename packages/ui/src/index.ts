@@ -119,6 +119,5 @@ export {
 export {
   JournalHeatmap,
   type HeatmapDay,
-  type HeatmapEntrySummary,
   type JournalHeatmapProps,
 } from "./components/journal-heatmap";

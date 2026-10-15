@@ -1,5 +1,9 @@
 import "server-only";
-import { EntriesRepository, type EntryType } from "@mindreva/database";
+import {
+  AppLoginsRepository,
+  EntriesRepository,
+  type EntryType,
+} from "@mindreva/database";
 import { getUser } from "@mindreva/auth/server";
 import {
   listMyEntries,
@@ -7,12 +11,15 @@ import {
 } from "./entries.service";
 
 /**
- * Activity-heatmap data: entry counts per calendar day, the four-level
- * intensity bucketing used by both the compact monthly grid and the
- * full-year grid, a reliable streak derived purely from those same counts,
- * and the inline per-day detail panel's entries. No new storage — this reads
- * `entries.entry_date`, the same column the old CalendarPicker's dots and
- * day-thumbnails already used.
+ * Activity-heatmap data: a two-tier "did you show up" signal per calendar
+ * day — visited (opened the app that day) and recorded (also wrote at least
+ * one entry that day) — used by both the compact monthly grid and the
+ * full-year grid, a reliable streak derived from the same data, and the
+ * inline per-day detail panel's entries.
+ *
+ * "Visited" is new storage (app_logins, one row per user per day). "Recorded"
+ * still reads `entries.entry_date`, the same column the old CalendarPicker's
+ * dots and day-thumbnails already used — no change there.
  */
 
 async function requireUserId(): Promise<string> {
@@ -21,33 +28,70 @@ async function requireUserId(): Promise<string> {
   return user.id;
 }
 
-/** 0 = no entries, 1-4 = increasing activity. Thresholds tuned for normal
- * journaling cadence (at most a handful of entries on a busy day), not
- * GitHub's commit-count scale. */
-export function levelForCount(count: number): 0 | 1 | 2 | 3 | 4 {
-  if (count <= 0) return 0;
-  if (count === 1) return 1;
-  if (count === 2) return 2;
-  if (count <= 4) return 3;
-  return 4;
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+/**
+ * Records today as a visited day for the current user, once per calendar
+ * day (insert-if-missing). Called once per navigation into the protected
+ * app shell via next/server's after() — fire-and-forget: a failure here
+ * never blocks or breaks a page render. The whole body is one try/catch,
+ * not just the repository write: during `next build`'s static-page-data
+ * probing pass, getUser() itself can throw (it reads cookies(), which isn't
+ * available outside a real request), and that throw happens inside the
+ * after() callback where Next only logs it — so an unguarded getUser() call
+ * here would print a build-time error on every route for no reason.
+ */
+export async function recordMyVisit(): Promise<void> {
+  try {
+    const user = await getUser();
+    if (!user) return;
+    await AppLoginsRepository.recordVisit(user.id, todayKey());
+  } catch {
+    // Non-fatal: at worst, today's cell falls back to "not visited" until
+    // the next successful call records it.
+  }
+}
+
+/** 0 = no activity, 1 = opened the app only, 2-4 = also recorded (1, 2,
+ * 3+ entries). Showing up always counts; recording reads as a deeper shade
+ * of the same colour rather than a separate scale. */
+export type DayLevel = 0 | 1 | 2 | 3 | 4;
 
 export interface DayCount {
   /** "YYYY-MM-DD" */
   date: string;
+  /** Entries recorded that day (0 if only visited, never recorded). */
   count: number;
-  level: 0 | 1 | 2 | 3 | 4;
+  visited: boolean;
+  level: DayLevel;
 }
 
-function toDayCounts(
-  rows: { entryDate: string; count: number }[],
+function levelFor(visited: boolean, count: number): DayLevel {
+  if (count >= 3) return 4;
+  if (count === 2) return 3;
+  if (count === 1) return 2;
+  if (visited) return 1;
+  return 0;
+}
+
+function mergeDayData(
+  visitedDays: string[],
+  entryCounts: { entryDate: string; count: number }[],
 ): Record<string, DayCount> {
   const out: Record<string, DayCount> = {};
-  for (const r of rows) {
+  for (const day of visitedDays) {
+    out[day] = { date: day, count: 0, visited: true, level: 1 };
+  }
+  for (const r of entryCounts) {
+    const existing = out[r.entryDate];
     out[r.entryDate] = {
       date: r.entryDate,
       count: r.count,
-      level: levelForCount(r.count),
+      visited: existing?.visited ?? true,
+      level: levelFor(existing?.visited ?? true, r.count),
     };
   }
   return out;
@@ -63,12 +107,11 @@ export async function getMyMonthHeatmap(
   const dateFrom = `${month}-01`;
   const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last day of this one
   const dateTo = `${month}-${String(lastDay).padStart(2, "0")}`;
-  const rows = await EntriesRepository.countsByDateForUser(userId, {
-    type,
-    dateFrom,
-    dateTo,
-  });
-  return toDayCounts(rows);
+  const [visitedDays, entryCounts] = await Promise.all([
+    AppLoginsRepository.listDaysForUser(userId, dateFrom, dateTo),
+    EntriesRepository.countsByDateForUser(userId, { type, dateFrom, dateTo }),
+  ]);
+  return mergeDayData(visitedDays, entryCounts);
 }
 
 export interface YearHeatmap {
@@ -82,11 +125,6 @@ export interface YearHeatmap {
   currentStreak: number;
 }
 
-function todayKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function addDays(dateKey: string, delta: number): string {
   const [y, m, d] = dateKey.split("-").map(Number) as [number, number, number];
   const date = new Date(y, m - 1, d + delta);
@@ -94,8 +132,10 @@ function addDays(dateKey: string, delta: number): string {
 }
 
 /** Walks backward day by day from today (or yesterday, if today has nothing
- * yet) counting consecutive journaled days. Purely derived from the same
- * day-count data the grid renders — nothing stored, nothing invented. */
+ * yet) counting consecutive visited days — opening the app keeps a streak
+ * alive, same as recording does, since every visit is a contribution.
+ * Purely derived from the same day data the grid renders — nothing stored,
+ * nothing invented. */
 function computeStreak(days: Record<string, DayCount>): number {
   let cursor = todayKey();
   if (!days[cursor]) {
@@ -110,27 +150,29 @@ function computeStreak(days: Record<string, DayCount>): number {
   return streak;
 }
 
-/** The whole year's day-counts, for the expanded full-year grid. */
+/** The whole year's day data, for the expanded full-year grid. */
 export async function getMyYearHeatmap(
   year: number,
   type?: EntryType,
 ): Promise<YearHeatmap> {
   const userId = await requireUserId();
-  const rows = await EntriesRepository.countsByDateForUser(userId, {
-    type,
-    dateFrom: `${year}-01-01`,
-    dateTo: `${year}-12-31`,
-  });
-  const days = toDayCounts(rows);
-  const totalEntries = rows.reduce((n, r) => n + r.count, 0);
+  const dateFrom = `${year}-01-01`;
+  const dateTo = `${year}-12-31`;
+  const [visitedDays, entryCounts] = await Promise.all([
+    AppLoginsRepository.listDaysForUser(userId, dateFrom, dateTo),
+    EntriesRepository.countsByDateForUser(userId, { type, dateFrom, dateTo }),
+  ]);
+  const days = mergeDayData(visitedDays, entryCounts);
+  const totalEntries = entryCounts.reduce((n, r) => n + r.count, 0);
+  const totalDaysJournaled = entryCounts.length;
 
   return {
     year,
     days,
-    totalDaysJournaled: rows.length,
+    totalDaysJournaled,
     totalEntries,
     // A streak is only meaningful against the CURRENT year's trailing edge;
-    // a past year's grid still shows its own counts but doesn't claim a
+    // a past year's grid still shows its own data but doesn't claim a
     // "current streak" that isn't about now.
     currentStreak: year === new Date().getFullYear() ? computeStreak(days) : 0,
   };

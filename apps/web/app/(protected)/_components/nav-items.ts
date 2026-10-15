@@ -1,4 +1,4 @@
-import { Hourglass, Puzzle, type LucideIcon } from "lucide-react";
+import { History, Plug, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -13,8 +13,8 @@ export interface NavItem {
  * being a destination of its own.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/chat", label: "Re-live Me", Icon: Hourglass },
-  { href: "/integrations", label: "Integrations", Icon: Puzzle },
+  { href: "/chat", label: "Re-live Me", Icon: History },
+  { href: "/integrations", label: "Integrations", Icon: Plug },
 ];
 
 export function isActivePath(pathname: string, href: string): boolean {

@@ -134,14 +134,37 @@ export async function getMyEntryThumbnails(
     entryId,
     ...photo,
   }));
-  const signed = await signPhotoUrls(rows);
-  const urlById = new Map(signed.map((s) => [s.id, s.url]));
+
+  // Prefer the small list thumbnail; photos uploaded before thumbnails
+  // existed have none and fall back to the full photo. Both are signed in
+  // parallel so the fallback costs no extra round trip.
+  const supabase = await createClient();
+  const [{ data: thumbs }, full] = await Promise.all([
+    supabase.storage.from("photos").createSignedUrls(
+      rows.map((r) => thumbnailPathFor(r.storagePath)),
+      PHOTO_SIGNED_URL_EXPIRY_SECONDS,
+    ),
+    signPhotoUrls(rows),
+  ]);
+  const thumbByPath = new Map(
+    (thumbs ?? [])
+      .filter((t) => !t.error && t.signedUrl)
+      .map((t) => [t.path, t.signedUrl]),
+  );
+  const fullById = new Map(full.map((s) => [s.id, s.url]));
   const result: Record<string, string> = {};
   for (const r of rows) {
-    const url = urlById.get(r.id);
+    const url =
+      thumbByPath.get(thumbnailPathFor(r.storagePath)) ?? fullById.get(r.id);
     if (url) result[r.entryId] = url;
   }
   return result;
+}
+
+/** Where a photo's list thumbnail lives: next to it, same owner folder, so
+ * the existing per-user Storage policies cover it unchanged. */
+function thumbnailPathFor(storagePath: string): string {
+  return `${storagePath}.thumb`;
 }
 
 export async function listMyArchivedEntries(
@@ -279,6 +302,8 @@ export async function addPhotoToEntry(
     kind?: EntryPhotoKind;
     /** For kind 'cover': make this the entry's cover (Change cover image). */
     makeCover?: boolean;
+    /** Small copy for list thumbnails, stored at thumbnailPathFor(path). */
+    thumbnail?: { image: Buffer; mimeType: string };
   },
 ): Promise<EntryPhotoWithUrl> {
   const user = await getUser();
@@ -290,14 +315,26 @@ export async function addPhotoToEntry(
   // The object path is a fresh UUID and is never overwritten, so the browser
   // may keep it for a year. Without this, Storage served photos with no
   // cache-control at all, leaving the browser to guess and re-check.
-  const { error: uploadError } = await supabase.storage
-    .from("photos")
-    .upload(objectPath, input.image, {
+  const [{ error: uploadError }, thumbResult] = await Promise.all([
+    supabase.storage.from("photos").upload(objectPath, input.image, {
       contentType: input.mimeType,
       cacheControl: "31536000",
-    });
+    }),
+    input.thumbnail
+      ? supabase.storage
+          .from("photos")
+          .upload(thumbnailPathFor(objectPath), input.thumbnail.image, {
+            contentType: input.thumbnail.mimeType,
+            cacheControl: "31536000",
+          })
+      : null,
+  ]);
   if (uploadError) {
     throw new Error(`Photo upload failed: ${uploadError.message}`);
+  }
+  if (thumbResult?.error) {
+    // Non-fatal: list cards fall back to the full photo.
+    console.error("Thumbnail upload failed:", thumbResult.error.message);
   }
 
   const photo = await EntryPhotosRepository.create({

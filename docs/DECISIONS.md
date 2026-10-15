@@ -11,6 +11,59 @@ rather than resolved.
 
 ---
 
+## 2026-10-16 — List thumbnails: client-made WebP copies, not format conversion
+
+**What happened:** The owner asked to make all images WebP and lazy-load
+them. Measuring showed new uploads were already WebP (since 2026-10-14) and
+the default artwork is ~1 KB SVG, smaller than any WebP would be. The real
+waste was list cards downloading the full (up to 1600px) cover to show an
+80px square.
+
+**Why:** Supabase image transformations aren't on the free plan, and
+`next/image` optimisation would count every signed URL against Vercel Hobby's
+quota.
+
+**What was decided:** The browser makes a 240px thumbnail alongside the
+resized photo; the server stores it at `<photo path>.thumb` (same per-user
+folder, so the existing Storage policies apply). The thumbnails API signs
+thumbnails and full photos in parallel and prefers the thumbnail. Older photos
+have no thumbnail and keep loading full size. Lazy loading was added to list
+images. Also decided: the activity-card year cache is module-level for the
+session but is cleared when the signed-in user changes, because sign-out is a
+client-side redirect, not a page reload.
+
+---
+
+## 2026-10-16 — Journal hero: activity card on top, record bar in the search slot, recording inline
+
+**What happened:** The owner asked for the activity heatmap at the top of
+Journal and the record control in place of the search box, with recording
+starting on tap. A first attempt grew the heatmap into a bigger section and
+later merged it into the record pill; both were rejected, and the work was
+redone from master against two reference screenshots.
+
+**Why:** The heatmap should occupy the old hero slot, not add height. Recording
+should not leave the screen or stop at a review step.
+
+**What was decided:**
+
+- Heatmap is a standalone, always-visible year card; the record bar is a
+  separate pill below it. Search moved to an icon beside the list heading;
+  the All/Today/Date filter row was removed.
+- Opening the app counts as activity (new `app_logins` table). Levels 1-4 =
+  visited, then 1/2/3+ recordings, so recording deepens the same colour.
+- Muted amber, not mint, because mint is reserved for actions. The ramp is a
+  pair of CSS variables (`--heat-1..4`) that brighten in dark mode; a single
+  fixed amber scale made the palest "visited" cell the brightest thing on a
+  dark background.
+- Recording runs inline via a shared `useVoiceRecorder` hook, so `/record`
+  and the Journal bar use one MediaRecorder implementation. The pill keeps
+  the same height in both states so the list never jumps. Tapping the
+  waveform pauses; a discard button is included so an accidental tap doesn't
+  create an entry.
+
+---
+
 ## 2026-10-14 — Fix slow photos client-side: reuse signed URLs, resize before upload
 
 **What happened:** Photos took 1-2s on every visit. Measured: each render

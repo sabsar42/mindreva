@@ -195,6 +195,22 @@
     0 2px 4px rgb(0 0 0 / 0.25), 0 18px 40px -16px rgb(0 0 0 / 0.6);
 }
 
+/* Activity-heatmap ramp (muted amber). Light mode deepens toward brown; dark
+   mode brightens instead, so "more" always reads as the strongest cell
+   against its own background rather than the palest one glowing. */
+:root {
+  --heat-1: #f3ddc0;
+  --heat-2: #e8c091;
+  --heat-3: #c47f3d;
+  --heat-4: #7e4d23;
+}
+.dark {
+  --heat-1: #45301f;
+  --heat-2: #74492a;
+  --heat-3: #b0723b;
+  --heat-4: #e6ad74;
+}
+
 /**
  * Expose the semantic vars to Tailwind as utilities (bg-background,
  * text-foreground, border-border, ring-ring, bg-primary, bg-accent…).
@@ -221,6 +237,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
 }
 
 @keyframes fade-in {
@@ -377,6 +397,41 @@
   &:active {
     transform: scale(0.97);
   }
+}
+
+/* The year activity grid's horizontal scroll area: a real, always-visible
+   track + thumb rather than the invisible-until-hover browser default, which
+   on first glance reads as an inert, "nothing to see here" strip rather than
+   something you can drag. Thin and quiet, not a full-size scrollbar. */
+.heatmap-year-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(
+      in oklab,
+      var(--color-muted-foreground) 22%,
+      transparent
+    )
+    transparent;
+}
+.heatmap-year-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.heatmap-year-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.heatmap-year-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(
+    in oklab,
+    var(--color-muted-foreground) 22%,
+    transparent
+  );
+  border-radius: 999px;
+}
+.heatmap-year-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(
+    in oklab,
+    var(--color-muted-foreground) 38%,
+    transparent
+  );
 }
 
 /* Honor the OS "reduce motion" setting everywhere: every animation and

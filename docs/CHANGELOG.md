@@ -7,6 +7,86 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-16 — Performance and flicker pass
+
+Measured on a production build with 4x CPU throttling and a ~9 Mbps / 60 ms
+network, before and after.
+
+### Fixed
+
+- **Activity card lag.** Each render formatted 365 dates with
+  `toLocaleDateString` and every hover re-rendered the whole grid. Now one
+  shared `Intl.DateTimeFormat` builds labels once per year, the grid is
+  memoized, and a single delegated listener replaces per-cell handlers.
+  Journal long tasks 1,105 ms → ~280 ms; CPU busy on load 1,351 → 654 ms;
+  hover 16 ms/frame.
+- **Activity card skeleton flash.** The current year is now loaded on the
+  server with the entry list (seen in 5/40 first-paint samples before, 0/40
+  after).
+- **Year switching.** Years are cached for the session (per signed-in user)
+  and the previous year is prefetched; a switch is ~100 ms with no skeleton.
+  An uncached year keeps the old grid up, dimmed. Navigation now reaches next
+  year (e.g. 2027), which renders empty without a request.
+- **Thumbnail swap flicker.** Cards showed default artwork, then swapped to
+  the real photo ~0.5 s later. Cards now show a neutral tile until the cover
+  is known, and remember "no cover" for the session. Images use
+  `loading="lazy"` + `decoding="async"` with fixed dimensions.
+- **List thumbnails were full-size photos.** Cover uploads now also store a
+  240px WebP (JPEG on Safari) at `<photo path>.thumb`; the thumbnails API
+  serves it, falling back to the full photo for older uploads (both signed in
+  parallel, no extra round trip). No schema change.
+- **Swiping the activity card switched tabs** (Journal → Re-live Me). Its
+  scroller is now excluded from the swipe-nav gesture.
+- **Leaving Journal mid-recording dropped the audio.** Unmounting now stops
+  and saves the take; Discard still discards.
+- **Stopping while paused overstated duration** by the paused time.
+
+### Verified
+
+Before/after sweep of every screen, a CPU profile of Journal, and targeted
+checks for each fix above, on a seeded throwaway account (deleted with its
+Storage objects afterwards). typecheck / lint / test (80) / build green.
+
+## 2026-10-16 — Journal hero: activity card + inline record bar
+
+Phase 6.12 (unplanned; see docs/roadmap.md and docs/DECISIONS.md
+2026-10-16). Rebuilt from master after an earlier attempt on the same branch
+was rejected.
+
+### Changed
+
+- **Hero is now two pieces:** an always-visible "Your activity" card (full
+  year, year arrows, month labels, a visible scrollbar, status line + Less/More
+  legend) where the big "Start recording" card was, and a pill-shaped record
+  bar where the search box was.
+- **Inline recording.** Tapping the record bar starts recording in place: the
+  pill keeps its exact 72px size and turns into red dot + live waveform (tap
+  to pause) + discard + timer + Stop. No navigation to `/record`, no review
+  screen. Stop uploads and transcription runs in the background as before; the
+  list and heatmap refresh when it lands. Mic-blocked and upload-failed states
+  have inline Retry.
+- **Heatmap counts showing up.** New `app_logins` table (RLS, one row per user
+  per day, migrations 0013/0014) written via `after()` on every protected page
+  load. Levels: 0 nothing, 1 opened the app, 2/3/4 = 1/2/3+ recordings.
+  Colours are a muted amber `--heat-1..4` ramp (deepens in light mode,
+  brightens in dark mode). Status line shows the current streak, or the tapped
+  day's activity.
+- Filter row (All/Today/Date) and its date sheet removed; search is an icon
+  next to the list heading.
+- Icons: Re-live Me `Hourglass` → `History`, Integrations `Puzzle` → `Plug`.
+- `useVoiceRecorder` hook (`apps/web/lib/use-voice-recorder.ts`) holds the
+  MediaRecorder lifecycle; `/record` still works as a deep-link on top of it.
+- Light mode is the default again; dark applies only when chosen explicitly
+  (the OS setting is ignored). This earlier fix had not reached master.
+
+### Verified
+
+Headless Edge, 390px, light and dark, seeded throwaway account (fake media
+stream): all five levels render, streak and day status correct, record →
+pause → resume → discard saves nothing, record → stop saves one entry, never
+leaves `/journal`, no console errors. Account deleted, cascade confirmed (0
+rows left). typecheck / lint / test (80) / build green; `/journal` 186kB.
+
 ## 2026-10-14 — UI fix pass: header spacing, dark-mode heatmap digits, bold+italic, photo loading, trash confirmation
 
 Five issues reported against the deployed app.

@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import { getMyProfile } from "@/lib/services/profile.service";
+import { recordMyVisit } from "@/lib/services/heatmap.service";
 import { AppShell } from "./_components/app-shell";
 import type { AccountSummary } from "./_components/account-context";
 
@@ -29,5 +31,14 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Records today's visit for the activity heatmap's "visited" tier. Run
+  // after the response is sent (next/server's after()) so a slow or failed
+  // write never delays or breaks the page it rides in on — same pattern used
+  // for the background mindmap recompute and auto-summarize in
+  // entries.service.ts. Every protected-layout render is one page view, so
+  // this fires once per navigation; the (user_id, day) unique constraint
+  // makes repeats within the same day free no-ops.
+  after(() => recordMyVisit());
+
   return <AppShell account={loadAccount()}>{children}</AppShell>;
 }

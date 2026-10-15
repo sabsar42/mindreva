@@ -24,7 +24,7 @@ export function TrashList({
   const router = useRouter();
   const [entries, setEntries] = React.useState(initial);
   const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
-  const thumbnails = useEntryThumbnails(entryIds);
+  const { thumbnails, resolved } = useEntryThumbnails(entryIds);
   const hydrated = useHydrated();
 
   async function restore(id: string) {
@@ -69,6 +69,7 @@ export function TrashList({
                   : DATE_PLACEHOLDER
               }
               snippet={entry.snippet ?? undefined}
+              thumbnailPending={!resolved(entry.id)}
               thumbnailUrl={
                 thumbnails[entry.id] ??
                 entry.thumbnailUrl ??

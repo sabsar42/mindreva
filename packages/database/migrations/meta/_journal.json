@@ -92,6 +92,20 @@
       "when": 1791896732863,
       "tag": "0012_chat_sessions_soft_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792072293005,
+      "tag": "0013_app_logins",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792072400000,
+      "tag": "0014_app_logins_rls",
+      "breakpoints": true
     }
   ]
 }

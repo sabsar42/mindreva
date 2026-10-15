@@ -5,6 +5,7 @@ import { addPhotoToEntry } from "@/lib/services/entries.service";
 // Generous client-side cap for a single photo; the "recordings" route uses the
 // same pattern to guard against a modified client pushing an oversized upload.
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_THUMBNAIL_BYTES = 512 * 1024;
 
 export async function POST(
   request: Request,
@@ -36,6 +37,16 @@ export async function POST(
   const kind = form.get("kind") === "inline" ? "inline" : "cover";
   const makeCover = form.get("makeCover") === "true";
 
+  // Optional small copy for list thumbnails; ignored if missing or suspicious.
+  const thumb = form.get("thumbnail");
+  const thumbnail =
+    thumb instanceof File &&
+    thumb.size > 0 &&
+    thumb.size <= MAX_THUMBNAIL_BYTES &&
+    (thumb.type === "image/webp" || thumb.type === "image/jpeg")
+      ? { image: Buffer.from(await thumb.arrayBuffer()), mimeType: thumb.type }
+      : undefined;
+
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const photo = await addPhotoToEntry(entryId, {
@@ -43,6 +54,7 @@ export async function POST(
       mimeType: file.type || "image/jpeg",
       kind,
       makeCover,
+      thumbnail: kind === "cover" ? thumbnail : undefined,
     });
     return NextResponse.json({ photo }, { status: 201 });
   } catch (err) {

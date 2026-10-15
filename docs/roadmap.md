@@ -32,6 +32,7 @@ Last updated: July 23, 2026 (revised after founder-supplied reference screens, s
 | 6     | "Chat with past self" RAG persona engine     | P1       | 5-7 days                     | Phase 5                           |
 | 6.5   | Photo attachments for entries                | P2       | 1-2 days                     | Phase 5                           |
 | 6.6   | Rich text editing & task extraction          | P2       | 1-2 days                     | Phase 5                           |
+| 6.12  | Journal hero: activity card + inline record  | P2       | 1-2 days                     | Phase 6.11, Phase 4               |
 | 7     | CI/CD & free-tier deployment                 | P0       | 2-3 days                     | Phase 2 (can run parallel to 3-6) |
 | 8     | PWA + Capacitor mobile wrapper -> Play Store | P1       | 5-8 days                     | Phase 7                           |
 | 9     | Scaling, observability & migration playbook  | P2       | 1-2 days setup, then ongoing | Phase 7                           |
@@ -1457,6 +1458,34 @@ apps/web/
 - **A wide horizontally-scrolling grid needs an explicit initial scroll position.** A 52+-column year grid defaults to showing its first column (January); without auto-scrolling to the relevant month, real data can be computed correctly and still look completely empty on screen — confirmed via a direct DOM/computed-style check, not just a screenshot, when this happened.
 - **Check that a custom Tailwind color scale actually generates utility classes** (`bg-mint-600`) before assuming you need `style={{ background: "var(--color-mint-600)" }}` instead — this project's `@theme` block does generate them.
 - **A streak must never claim to be "current" for a past year.** Compute it only against the current year's trailing edge.
+
+---
+
+## Phase 6.12: Journal Hero — Activity Card + Inline Record Bar
+
+**Objective:** put an always-visible, gamified activity card at the top of Journal and turn the search slot into a record bar that records in place. Unplanned addition; judgment calls in docs/DECISIONS.md (2026-10-16).
+
+**Priority:** P2
+**Dependencies:** Phase 6.11 (heatmap), Phase 4 (voice capture)
+
+### Checklist
+
+- [x] `app_logins` table + RLS (migrations 0013/0014), `AppLoginsRepository`, `recordMyVisit()` via `after()` in the protected layout
+- [x] Day levels: 0 none, 1 visited, 2/3/4 = 1/2/3+ recordings; streak counts visited days
+- [x] `JournalHeatmap` as a standalone year card with a visible scrollbar, status line and legend, on a `--heat-1..4` amber ramp with a dark-mode variant
+- [x] `useVoiceRecorder` hook shared by `/record` and the new `InlineRecorder`
+- [x] Inline recorder: same-size pill, waveform (tap to pause), discard, timer, Stop; mic-blocked and upload-failed retry states
+- [x] Filter row removed, search behind an icon; History / Plug icons
+- [x] Perf/flicker pass: server-rendered current year, session year cache with prefetch, memoized grid, neutral thumbnail tiles, 240px `.thumb` copies for list covers, swipe-nav exclusion, save-on-leave while recording
+
+### Common mistakes
+
+- **Wrap the whole `after()` callback body in try/catch.** `getUser()` reads `cookies()`, which throws during `next build`'s static probe; inside `after()` that only logs, but it logs on every route.
+- **A colour ramp that is fixed hex in both themes can invert in dark mode.** The palest step becomes the brightest cell. Define the ramp as theme variables.
+- **Keep a control the same size across its states** when content sits below it, or the list jumps every time recording starts and stops.
+- **Never call `toLocaleDateString` per cell in a 365-cell grid**, and don't let hover state re-render the grid. Build labels once per year with one `Intl.DateTimeFormat`, memoize the grid, and use one delegated listener. Measured: this was ~70% of Journal's main-thread time on a throttled CPU.
+- **List thumbnails must not load full photos.** Cover uploads store a small copy at `<photo path>.thumb`; any future photo-deletion code must delete that object too.
+- **A module-level client cache outlives sign-out** (it's a client-side redirect, not a reload). Key or clear it by the signed-in user.
 
 ---
 

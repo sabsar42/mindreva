@@ -24,6 +24,31 @@ from the entry page.
 
 ---
 
+## Privacy, Terms, Support and "Delete account" links are dead (404)
+
+**Status:** Open — needs owner input.
+
+The sign-in/sign-up footer and the Account page link to `/privacy`,
+`/terms` and `/support`, none of which exist; "Delete account" also points to
+`/support`. Needs real policy text and a support contact (not something to
+generate), or the links should be hidden until those exist.
+
+## Older photos still load full size in lists
+
+Thumbnails (`<photo path>.thumb`) only exist for covers uploaded after
+2026-10-16. A one-off backfill (download, resize, upload `.thumb`) would
+cover the rest; see also "Photos uploaded before 2026-10-14" below.
+
+## Journal hero (activity card + inline recorder): open items
+
+**Inline recorder only tested with a fake media stream** in headless Edge,
+not a real microphone, a real permission prompt, or a phone browser (iOS
+Safari's MediaRecorder support is the main risk).
+
+**Visits are recorded per server-local calendar day**, not the user's
+timezone, same as `entry_date` elsewhere. Near midnight a visit can land on
+the neighbouring day.
+
 ## Journal activity heatmap: open items
 
 **No lazy loading.** `CalendarPicker` was previously deferred behind

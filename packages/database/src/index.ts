@@ -25,6 +25,7 @@ export {
   type MatchedEntry,
 } from "./repositories/embeddings.repository";
 export { ChatRepository } from "./repositories/chat.repository";
+export { AppLoginsRepository } from "./repositories/app-logins.repository";
 export {
   MindmapRepository,
   membershipKey,
@@ -67,6 +68,7 @@ export type {
   EntryShare,
   NewEntryShare,
   EntryShareRecipient,
+  AppLogin,
   MindmapCluster,
   NewMindmapCluster,
   MindmapClusterEntry,
