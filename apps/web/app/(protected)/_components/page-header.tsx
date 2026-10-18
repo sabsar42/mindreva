@@ -3,7 +3,7 @@
 import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { cn } from "@mindreva/ui";
+import { buttonVariants, cn } from "@mindreva/ui";
 import { PrefetchLink } from "./prefetch-link";
 
 interface PageHeaderProps {
@@ -25,13 +25,15 @@ export function PageHeader({
 }: PageHeaderProps) {
   const router = useRouter();
 
-  const backBtnClass =
-    "text-foreground hover:bg-secondary -ml-2 rounded-full p-2 transition-colors";
+  const backBtnClass = cn(
+    buttonVariants({ variant: "ghost", size: "icon" }),
+    "-ml-2",
+  );
 
   const backEl =
     typeof back === "string" ? (
       <PrefetchLink href={back} aria-label="Back" className={backBtnClass}>
-        <ArrowLeft className="size-5" />
+        <ArrowLeft />
       </PrefetchLink>
     ) : (
       <button
@@ -40,7 +42,7 @@ export function PageHeader({
         onClick={typeof back === "function" ? back : () => router.back()}
         className={backBtnClass}
       >
-        <ArrowLeft className="size-5" />
+        <ArrowLeft />
       </button>
     );
 

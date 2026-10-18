@@ -1476,6 +1476,7 @@ apps/web/
 - [x] `useVoiceRecorder` hook shared by `/record` and the new `InlineRecorder`
 - [x] Inline recorder: same-size pill, waveform (tap to pause), discard, timer, Stop; mic-blocked and upload-failed retry states
 - [x] Filter row removed, search behind an icon; History / Plug icons
+- [x] Mori companion (7 moods, tap bubble, long-press sheet, quiet mode), week strip + full-graph sheet, memory cards that form on screen (transcribing -> shaping -> settled, failures handled), dead `/record` + review + watcher + old RecordButton removed
 - [x] Perf/flicker pass: server-rendered current year, session year cache with prefetch, memoized grid, neutral thumbnail tiles, 240px `.thumb` copies for list covers, swipe-nav exclusion, save-on-leave while recording
 
 ### Common mistakes
@@ -1485,6 +1486,9 @@ apps/web/
 - **Keep a control the same size across its states** when content sits below it, or the list jumps every time recording starts and stops.
 - **Never call `toLocaleDateString` per cell in a 365-cell grid**, and don't let hover state re-render the grid. Build labels once per year with one `Intl.DateTimeFormat`, memoize the grid, and use one delegated listener. Measured: this was ~70% of Journal's main-thread time on a throttled CPU.
 - **List thumbnails must not load full photos.** Cover uploads store a small copy at `<photo path>.thumb`; any future photo-deletion code must delete that object too.
+- **Anything that must keep working while the user navigates (a memory forming) belongs in a module-level store, not component state.** Reset it when the signed-in user changes.
+- **Don't build a status UI from timers.** The forming card advances only on real results (transcript done, summary done); a failure turns it neutral, never leaves it green.
+- **Don't hand-style a button.** Use `Button` / `buttonVariants` (role = variant, size = scale in `button-variants.tsx`). A new look for a button is a new variant there, so it shows up the same on every page and in both themes.
 - **A module-level client cache outlives sign-out** (it's a client-side redirect, not a reload). Key or clear it by the signed-in user.
 
 ---

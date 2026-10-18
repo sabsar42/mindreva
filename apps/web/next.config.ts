@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
     //
     // 30s is a deliberate tradeoff: every mutation that needs fresh data
     // already calls router.refresh() explicitly (archive/trash/restore,
-    // transcription-watcher — see those call sites), which bypasses this
+    // a memory finishing forming — see those call sites), which bypasses this
     // cache regardless of its duration. So the only thing this affects is
     // pure back/forward navigation with no mutation involved, which is
     // exactly the case that should be instant.

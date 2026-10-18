@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { toast, type RecordButtonState } from "@mindreva/ui";
-import { queueTranscriptionWatch } from "@/lib/transcription-watch";
+import { toast } from "@mindreva/ui";
 import type { EntryType } from "@mindreva/database";
+
+export type RecorderState =
+  "idle" | "preparing" | "recording" | "paused" | "processing";
 
 const SOFT_WARNING_MS = 5 * 60 * 1000;
 const HARD_STOP_MS = 10 * 60 * 1000;
@@ -42,9 +44,10 @@ export function useVoiceRecorder({
   onDone,
 }: {
   entryType: EntryType;
-  onDone: (entryId: string) => void;
+  /** The audio is uploaded and the entry exists. */
+  onDone: (entryId: string, durationMs: number) => void;
 }) {
-  const [state, setState] = React.useState<RecordButtonState>("idle");
+  const [state, setState] = React.useState<RecorderState>("idle");
   const [elapsedMs, setElapsedMs] = React.useState(0);
   const [amplitudes, setAmplitudes] = React.useState<number[]>(() =>
     new Array(WAVEFORM_BARS).fill(0.1),
@@ -156,11 +159,9 @@ export function useVoiceRecorder({
         if (!res.ok) throw new Error("Upload failed");
         const data = (await res.json()) as { entryId: string };
         setUploadFailed(false);
-        queueTranscriptionWatch(data.entryId);
-        toast.success("Recording saved. Transcribing in the background…");
         setState("idle");
         setElapsedMs(0);
-        onDone(data.entryId);
+        onDone(data.entryId, durationMs);
       } catch {
         setUploadFailed(true);
         toast.error("Couldn't upload your recording. You can retry below.");

@@ -7,11 +7,7 @@ import { AccountProvider, type AccountSummary } from "./account-context";
 
 // Flows with their own exit (Cancel/Back/Save). They don't prefetch the tabs,
 // so the work they're doing isn't competing with background requests.
-const FOCUSED_ROUTES = [
-  /^\/record(\/|$)/,
-  /^\/entries\/[^/]+\/review(\/|$)/,
-  /^\/chat\/[^/]+/,
-];
+const FOCUSED_ROUTES = [/^\/chat\/[^/]+/];
 
 // Tabs fully prefetched as soon as a tab screen is showing, so tapping one
 // renders from the Router Cache instead of waiting ~450ms on the server

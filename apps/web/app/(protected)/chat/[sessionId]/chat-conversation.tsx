@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Send } from "lucide-react";
-import { Button, Input, cn, toast } from "@mindreva/ui";
+import { Button, Input, buttonVariants, cn, toast } from "@mindreva/ui";
 // Imported via the direct subpath, NOT the "@mindreva/llm" barrel: the barrel
 // re-exports getLLMProvider, which pulls the Anthropic/Google/Groq SDKs into
 // whatever bundle imports it. This is a client component, so that would ship
@@ -217,9 +217,12 @@ export function ChatConversation({
             }
           }}
           aria-label="Back"
-          className="text-foreground hover:bg-secondary press -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full"
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "-ml-2",
+          )}
         >
-          <ArrowLeft className="size-5" />
+          <ArrowLeft />
         </button>
         <div>
           <h1 className="text-foreground text-2xl font-bold leading-none tracking-tight">
@@ -333,7 +336,7 @@ export function ChatConversation({
           aria-label="Send"
           variant="primary"
         >
-          <Send className="size-4" />
+          <Send />
         </Button>
       </div>
     </main>

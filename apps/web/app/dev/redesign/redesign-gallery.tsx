@@ -2,13 +2,7 @@
 
 import * as React from "react";
 import { FileText, Search } from "lucide-react";
-import {
-  Button,
-  IconTile,
-  NoteCard,
-  ProcessingSteps,
-  RecordButton,
-} from "@mindreva/ui";
+import { Button, IconTile, NoteCard } from "@mindreva/ui";
 import { EmptyState } from "../../(protected)/_components/empty-state";
 import { ThemeSwitchRow } from "../../(protected)/_components/theme-switch-row";
 import { IntegrationCard } from "../../(protected)/integrations/integration-card";
@@ -257,23 +251,6 @@ export function RedesignGallery() {
         />
       </Section>
 
-      <Section title="Processing steps">
-        <div className="space-y-6">
-          <ProcessingSteps
-            steps={["Saved", "Queued", "Transcribing", "Ready"]}
-            current={1}
-          />
-          <ProcessingSteps
-            steps={["Saved", "Queued", "Transcribing", "Ready"]}
-            current={2}
-          />
-          <ProcessingSteps
-            steps={["Saved", "Queued", "Transcribing", "Ready"]}
-            current={4}
-          />
-        </div>
-      </Section>
-
       <Section title="Empty states">
         <EmptyState
           icon={<FileText />}
@@ -295,9 +272,6 @@ export function RedesignGallery() {
           snippet="Ran the lake loop before work. Somewhere around the second kilometre the pitch clicked."
           onClick={noop}
         />
-        <div className="flex justify-center py-4">
-          <RecordButton state="idle" />
-        </div>
       </Section>
     </div>
   );

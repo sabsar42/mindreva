@@ -5,13 +5,29 @@ import { useRouter } from "next/navigation";
 import { Archive, FileText, Search, X } from "lucide-react";
 import { trashSwipeAction } from "./swipe-actions";
 import {
+  ActivitySheet,
+  ActivityStrip,
   Input,
-  JournalHeatmap,
   NoteCard,
   SwipeableRow,
+  buttonVariants,
   toast,
+  type WeekInfo,
 } from "@mindreva/ui";
-import { useHeatmapYears, type InitialHeatmap } from "./use-heatmap-years";
+import { useActivity, type InitialActivity } from "./use-activity";
+import {
+  beginForming,
+  resetFormingFor,
+  settleForming,
+  useFormingMemories,
+} from "@/lib/memory-forming";
+import {
+  localDayKey,
+  moriMood,
+  type MoriContext,
+  type RecorderPhase,
+} from "@/lib/mori-mood";
+import { MoriCompanion } from "./mori-companion";
 import {
   DATE_PLACEHOLDER,
   formatEntryDateTime,
@@ -25,7 +41,6 @@ import { InlineRecorder } from "./inline-recorder";
 import { SwipeNav } from "./swipe-nav";
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
-import { TranscriptionWatcher } from "./transcription-watcher";
 import { useEntryThumbnails } from "./use-entry-thumbnails";
 import { PrefetchLink } from "./prefetch-link";
 import { getDefaultArtwork } from "@/lib/default-artwork";
@@ -34,12 +49,12 @@ export function EntryListScreen({
   type,
   heading,
   entries,
-  initialHeatmap,
+  initialActivity,
 }: {
   type: EntryType;
   heading: string;
   entries: EntryListItemWithThumbnail[];
-  initialHeatmap: InitialHeatmap | null;
+  initialActivity: InitialActivity | null;
 }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -56,7 +71,72 @@ export function EntryListScreen({
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   // `entries` changes identity on router.refresh(), e.g. after a recording.
-  const heatmap = useHeatmapYears(type, initialHeatmap, entries);
+  const activity = useActivity(type, initialActivity, entries);
+
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [week, setWeek] = React.useState<WeekInfo | null>(null);
+  const [phase, setPhase] = React.useState<RecorderPhase>("idle");
+  const [celebrating, setCelebrating] = React.useState(false);
+  const [hour, setHour] = React.useState(12);
+  const forming = useFormingMemories();
+
+  // Another account on the same tab must not see this one's memories forming.
+  const ownerId = initialActivity?.ownerId;
+  React.useEffect(() => {
+    if (ownerId) resetFormingFor(ownerId);
+  }, [ownerId]);
+
+  // Mori follows the clock: the hour changes how it reads a quiet day.
+  React.useEffect(() => {
+    const tick = () => setHour(new Date().getHours());
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // A memory that has finished forming asks the server for the fresh list,
+  // then settles into it once that list arrives. (The entry is already in the
+  // list from the upload, with no title yet, so "it is in the list" alone
+  // would settle on stale content.)
+  const refreshedFor = React.useRef(new Map<string, unknown>());
+  React.useEffect(() => {
+    for (const m of forming) {
+      if (m.phase !== "ready") continue;
+      if (!refreshedFor.current.has(m.id)) {
+        refreshedFor.current.set(m.id, entries);
+        router.refresh();
+      } else if (
+        refreshedFor.current.get(m.id) !== entries &&
+        entries.some((e) => e.id === m.id)
+      ) {
+        refreshedFor.current.delete(m.id);
+        settleForming(m.id);
+        setCelebrating(true);
+      }
+    }
+  }, [forming, entries, router]);
+
+  React.useEffect(() => {
+    if (!celebrating) return;
+    const id = setTimeout(() => setCelebrating(false), 3200);
+    return () => clearTimeout(id);
+  }, [celebrating]);
+
+  const today = hydrated ? activity.getDay(localDayKey(new Date())) : undefined;
+  const moriContext: MoriContext = {
+    phase,
+    forming: forming.some((m) =>
+      ["transcribing", "writing", "ready"].includes(m.phase),
+    ),
+    celebrating,
+    week: week && {
+      days: week.days,
+      recordings: week.recordings,
+      isCurrent: week.isCurrent,
+    },
+    todayRecordings: today?.count ?? 0,
+    hour,
+  };
 
   // Keep local state in sync when the server re-provides entries (e.g. after
   // router.refresh()) — otherwise a swipe-removed row could reappear stale.
@@ -124,73 +204,130 @@ export function EntryListScreen({
     return () => clearTimeout(handle);
   }, [query, type]);
 
-  const visible = searchResults ?? localEntries;
+  // Memories still forming take the place of their (blank) entry, newest on
+  // top; ones that failed keep their entry card with a short reason.
+  const makingIds = new Set(
+    forming
+      .filter((m) => ["transcribing", "writing", "ready"].includes(m.phase))
+      .map((m) => m.id),
+  );
+  const failedReason = new Map(
+    forming.filter((m) => m.phase === "failed").map((m) => [m.id, m.failure]),
+  );
+  const settlingIds = new Set(
+    forming.filter((m) => m.phase === "settled").map((m) => m.id),
+  );
+  const formingCards = searchResults
+    ? []
+    : forming.filter((m) => makingIds.has(m.id));
+  const visible = (searchResults ?? localEntries).filter(
+    (e) => searchResults || !makingIds.has(e.id),
+  );
   const visibleIds = React.useMemo(() => visible.map((e) => e.id), [visible]);
   const { thumbnails: entryThumbnails, resolved: thumbnailResolved } =
     useEntryThumbnails(visibleIds);
 
   return (
     <SwipeNav>
-      <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
-        <TranscriptionWatcher />
-        <HomeHeader />
-
-        <JournalHeatmap
-          className="mt-6"
-          days={heatmap.days}
-          pending={heatmap.pending}
-          year={heatmap.year}
-          maxYear={heatmap.maxYear}
-          onYearChange={heatmap.changeYear}
-          currentStreak={heatmap.currentStreak}
-        />
-
-        {type === "journal" && <InlineRecorder className="mt-4" />}
-
-        <div className="mt-7 flex h-10 items-center justify-between gap-3">
-          {searchOpen ? (
-            <div className="border-border bg-card motion-safe:animate-fade-in flex h-10 flex-1 items-center gap-2 rounded-full border px-3.5">
-              <Search className="text-muted-foreground size-4 shrink-0" />
-              <Input
-                ref={searchInputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && closeSearch()}
-                placeholder={`Search ${heading.toLowerCase()}…`}
-                className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+      <main className="mx-auto flex h-dvh flex-col px-5 pt-6">
+        {/* Everything above the entries is fixed; only the list scrolls. */}
+        <div className="shrink-0">
+          <HomeHeader
+            leading={
+              <MoriCompanion
+                mood={moriMood(moriContext)}
+                context={moriContext}
+                streak={activity.streak}
               />
-              <button
-                type="button"
-                aria-label="Close search"
-                onClick={closeSearch}
-                className="text-muted-foreground hover:text-foreground shrink-0"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          ) : (
-            <>
-              <h2 className="text-foreground text-lg font-bold tracking-tight">
-                {heading}
-              </h2>
-              <button
-                type="button"
-                aria-label={`Search ${heading.toLowerCase()}`}
-                onClick={openSearch}
-                className="text-muted-foreground hover:bg-secondary hover:text-foreground press flex size-10 items-center justify-center rounded-full transition-colors"
-              >
-                <Search className="size-4.5" />
-              </button>
-            </>
+            }
+          />
+
+          <ActivityStrip
+            className="mt-[18px]"
+            getDay={activity.getDay}
+            ensureYear={activity.ensureYear}
+            onWeekChange={setWeek}
+            onOpen={() => setSheetOpen(true)}
+          />
+          {type === "journal" && (
+            <InlineRecorder
+              className="mt-4"
+              streak={activity.streak}
+              onPhaseChange={setPhase}
+              onSaved={beginForming}
+            />
           )}
+
+          <div className="mt-3.5 flex h-10 items-center justify-between gap-3">
+            {searchOpen ? (
+              <div className="border-border bg-card motion-safe:animate-fade-in flex h-10 flex-1 items-center gap-2 rounded-full border px-3.5">
+                <Search className="text-muted-foreground size-4 shrink-0" />
+                <Input
+                  ref={searchInputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && closeSearch()}
+                  placeholder={`Search ${heading.toLowerCase()}…`}
+                  className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+                />
+                <button
+                  type="button"
+                  aria-label="Close search"
+                  onClick={closeSearch}
+                  className={buttonVariants({
+                    variant: "quiet",
+                    size: "icon-sm",
+                  })}
+                >
+                  <X />
+                </button>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-foreground text-lg font-bold tracking-tight">
+                  {heading}
+                </h2>
+                <button
+                  type="button"
+                  aria-label={`Search ${heading.toLowerCase()}`}
+                  onClick={openSearch}
+                  className={buttonVariants({ variant: "quiet", size: "icon" })}
+                >
+                  <Search />
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="mt-3 space-y-2">
+        <div
+          data-entry-list
+          className="-mx-5 mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 pb-10 pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_10px)]"
+        >
           {searching && (
             <p className="text-muted-foreground text-sm">Searching…</p>
           )}
 
-          {!searching && visible.length === 0 && (
+          {!searching &&
+            formingCards.map((m) => (
+              <NoteCard
+                key={m.id}
+                title=""
+                dateLabel="Just now"
+                durationLabel={formatDuration(m.durationMs)}
+                forming={{
+                  stage:
+                    m.phase === "transcribing"
+                      ? "transcribing"
+                      : m.phase === "writing"
+                        ? "writing"
+                        : "finishing",
+                  text: m.text,
+                }}
+              />
+            ))}
+
+          {!searching && visible.length === 0 && formingCards.length === 0 && (
             <EmptyState
               icon={searchResults ? <Search /> : <FileText />}
               title={
@@ -231,6 +368,8 @@ export function EntryListScreen({
                     }
                     durationLabel={formatDuration(entry.durationMs)}
                     snippet={entry.snippet ?? undefined}
+                    failed={failedReason.get(entry.id)}
+                    settling={settlingIds.has(entry.id)}
                     thumbnailPending={!thumbnailResolved(entry.id)}
                     thumbnailUrl={
                       entryThumbnails[entry.id] ??
@@ -242,6 +381,13 @@ export function EntryListScreen({
               </SwipeableRow>
             ))}
         </div>
+
+        <ActivitySheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          getDay={activity.getDay}
+          ensureYear={activity.ensureYear}
+        />
 
         <ConfirmTrashDialog
           open={confirmTrashId !== null}

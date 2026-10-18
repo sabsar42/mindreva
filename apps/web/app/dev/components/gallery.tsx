@@ -28,11 +28,11 @@ import {
   FilterPills,
   Input,
   Logo,
+  Mori,
+  type MoriMood,
   NoteCard,
   OptionCard,
   ProgressBar,
-  RecordButton,
-  type RecordButtonState,
   SettingsRow,
   Skeleton,
   Switch,
@@ -42,8 +42,6 @@ import {
   TabsTrigger,
   Textarea,
   toast,
-  TransportButton,
-  WaveformVisualizer,
 } from "@mindreva/ui";
 
 // Deferred the same way as its real app usage (entry-list-screen.tsx) — see
@@ -101,15 +99,16 @@ const useCases = [
 export function ComponentsGallery() {
   const [filter, setFilter] = React.useState("all");
   const [useCase, setUseCase] = React.useState("meetings");
-  const [recState, setRecState] = React.useState<RecordButtonState>("idle");
   const [date, setDate] = React.useState<Date | undefined>(new Date());
 
-  const recStates: RecordButtonState[] = [
-    "idle",
-    "preparing",
-    "recording",
-    "paused",
-    "processing",
+  const moods: MoriMood[] = [
+    "sleepy",
+    "calm",
+    "happy",
+    "thriving",
+    "listening",
+    "thinking",
+    "celebrating",
   ];
 
   return (
@@ -360,29 +359,59 @@ export function ComponentsGallery() {
         </div>
       </Section>
 
-      <Section title="Record button (states)">
-        <div className="flex flex-wrap items-start gap-8">
-          {recStates.map((s) => (
-            <RecordButton key={s} state={s} size="md" />
+      <Section title="Mori (moods)">
+        <div className="flex flex-wrap items-start gap-6">
+          {moods.map((m) => (
+            <div key={m} className="flex flex-col items-center gap-2">
+              <div className="bg-accent/45 flex size-20 items-center justify-center rounded-full">
+                <Mori mood={m} className="size-[72px]" />
+              </div>
+              <span className="text-muted-foreground text-xs">{m}</span>
+            </div>
           ))}
-        </div>
-        <div className="mt-8 flex items-center gap-4">
-          <span className="text-muted-foreground text-sm">Interactive:</span>
-          <RecordButton
-            state={recState}
-            onClick={() =>
-              setRecState((prev) => (prev === "idle" ? "recording" : "idle"))
-            }
-          />
-          <TransportButton action="pause" />
-          <TransportButton action="stop" />
         </div>
       </Section>
 
-      <Section title="Waveform visualizer">
-        <div className="space-y-6">
-          <WaveformVisualizer active />
-          <WaveformVisualizer active={false} />
+      <Section title="Memory card (forming)">
+        <div className="space-y-3">
+          <NoteCard
+            title=""
+            dateLabel="Just now"
+            durationLabel="12 s"
+            forming={{ stage: "transcribing" }}
+          />
+          <NoteCard
+            title=""
+            dateLabel="Just now"
+            durationLabel="12 s"
+            forming={{
+              stage: "writing",
+              text: "Walked to the river before work. Thought about the move, the new team, and whether it is the right time.",
+            }}
+          />
+          <NoteCard
+            title=""
+            dateLabel="Just now"
+            durationLabel="12 s"
+            forming={{
+              stage: "finishing",
+              text: "Walked to the river before work.",
+            }}
+          />
+          <NoteCard
+            title="Morning walk and a long think"
+            dateLabel="Oct 18, 8:42 AM"
+            durationLabel="12 s"
+            snippet="Walked to the river before work. Thought about the move."
+            settling
+          />
+          <NoteCard
+            title="Untitled entry"
+            dateLabel="Oct 18, 8:42 AM"
+            durationLabel="12 s"
+            snippet="Walked to the river before work."
+            failed="Saved, but the summary didn't finish. Open it to try again."
+          />
         </div>
       </Section>
 

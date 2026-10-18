@@ -7,6 +7,172 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-18 — One button hierarchy across every page and theme
+
+`packages/ui/src/components/button-variants.tsx` is now the single scale, with
+the hierarchy written at the top of the file.
+
+- **Roles:** `primary` (main action), `ink` (single top action on auth-style
+  screens), `destructive` (Stop, Delete), `secondary`, `outline`, `glass` (over
+  a photo), `ghost` (navigation such as Back), `quiet` (toolbar icon actions).
+  One `primary` per surface. All colors are theme tokens, so light and dark
+  follow automatically.
+- **Sizes:** text buttons sm 36 / default 44 / lg 56. Icon-only buttons
+  icon-sm 32 / icon 40 / icon-lg 44, and the icon sizes itself (16 / 20 / 24),
+  so no button needs its own icon size class.
+- **Moved onto it** (they were hand-styled in at least eight different sizes
+  from 28 to 44px, with icons from 16 to 24px, and two different greys): header
+  tab icons, Back (page header, entry detail, chat), Archive/Trash, Journal
+  search and its close, the cover "Change cover" button (new `glass` variant),
+  river expand, share-sheet remove, show/hide password, the week-graph arrows,
+  and the recorder's Stop (`destructive`, lg), Retry (`primary`, lg) and
+  Discard/Dismiss (`quiet`, icon).
+- Left alone on purpose: tabs, switches, filter pills, the rich-text toolbar,
+  list rows, Mori and the avatar (they are not buttons in this hierarchy).
+
+Verified in light and dark: header icons 44, standard icon buttons 40, "Change
+cover" 36, Stop 56 tall; no console errors; typecheck and lint pass.
+
+## 2026-10-18 — Mori, week strip, and memories that form on screen
+
+Built on the Journal screen in the real app, from the mockup and brief.
+
+### Added
+
+- **Mori** (`packages/ui/src/components/mori.tsx`), a leaf companion in the
+  header's top-left. Seven moods, cross-faded (not swapped): `sleepy`, `calm`,
+  `happy`, `thriving` for the week on screen, and live `listening`,
+  `thinking`, `celebrating`. Rules live in `lib/mori-mood.ts` (pure, 17 tests):
+  what the user is doing right now wins; otherwise the viewed week sets the
+  base (active days, recordings); for the current week today adjusts it
+  (recorded today lifts Mori, a quiet late night puts it to sleep, a quiet
+  evening after a good week reads calm). It follows the clock hourly.
+  - **Tap:** a speech bubble says what Mori feels and why.
+  - **Hover (mouse):** a small hop, at most every 2.5s. Nothing opens.
+  - **Press and hold (600ms):** a bottom sheet with today at a glance and a
+    **Quiet mode** switch (Mori keeps its expressions but stays still; stored
+    per device).
+- **Week strip + full graph** (`activity-graph.tsx`): the contribution graph is
+  one week in a rounded rectangle the size of the record bar. Swipe or drag to
+  go back through weeks (the month label follows); tap a day for details;
+  press and hold (or Enter) opens a bottom sheet with Month and Year views.
+  The strip reports the week on screen, which drives Mori.
+- **Memory cards that form.** After a recording uploads, a green card emerges on
+  top of the list and develops with the real pipeline: _Transcribing_ (shimmering
+  placeholder lines) -> _Shaping your memory_ (the transcript appears with a
+  caret) -> _Finishing up_, with a progress bar that follows the stage. On
+  completion the green drains out (`settle`, ~1.2s) and it becomes a normal,
+  tappable card. Driven by `lib/memory-forming.ts`, a module-level store, so the
+  work and the card survive switching tabs.
+- **Failure handling.** If transcription fails, nothing is heard, it stalls
+  (>150s) or summarising fails, the card turns neutral with a short reason and
+  the entry stays in the list; nothing stays green.
+- **Card hover/tap effect:** ready cards lift 2px with a green edge; the cover
+  leans in; a press scales down slightly.
+
+### Changed
+
+- **Voice entries are now summarised automatically** once their transcript is
+  done (the client calls the existing `POST /api/entries/:id/summarize`), so a
+  recording becomes a titled memory with a summary, tasks and embedding. Before,
+  inline recordings stayed "Untitled entry" until opened.
+- Header: Mori, then the date and greeting, the tab icons, and the weekday as
+  the title beneath (so "Wednesday" always fits). Order below it: week strip,
+  then the record bar (76px), then the Journal row.
+- The record bar no longer shows a "Saved!" banner (the forming card is the
+  feedback) and reports its phase so Mori can react. `useVoiceRecorder`'s
+  `onDone` now also passes the duration.
+
+### Removed (dead code)
+
+- `/record` page and `record-flow.tsx`; `/entries/[id]/review` and
+  `transcript-review.tsx` (nothing navigated to it: the record flow always
+  returned to `/journal`); `TranscriptionWatcher` and `lib/transcription-watch.ts`
+  (it only picked up work when it mounted, so it never fired after an inline
+  recording); `RecordButton`, `TransportButton`, `WaveformVisualizer`,
+  `ProcessingSteps`, and the old card-style `JournalHeatmap`; `use-heatmap-years`
+  (now `use-activity`); the `waveform` animation; `/record` in middleware and
+  app-shell. "Record your first entry" on Past Self now links to `/journal`.
+- The dev galleries show Mori's moods and every memory-card state instead.
+
+### Verified
+
+Real browser (headless Edge, 390px) against the real Supabase, ASR and LLM, on a
+throwaway account (deleted with its audio): recorded with a fake microphone and
+watched Mori go listening -> thinking -> celebrating while the card went
+Transcribing (2s) -> Shaping (7s) -> Finishing (22s) -> settled into a normal
+card that opens its entry; with summarising forced to fail, the card became
+neutral with its message and no green card remained. Tap and hold on Mori, hold
+on the strip, Month/Year views, quiet mode (persisted), hover lift, no page
+scroll, no console errors. typecheck, lint, 97 tests pass.
+
+## 2026-10-17 — Journal: everything above the list is fixed, bigger graph and bar
+
+Owner feedback: the top portion must not scroll at all; only the entry cards
+scroll. Also more space between graph and bar, and both a little bigger.
+
+### Changed
+
+- **Only the list scrolls.** Journal is now a fixed-height column (`h-dvh`):
+  header, graph, record bar and the "Journal" row are fixed; the entry list is
+  its own scroll area (`overscroll-contain`, soft fade at its top edge). The
+  page itself no longer scrolls. Replaces the earlier sticky block.
+- **Bigger:** graph cells 11px -> 13px (3px gap), year 18px; record bar
+  56px -> 64px with a 48px logo button and 16px title; Stop/Retry 44px.
+- **Gap** between graph and record bar 6px -> 16px.
+
+### Verified
+
+Headless Edge at 390x844 and 390x667: page height equals viewport, wheel over
+the list scrolls only the list, wheel over the header does nothing, header and
+bar do not move, recording works while the list is scrolled, search opens, no
+console errors. Fixed area is about 450px; the list gets 394px at 844 high and
+only 217px at 667 high (see KNOWN-ISSUES).
+
+## 2026-10-16 — Journal header redesign: bare graph, pinned, logo record button (iOS styling)
+
+Owner feedback on the running app: the activity card took too much room, and
+the record bar had a separate "Record" button.
+
+### Changed
+
+- **Activity graph is bare.** No card, "Your activity" title, streak line or
+  Less/More legend. It is the year with arrows above the grid, the month
+  labels and the thin scrollbar. Hovering or tapping a day shows its details
+  in the year slot (tap details clear after 2.5s), so it costs no height.
+  Cells are 11px with 3px gaps.
+- **Graph and record bar are pinned.** They sit in one sticky block at the top
+  of Journal; the date header scrolls away and entries slide under a soft
+  fade. Pinned height at 390px is 218px (26% of an 844px screen), down from
+  ~430px for the old card plus bar.
+- **The leaf logo is the record button.** The separate "Record" pill is gone.
+  The whole bar is one tappable button; the blinking leaf (with a pulsing
+  ring) on the right is its call to action. The streak (flame + "N-day
+  streak") now lives under the title.
+- **iOS feel, not game chrome.** An earlier pass used chunky raised buttons
+  and sparks; the owner found it cartoonish, so it is now flat: a hairline
+  capsule with a soft shadow, gradient capsule buttons (green Retry, red
+  Stop), semibold type, and a quick press-scale (no raised edge). The
+  `--primary-edge`/`--danger-edge` tokens and the burst animation were
+  removed.
+- **Recording state.** The blinking logo is the live indicator (ring while
+  recording, dimmed when paused, spinner while busy), then waveform, discard,
+  timer chip and a red Stop capsule. Every state is exactly 56px tall.
+- **Saved reward.** After a recording uploads, the bar shows "Saved!" with a
+  check badge and the flame count for ~2.6s (tap to record again).
+  This replaces the "Recording saved" toast for the inline recorder only
+  (`useVoiceRecorder` gained `announceSaved`; `/record` still toasts).
+- **Header icons** (History, Plug) are 24px in 44px buttons, up from 20px in
+  40px, on every tab.
+
+### Verified
+
+Headless Edge at 390px, light and dark, on a throwaway account (deleted with
+its photos and audio): pinned block stays at y=0 while the list scrolls,
+including during a recording; bar height is 56px idle, recording, saving and
+saved; no console errors; no horizontal overflow; typecheck, lint and 80 tests
+pass. Not tried on a real phone.
+
 ## 2026-10-16 — Performance and flicker pass
 
 Measured on a production build with 4x CPU throttling and a ~9 Mbps / 60 ms

@@ -11,6 +11,76 @@ rather than resolved.
 
 ---
 
+## 2026-10-18 — Mori, auto-summarising inline recordings, and what was removed
+
+**What happened:** The owner asked for Mori (the leaf mascot) as a living
+companion, the record bar and week strip from the mockup, and a memory card
+that visibly forms after recording, plus removal of dead code.
+
+**Decisions:**
+
+- **Auto-summarise.** A card that "forms into a memory" needs a title and
+  summary, but voice entries were only summarised after the (now unreachable)
+  review screen. The client now calls `summarize` as soon as the transcript is
+  done. This reverses the old rule "never summarise unreviewed raw ASR output";
+  the trade is that a mis-heard word can reach the summary. Editing the
+  transcript on the entry page still re-summarises. Cost: one LLM call (plus
+  embedding and mindmap work) per recording, which matters on the OpenRouter
+  free tier (see KNOWN-ISSUES).
+- **Client-driven, not a server chain.** The client sequences transcribe ->
+  summarise because it gets a definite success or failure per step to show on
+  the card; the server has no summary status to poll. The store is module-level
+  so work continues across tab changes. If the tab is closed mid-way the
+  recording and transcript are safe on the server but the memory is not made
+  until the entry is opened and saved.
+- **Dead code removed, not kept as deep links.** `/record`, the review screen,
+  the watcher and the old record button had no entry points left.
+- **Mori's long-press option** was unspecified: I chose a sheet with today at a
+  glance and a Quiet mode switch. **The card hover/tap effect** referred to an
+  earlier design I could not find: I used a small lift, green edge and
+  thumbnail lean-in, in the same green language as the forming card. Both are
+  easy to change.
+- The week strip renders after hydration (a same-size placeholder before),
+  because its weeks depend on the viewer's clock and time zone.
+
+---
+
+## 2026-10-17 — Journal: whole top section fixed, only the list scrolls
+
+The owner clarified that the entire top portion (header included) must not
+scroll. Done as a fixed-height flex column with the list as the sole scroll
+container, rather than `position: sticky`, so nothing above the list can move
+at all. Cost: ~450px of fixed UI (see KNOWN-ISSUES for short screens).
+
+---
+
+## 2026-10-16 — Journal header: pinned, bare graph, whole-bar record button
+
+**What happened:** The owner found the activity card too tall and asked for
+just the graph, pinned with the record bar while entries scroll, the logo as
+the record button, and a more game-like (Duolingo) feel.
+
+**Decisions:**
+
+- Kept the graph and the bar both pinned as asked, and compacted instead of
+  collapsing on scroll. Result: 218px at 390px wide. If that is still too
+  much, the next step is collapsing the graph once the list scrolls.
+- The whole bar is the button, not only the logo. A nested logo button would
+  be a button inside a button, and tapping anywhere on a record bar is the
+  more forgiving behaviour.
+- The streak moved from a footer into the bar's subtitle (it replaces
+  "Starts instantly, no extra tap"), keeping a gamification element without
+  adding a row. It describes today's streak whichever year the graph shows.
+- Day details moved into the year slot rather than a footer or tooltip, for
+  zero extra height.
+- Styling: a first pass used Duolingo-style raised 3D buttons and sparks; the
+  owner called it cartoonish and asked for an iOS feel matching the rest of
+  the app. Decided: flat capsules, hairline borders, soft shadows and a
+  press-scale. "Gamification" is kept only as the streak flame and the brief
+  "Saved!" confirmation.
+
+---
+
 ## 2026-10-16 — List thumbnails: client-made WebP copies, not format conversion
 
 **What happened:** The owner asked to make all images WebP and lazy-load

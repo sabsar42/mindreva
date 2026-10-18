@@ -24,6 +24,43 @@ from the entry page.
 
 ---
 
+## Every recording now costs an LLM summary
+
+**Status:** Open.
+
+Since 2026-10-18 each voice recording is summarised automatically (title,
+summary, tasks, embedding, mindmap). On the OpenRouter free tier (50/day) a busy
+day can hit the cap; the card then shows "Saved, but the summary didn't finish.
+Open it to try again." and the recording and transcript are safe. A server-side
+queue with a stored summary status would make this retryable without opening
+the entry.
+
+## A memory only forms while the tab stays open
+
+**Status:** Open.
+
+Transcription finishes on the server regardless, but summarising is started by
+the client. Closing the tab right after recording leaves a transcribed, untitled
+entry until it is opened and saved.
+
+## Mori and card effects are unreviewed guesses on two points
+
+**Status:** Open — owner's call.
+
+The long-press option (today at a glance + Quiet mode) and the card hover/tap
+effect (lift + green edge) were not specified precisely. Not yet tried on a real
+phone or iOS Safari (long-press timing, `dvh`, haptics).
+
+## Fixed Journal header leaves little room for the list on short screens
+
+**Status:** Open — owner's call.
+
+Header, graph, record bar and the Journal row are fixed (~450px). The list gets
+394px on an 844px-high phone and ~217px on a 667px-high one (iPhone SE size),
+less in landscape. If that is too tight, collapse the graph (or the header)
+while the list scrolls. Not tried on a real phone or iOS Safari (`dvh`,
+safe-area at the top).
+
 ## Privacy, Terms, Support and "Delete account" links are dead (404)
 
 **Status:** Open — needs owner input.
@@ -350,30 +387,6 @@ change (`LLM_PROVIDER=gemini`), not a code change.
   project.
 - Or contact Google Cloud support directly, per the error message's own
   suggestion.
-
----
-
-## New logo/landing-page/RecordButton visuals not independently verified in a browser
-
-**Status:** Open.
-
-**What's wrong:** The 2026-08-04 logo/RecordButton/landing-page redesign
-(see docs/CHANGELOG.md) was verified via `sharp`-rasterized PNGs (for the
-traced logo's legibility at various sizes), `tsc`/`eslint`/`next build`,
-and `curl` against a real production server for the landing page's SSR
-output — but no browser screenshot tool was available in this environment,
-so none of it has been visually confirmed by a human or automated
-screenshot at the actual pixel/layout level (blob placement, spacing,
-RecordButton hit-area feel on a real touch device).
-
-**Current workaround:** None needed unless a manual check turns up a real
-issue — flagging so this isn't silently assumed correct.
-
-**To revisit when there's time to chase it:** open the app in a real
-browser (`pnpm dev`, visit `/`, `/record`) and confirm the landing page
-layout and RecordButton states look and feel right, especially on an
-actual phone screen per this same phase's own "test the palette in
-daylight, not just your dev monitor" guidance.
 
 ---
 

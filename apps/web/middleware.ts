@@ -4,7 +4,6 @@ import { updateSession } from "@mindreva/auth/middleware";
 const AUTH_ROUTES = ["/sign-in", "/sign-up"];
 const PROTECTED_PREFIXES = [
   "/account",
-  "/record",
   "/journal",
   "/notes",
   "/archive",

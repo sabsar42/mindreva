@@ -61,17 +61,6 @@ export {
   type SwipeableRowAction,
   type SwipeableRowProps,
 } from "./components/swipeable-row";
-export {
-  RecordButton,
-  TransportButton,
-  type RecordButtonProps,
-  type RecordButtonState,
-  type TransportButtonProps,
-} from "./components/record-button";
-export {
-  WaveformVisualizer,
-  type WaveformVisualizerProps,
-} from "./components/waveform-visualizer";
 export { OptionCard, type OptionCardProps } from "./components/option-card";
 export {
   PhotoUploader,
@@ -108,16 +97,17 @@ export {
   type ExpandablePanelProps,
 } from "./components/expandable-panel";
 export {
-  ProcessingSteps,
-  type ProcessingStepsProps,
-} from "./components/processing-steps";
-export {
   JournalImage,
   journalImageWrapperClass,
   type JournalImageProps,
 } from "./components/journal-image";
 export {
-  JournalHeatmap,
+  ActivityStrip,
+  ActivitySheet,
   type HeatmapDay,
-  type JournalHeatmapProps,
-} from "./components/journal-heatmap";
+  type WeekInfo,
+  type DayLookup,
+  type ActivityStripProps,
+  type ActivitySheetProps,
+} from "./components/activity-graph";
+export { Mori, type MoriMood, type MoriProps } from "./components/mori";

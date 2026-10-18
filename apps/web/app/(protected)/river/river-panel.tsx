@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronDown, Droplets, Maximize2 } from "lucide-react";
-import { ExpandablePanel, IconTile, cn } from "@mindreva/ui";
+import { ExpandablePanel, IconTile, buttonVariants, cn } from "@mindreva/ui";
 import { RiverExplorer } from "./river-explorer";
 import { RiverModal } from "./river-modal";
 import type { RiverData } from "@/lib/services/mindmap.service";
@@ -130,9 +130,9 @@ export function RiverPanel({
             <button
               type="button"
               aria-label="Expand river of memories"
-              className="text-muted-foreground hover:bg-secondary hover:text-foreground press focus-visible:ring-ring flex size-9 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2"
+              className={buttonVariants({ variant: "quiet", size: "icon-sm" })}
             >
-              <Maximize2 className="size-4" />
+              <Maximize2 />
             </button>
           }
         />

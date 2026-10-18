@@ -21,6 +21,7 @@ import {
   Badge,
   Button,
   TaskChecklist,
+  buttonVariants,
   cn,
   toast,
   type TaskChecklistTask,
@@ -556,9 +557,12 @@ export function EntryDetail({
           type="button"
           onClick={() => void handleBack()}
           aria-label="Back"
-          className="text-foreground hover:bg-secondary press -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full transition-colors"
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "-ml-2",
+          )}
         >
-          <ArrowLeft className="size-5" />
+          <ArrowLeft />
         </button>
         <div className="flex items-center gap-1.5">
           {source === "voice" && (
@@ -584,22 +588,21 @@ export function EntryDetail({
             type="button"
             onClick={toggleArchive}
             aria-label={isArchived ? "Unarchive" : "Archive"}
-            className="text-muted-foreground hover:bg-secondary hover:text-foreground press flex size-9 items-center justify-center rounded-full transition-colors"
+            className={buttonVariants({ variant: "quiet", size: "icon" })}
           >
-            {isArchived ? (
-              <ArchiveRestore className="size-5" />
-            ) : (
-              <Archive className="size-5" />
-            )}
+            {isArchived ? <ArchiveRestore /> : <Archive />}
           </button>
           <button
             type="button"
             onClick={() => setConfirmTrashOpen(true)}
             disabled={trashing}
             aria-label="Move to Trash"
-            className="text-muted-foreground hover:bg-secondary hover:text-destructive press flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+            className={cn(
+              buttonVariants({ variant: "quiet", size: "icon" }),
+              "hover:text-destructive",
+            )}
           >
-            <Trash2 className="size-5" />
+            <Trash2 />
           </button>
         </div>
       </header>
@@ -651,12 +654,15 @@ export function EntryDetail({
           onClick={() => coverInputRef.current?.click()}
           disabled={uploadingCover}
           aria-label="Change cover image"
-          className="bg-glass border-border text-foreground press hover:bg-card shadow-subtle absolute bottom-3 right-3 flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold disabled:opacity-60"
+          className={cn(
+            buttonVariants({ variant: "glass", size: "sm" }),
+            "absolute bottom-3 right-3",
+          )}
         >
           {uploadingCover ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader2 className="animate-spin" />
           ) : (
-            <ImagePlus className="size-4" />
+            <ImagePlus />
           )}
           Change cover
         </button>

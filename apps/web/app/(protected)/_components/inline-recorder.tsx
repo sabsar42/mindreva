@@ -2,9 +2,19 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Mic, RotateCcw, X } from "lucide-react";
-import { cn } from "@mindreva/ui";
+import { Flame, Loader2, Mic, RotateCcw, Square, X } from "lucide-react";
+import { LeafMark, buttonVariants, cn } from "@mindreva/ui";
 import { useVoiceRecorder } from "@/lib/use-voice-recorder";
+import type { RecorderPhase } from "@/lib/mori-mood";
+
+/** Every state shares this exact box (76px), so nothing around it moves when
+ * recording starts, stops or saves. */
+const BAR =
+  "bg-card shadow-subtle flex h-19 w-full items-center gap-3.5 rounded-full border pl-2.5 pr-2.5";
+
+/** iOS-style press: a small, quick scale-down, nothing more. */
+const PRESS =
+  "transition-[transform,opacity] duration-150 active:scale-[0.97] active:opacity-90";
 
 function formatClock(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -28,7 +38,7 @@ function LiveWave({
   return (
     <div
       aria-hidden
-      className="gap-0.75 flex h-8 min-w-0 flex-1 items-center overflow-hidden"
+      className="gap-0.75 flex h-10 min-w-0 flex-1 items-center overflow-hidden"
     >
       {BAR_WEIGHTS.map((weight, i) => {
         const amp = amplitudes[i % amplitudes.length] ?? 0;
@@ -50,177 +60,258 @@ function LiveWave({
   );
 }
 
+function StreakLine({ streak }: { streak: number }) {
+  if (streak <= 0) {
+    return (
+      <span className="text-muted-foreground mt-1 block truncate text-[13px] font-medium">
+        Start your streak today
+      </span>
+    );
+  }
+  return (
+    <span className="text-muted-foreground mt-1 flex items-center gap-1 text-[13px] font-semibold">
+      <Flame className="text-heat-3 fill-heat-3 size-[15px]" aria-hidden />
+      {streak}-day streak
+    </span>
+  );
+}
+
 /**
- * The Journal screen's record bar. Tapping it starts recording right here —
- * no navigation, no review screen. The pill keeps its exact size between
- * idle and recording so nothing below it jumps; stopping uploads, and
- * transcription carries on in the background.
+ * The Journal screen's record bar. Tapping it starts recording right here: no
+ * navigation, no review screen. The leaf logo on the right is the call to
+ * action; it blinks, and sinks a little when pressed. Stopping uploads the
+ * audio (the bar shows "Saving…"), then hands the entry to the Journal, where
+ * its memory card forms in the list while transcription and summarising carry
+ * on. The bar is free for the next recording straight away.
  */
-export function InlineRecorder({ className }: { className?: string }) {
+export function InlineRecorder({
+  className,
+  streak = 0,
+  onPhaseChange,
+  onSaved,
+}: {
+  className?: string;
+  /** Consecutive active days ending today (shown under the title). */
+  streak?: number;
+  /** What the recorder is doing, so the rest of the screen can react. */
+  onPhaseChange?: (phase: RecorderPhase) => void;
+  /** The audio is uploaded and the entry exists. */
+  onSaved?: (entryId: string, durationMs: number) => void;
+}) {
   const router = useRouter();
-  const rec = useVoiceRecorder({
-    entryType: "journal",
-    onDone: () => router.refresh(),
-  });
+
+  const onDone = React.useCallback(
+    (entryId: string, durationMs: number) => {
+      router.refresh();
+      onSaved?.(entryId, durationMs);
+    },
+    [router, onSaved],
+  );
+
+  const rec = useVoiceRecorder({ entryType: "journal", onDone });
 
   const live = rec.state === "recording" || rec.state === "paused";
   const busy = rec.state === "preparing" || rec.state === "processing";
   const active =
     rec.state !== "idle" || rec.uploadFailed || rec.micError !== null;
 
+  React.useEffect(() => {
+    onPhaseChange?.(
+      rec.state === "recording"
+        ? "recording"
+        : rec.state === "paused"
+          ? "paused"
+          : rec.state === "processing" && !rec.uploadFailed
+            ? "processing"
+            : "idle",
+    );
+  }, [rec.state, rec.uploadFailed, onPhaseChange]);
+
   if (!active) {
     return (
-      <button
-        type="button"
-        aria-label="Start recording"
-        onClick={() => void rec.start()}
-        className={cn(
-          "border-border bg-card shadow-subtle focus-visible:ring-ring h-18 hover:shadow-elevated group flex w-full items-center gap-3 rounded-full border pl-3 pr-3 text-left transition-[box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 active:scale-[0.985]",
-          className,
-        )}
-      >
-        <span className="bg-gradient-primary shadow-subtle flex size-12 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-105">
-          <Mic className="text-primary-foreground size-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="text-foreground block truncate text-[15px] font-semibold tracking-tight">
-            Record a voice note
+      <div className={className}>
+        <button
+          type="button"
+          aria-label="Start recording"
+          onClick={() => void rec.start()}
+          className={cn(
+            BAR,
+            PRESS,
+            "border-border focus-visible:ring-ring group text-left focus-visible:outline-none focus-visible:ring-2",
+          )}
+        >
+          <span className="bg-accent text-accent-foreground flex size-14 shrink-0 items-center justify-center rounded-full">
+            <Mic className="size-6" aria-hidden />
           </span>
-          <span className="text-muted-foreground block truncate text-xs">
-            Starts instantly, no extra tap
+          <span className="min-w-0 flex-1">
+            <span className="text-foreground block truncate text-lg font-semibold leading-tight tracking-tight">
+              Record a voice note
+            </span>
+            <StreakLine streak={streak} />
           </span>
-        </span>
-        <span className="bg-accent text-accent-foreground flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-bold transition-colors group-hover:brightness-95">
-          <span className="size-2.5 rounded-full border-2 border-current" />
-          Record
-        </span>
-      </button>
+          <span className="relative flex size-14 shrink-0 items-center justify-center">
+            <span
+              aria-hidden
+              className="bg-primary/25 motion-safe:animate-mic-pulse absolute inset-0 rounded-full"
+            />
+            <span className="bg-gradient-primary text-primary-foreground shadow-subtle relative flex size-14 items-center justify-center rounded-full transition-transform duration-150 group-active:scale-95">
+              <LeafMark className="size-9 motion-safe:animate-pulse" />
+            </span>
+          </span>
+        </button>
+      </div>
     );
   }
 
   return (
-    <div
-      role="group"
-      aria-label="Voice recording"
-      className={cn(
-        "border-primary bg-card ring-primary/15 motion-safe:animate-scale-in h-18 flex w-full items-center gap-3 rounded-full border-[1.5px] pl-2.5 pr-2.5 ring-4",
-        className,
-      )}
-    >
-      {rec.micError ? (
-        <>
-          <p className="text-foreground min-w-0 flex-1 pl-3 text-sm leading-snug">
-            Microphone blocked. Allow access in your browser, then try again.
-          </p>
-          <button
-            type="button"
-            onClick={rec.cancel}
-            aria-label="Dismiss"
-            className="text-muted-foreground hover:bg-secondary press flex size-9 shrink-0 items-center justify-center rounded-full"
-          >
-            <X className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void rec.start()}
-            className="bg-primary text-primary-foreground press flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-bold"
-          >
-            <RotateCcw className="size-3.5" />
-            Retry
-          </button>
-        </>
-      ) : (
-        <>
-          <span
-            className={cn(
-              "ml-1 flex size-9 shrink-0 items-center justify-center rounded-full",
-              busy ? "bg-secondary" : "bg-destructive/10",
-            )}
-          >
-            {busy ? (
-              <Loader2 className="text-primary size-4 animate-spin" />
-            ) : (
-              <span
-                className={cn(
-                  "bg-destructive size-3 rounded-full",
-                  rec.state === "recording" && "motion-safe:animate-pulse",
-                  rec.state === "paused" && "opacity-40",
-                )}
-              />
-            )}
-          </span>
-
-          {rec.state === "preparing" ? (
-            <span className="text-muted-foreground min-w-0 flex-1 text-sm">
-              Starting microphone…
-            </span>
-          ) : rec.state === "processing" || rec.uploadFailed ? (
-            <span className="text-muted-foreground min-w-0 flex-1 text-sm">
-              {rec.uploadFailed
-                ? "Couldn't save. Your audio is kept."
-                : "Saving…"}
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={rec.state === "recording" ? rec.pause : rec.resume}
-              aria-label={rec.state === "recording" ? "Pause" : "Resume"}
-              title={
-                rec.state === "recording" ? "Tap to pause" : "Tap to resume"
-              }
-              className="flex min-w-0 flex-1 items-center rounded-full focus-visible:outline-none"
-            >
-              <LiveWave
-                amplitudes={rec.amplitudes}
-                active={rec.state === "recording"}
-              />
-            </button>
-          )}
-
-          {(live || rec.uploadFailed) && (
+    <div className={className} aria-live="polite">
+      <div
+        role="group"
+        aria-label="Voice recording"
+        className={cn(
+          BAR,
+          "border-primary/50 ring-primary/10 motion-safe:animate-scale-in ring-4",
+        )}
+      >
+        {rec.micError ? (
+          <>
+            <p className="text-foreground min-w-0 flex-1 pl-2 text-xs leading-snug">
+              Microphone blocked. Allow access in your browser, then try again.
+            </p>
             <button
               type="button"
               onClick={rec.cancel}
-              aria-label="Discard recording"
-              className="text-muted-foreground hover:bg-secondary hover:text-foreground press flex size-8 shrink-0 items-center justify-center rounded-full transition-colors"
+              aria-label="Dismiss"
+              className={buttonVariants({ variant: "quiet", size: "icon" })}
             >
-              <X className="size-4" />
+              <X />
             </button>
-          )}
-
-          <span
-            role="timer"
-            className={cn(
-              "bg-accent text-accent-foreground shrink-0 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums",
-              rec.state === "paused" && "opacity-60",
-            )}
-          >
-            {formatClock(rec.elapsedMs)}
-          </span>
-
-          {rec.uploadFailed ? (
             <button
               type="button"
-              onClick={rec.retryUpload}
-              className="bg-primary text-primary-foreground press flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-bold"
+              onClick={() => void rec.start()}
+              className={buttonVariants({
+                variant: "primary",
+                size: "lg",
+                className: "px-5",
+              })}
             >
-              <RotateCcw className="size-3.5" />
+              <RotateCcw />
               Retry
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={rec.finish}
-              disabled={!live}
-              aria-label="Stop and save recording"
-              className="bg-gradient-danger press shadow-subtle flex h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-bold text-white transition-opacity disabled:opacity-50"
+          </>
+        ) : (
+          <>
+            {/* The logo is the live indicator: it blinks and rings while
+                recording, dims when paused, and is a spinner while busy. */}
+            <span className="relative flex size-14 shrink-0 items-center justify-center">
+              {rec.state === "recording" && (
+                <span
+                  aria-hidden
+                  className="bg-primary/25 motion-safe:animate-mic-pulse absolute inset-0 rounded-full"
+                />
+              )}
+              <span
+                className={cn(
+                  "relative flex size-14 items-center justify-center rounded-full",
+                  busy
+                    ? "bg-secondary text-primary"
+                    : "bg-primary text-primary-foreground",
+                  rec.state === "paused" && "opacity-60",
+                )}
+              >
+                {busy ? (
+                  <Loader2 className="size-6 animate-spin" />
+                ) : (
+                  <LeafMark
+                    className={cn(
+                      "size-8",
+                      rec.state === "recording" && "motion-safe:animate-pulse",
+                    )}
+                  />
+                )}
+              </span>
+            </span>
+
+            {rec.state === "preparing" ? (
+              <span className="text-muted-foreground min-w-0 flex-1 text-base font-medium">
+                Starting microphone…
+              </span>
+            ) : rec.state === "processing" || rec.uploadFailed ? (
+              <span className="text-muted-foreground min-w-0 flex-1 text-base font-medium">
+                {rec.uploadFailed
+                  ? "Couldn't save. Your audio is kept."
+                  : "Saving…"}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={rec.state === "recording" ? rec.pause : rec.resume}
+                aria-label={rec.state === "recording" ? "Pause" : "Resume"}
+                title={
+                  rec.state === "recording" ? "Tap to pause" : "Tap to resume"
+                }
+                className="flex min-w-0 flex-1 items-center rounded-full focus-visible:outline-none"
+              >
+                <LiveWave
+                  amplitudes={rec.amplitudes}
+                  active={rec.state === "recording"}
+                />
+              </button>
+            )}
+
+            {(live || rec.uploadFailed) && (
+              <button
+                type="button"
+                onClick={rec.cancel}
+                aria-label="Discard recording"
+                className={buttonVariants({ variant: "quiet", size: "icon" })}
+              >
+                <X />
+              </button>
+            )}
+
+            <span
+              role="timer"
+              className={cn(
+                "bg-accent text-accent-foreground shrink-0 rounded-full px-3.5 py-2.5 text-base font-semibold tabular-nums",
+                rec.state === "paused" && "opacity-60",
+              )}
             >
-              <span className="rounded-xs size-2.5 bg-white" />
-              Stop
-            </button>
-          )}
-        </>
-      )}
+              {formatClock(rec.elapsedMs)}
+            </span>
+
+            {rec.uploadFailed ? (
+              <button
+                type="button"
+                onClick={rec.retryUpload}
+                className={buttonVariants({
+                  variant: "primary",
+                  size: "lg",
+                  className: "px-5",
+                })}
+              >
+                <RotateCcw />
+                Retry
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={rec.finish}
+                disabled={!live}
+                aria-label="Stop and save recording"
+                className={buttonVariants({
+                  variant: "destructive",
+                  size: "lg",
+                  className: "px-5",
+                })}
+              >
+                <Square className="fill-current" />
+                Stop
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

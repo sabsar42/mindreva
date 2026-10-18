@@ -12,6 +12,7 @@ import {
   IconTile,
   Input,
   Skeleton,
+  buttonVariants,
   cn,
   toast,
 } from "@mindreva/ui";
@@ -363,9 +364,12 @@ export function ShareSheet({
                               onClick={() => void removeRecipient(address)}
                               disabled={busy !== null}
                               aria-label={`Remove ${address}`}
-                              className="text-muted-foreground hover:bg-secondary hover:text-foreground flex size-7 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+                              className={buttonVariants({
+                                variant: "quiet",
+                                size: "icon-sm",
+                              })}
                             >
-                              <X className="size-4" />
+                              <X />
                             </button>
                           </li>
                         ))}

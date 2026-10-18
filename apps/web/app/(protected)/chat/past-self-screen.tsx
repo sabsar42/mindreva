@@ -344,7 +344,7 @@ export function PastSelfScreen({
               you can revisit and talk to them.
             </p>
             <Button asChild className="mt-5">
-              <Link href="/record">Record your first entry</Link>
+              <Link href="/journal">Record your first entry</Link>
             </Button>
           </div>
         ) : (

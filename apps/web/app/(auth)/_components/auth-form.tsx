@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { Button, Input, toast } from "@mindreva/ui";
+import { Button, Input, buttonVariants, cn, toast } from "@mindreva/ui";
 import { createClient } from "@mindreva/auth/client";
 import { GoogleIcon } from "./google-icon";
 
@@ -161,13 +161,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
               type="button"
               aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword((v) => !v)}
-              className="text-muted-foreground hover:text-foreground absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-            >
-              {showPassword ? (
-                <EyeOff className="size-4" />
-              ) : (
-                <Eye className="size-4" />
+              className={cn(
+                buttonVariants({ variant: "quiet", size: "icon-sm" }),
+                "absolute right-2 top-1/2 -translate-y-1/2",
               )}
+            >
+              {showPassword ? <EyeOff /> : <Eye />}
             </button>
           </div>
         </div>
