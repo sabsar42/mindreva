@@ -115,7 +115,10 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
             : style
         }
         className={cn(
-          "bg-card border-border shadow-subtle group/card relative flex items-center gap-3 overflow-hidden rounded-2xl border p-5",
+          // Every ready card is exactly the same size (the cover is 80px, the
+          // padding 14px); a card still forming may be taller until it settles.
+          "bg-card border-border shadow-subtle group/card relative flex items-center gap-3 overflow-hidden rounded-2xl border p-3.5",
+          forming ? "min-h-[108px]" : "h-[108px]",
           // Ready cards respond to a hover or a tap: a small lift, a green
           // edge, and the thumbnail leaning in. Cards still forming don't
           // (there is nothing to open yet).
@@ -179,11 +182,11 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
             </>
           ) : (
             <>
-              <h3 className="text-foreground mt-2 line-clamp-1 text-lg font-bold leading-snug">
+              <h3 className="text-foreground mt-1 line-clamp-1 text-lg font-bold leading-snug">
                 {title}
               </h3>
               {snippet && (
-                <p className="text-muted-foreground mt-1.5 line-clamp-2 text-sm leading-relaxed">
+                <p className="text-muted-foreground mt-1 line-clamp-2 text-sm leading-snug">
                   {snippet}
                 </p>
               )}

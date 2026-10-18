@@ -11,6 +11,7 @@ import {
   NoteCard,
   SwipeableRow,
   buttonVariants,
+  haptic,
   toast,
   type WeekInfo,
 } from "@mindreva/ui";
@@ -112,6 +113,7 @@ export function EntryListScreen({
         refreshedFor.current.delete(m.id);
         settleForming(m.id);
         setCelebrating(true);
+        haptic("success");
       }
     }
   }, [forming, entries, router]);

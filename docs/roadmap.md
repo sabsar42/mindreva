@@ -1489,6 +1489,8 @@ apps/web/
 - **Anything that must keep working while the user navigates (a memory forming) belongs in a module-level store, not component state.** Reset it when the signed-in user changes.
 - **Don't build a status UI from timers.** The forming card advances only on real results (transcript done, summary done); a failure turns it neutral, never leaves it green.
 - **Don't hand-style a button.** Use `Button` / `buttonVariants` (role = variant, size = scale in `button-variants.tsx`). A new look for a button is a new variant there, so it shows up the same on every page and in both themes.
+- **No plan, tier, quota-bar or upgrade UI, ever.** Support is a voluntary link (`NEXT_PUBLIC_SUPPORT_URL`) that unlocks nothing; a limit is explained calmly, never sold against.
+- **Keep targets 44px.** New compact styling must not shrink tap targets; use the base-layer hit area, and `data-dense` only for packed grids.
 - **A module-level client cache outlives sign-out** (it's a client-side redirect, not a reload). Key or clear it by the signed-in user.
 
 ---

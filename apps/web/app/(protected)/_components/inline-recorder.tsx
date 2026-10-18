@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Flame, Loader2, Mic, RotateCcw, Square, X } from "lucide-react";
-import { LeafMark, buttonVariants, cn } from "@mindreva/ui";
+import { LeafMark, buttonVariants, cn, haptic } from "@mindreva/ui";
 import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import type { RecorderPhase } from "@/lib/mori-mood";
 
@@ -133,7 +133,10 @@ export function InlineRecorder({
         <button
           type="button"
           aria-label="Start recording"
-          onClick={() => void rec.start()}
+          onClick={() => {
+            haptic("tap");
+            void rec.start();
+          }}
           className={cn(
             BAR,
             PRESS,
@@ -188,7 +191,10 @@ export function InlineRecorder({
             </button>
             <button
               type="button"
-              onClick={() => void rec.start()}
+              onClick={() => {
+                haptic("tap");
+                void rec.start();
+              }}
               className={buttonVariants({
                 variant: "primary",
                 size: "lg",
@@ -296,7 +302,10 @@ export function InlineRecorder({
             ) : (
               <button
                 type="button"
-                onClick={rec.finish}
+                onClick={() => {
+                  haptic("tap");
+                  rec.finish();
+                }}
                 disabled={!live}
                 aria-label="Stop and save recording"
                 className={buttonVariants({

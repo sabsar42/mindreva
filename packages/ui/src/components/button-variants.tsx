@@ -30,12 +30,12 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-gradient-primary text-primary-foreground shadow-subtle hover:brightness-105 active:bg-gradient-primary-pressed",
+          "bg-gradient-primary text-primary-foreground shadow-button hover:brightness-105 active:bg-gradient-primary-pressed",
         // Dark ink pill: the Apple "Continue with…" treatment. Reads as the
         // strongest button on a screen, so it is for the single top action.
-        ink: "bg-gradient-ink text-white shadow-subtle hover:brightness-110",
+        ink: "bg-gradient-ink text-white shadow-button hover:brightness-110",
         destructive:
-          "bg-gradient-danger text-destructive-foreground shadow-subtle hover:brightness-105",
+          "bg-gradient-danger text-white shadow-button hover:brightness-105",
         secondary:
           "bg-card text-foreground border border-border shadow-subtle hover:bg-secondary",
         outline:

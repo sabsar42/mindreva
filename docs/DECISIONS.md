@@ -11,6 +11,22 @@ rather than resolved.
 
 ---
 
+## 2026-10-19 — The sign-in page is the design reference; neutral, flat, no rim
+
+The sign-in and sign-up pages are the reference for the whole app. Surfaces use Apple's neutral grays instead of a warm cream; borders are plain hairlines; cards carry no inner rim light and (in dark) no shadow, because a bright 1px rim on a near-black card reads as an outline, not as depth. Dark mode steps surfaces up from true black instead of lifting the page. Filled buttons keep their top-edge highlight because that is what gives the sign-in buttons their depth. The paper grain added earlier the same day was removed for the same reason. Radius tightened to 22px for a more compact feel.
+
+---
+
+## 2026-10-19 — Tactile and compact through tokens; no plans; support is voluntary
+
+- **Through tokens, not screens.** Press, shadows, springs, the type scale and the 44px hit areas live in `tokens.css` base rules and `packages/ui` components, so new screens inherit them. The type scale is lowered in the theme tokens (text only) rather than by shrinking the root font size, because rem also drives spacing and tap-target sizes.
+- **Hit areas via `::after`**, with a `data-dense` opt-out for packed grids, because enlarging every control's real box would undo "compact", and overlapping 44px zones in the day grids would misroute taps.
+- **A deeper dark-mode red** for the destructive gradient instead of changing the label per theme: no single label colour passed contrast across the old gradient.
+- **No tiers anywhere.** The app has no paid plans; the plan and usage columns remain only as unused database columns. Support is a link out to a page the owner chooses via an env var, hidden when unset. Past Self's two-conversations-per-period cap stays (it keeps each period focused) but is described as a plain limit, not a plan.
+- **Legal text is written from the code, not boilerplate**, and carries no invented contact details: the contact line shows only when `NEXT_PUBLIC_CONTACT_EMAIL` is set. It is a plain-language draft the owner should read and adjust.
+
+---
+
 ## 2026-10-18 — Mori, auto-summarising inline recordings, and what was removed
 
 **What happened:** The owner asked for Mori (the leaf mascot) as a living

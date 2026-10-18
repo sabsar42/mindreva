@@ -27,10 +27,10 @@ import type { RiverData } from "@/lib/services/mindmap.service";
 // so the refresh would never actually invalidate the cached list.
 const SESSIONS_STALE_KEY = "mindreva:chat-sessions-stale";
 
-// Free-tier cap on conversations per half-year session. Must match
-// MAX_FREE_CONVERSATIONS_PER_HALF in lib/services/persona-chat.service.ts,
-// which actually enforces it server-side — this is only for the UI copy.
-const MAX_FREE_CONVERSATIONS_PER_HALF = 2;
+// Cap on conversations per half-year session. Must match
+// MAX_CONVERSATIONS_PER_HALF in lib/services/persona-chat.service.ts, which
+// actually enforces it server-side — this is only for the UI copy.
+const MAX_CONVERSATIONS_PER_HALF = 2;
 
 function markSessionsStale(): void {
   try {
@@ -180,8 +180,8 @@ function SessionCard({
                     Conversations
                   </h3>
                   <span className="text-muted-foreground/80 text-xs">
-                    {session.conversations.length}/
-                    {MAX_FREE_CONVERSATIONS_PER_HALF} on the free plan
+                    {session.conversations.length} of{" "}
+                    {MAX_CONVERSATIONS_PER_HALF} for this period
                   </span>
                 </div>
                 <ul className="mt-2 space-y-1.5">

@@ -40,6 +40,7 @@ Completed: Phase 1 (Monorepo Bootstrap and Dev Environment), Phase 2 (Design Sys
 - Journals and notes are one shared `entries` table distinguished by a
   `type` field. Never build two parallel systems for them.
 - Entries are soft-deleted only (`deleted_at`). Never a hard DELETE.
+- Nothing is gated behind payment or support, and no screen shows a plan, a paid tier or an upgrade prompt. The support link (`NEXT_PUBLIC_SUPPORT_URL`) is voluntary and unlocks nothing; a limit is explained calmly.
 
 ## Stack
 

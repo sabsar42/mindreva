@@ -39,7 +39,7 @@ const BottomSheetContent = React.forwardRef<
       className={cn(
         // A slide-up drawer anchored to the bottom, at every width: the app is
         // one phone-width column, so sheets stay sheets on desktop too.
-        "border-border bg-popover text-popover-foreground shadow-elevated fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md rounded-t-3xl border border-b-0 px-5 pb-8 pt-3",
+        "border-border bg-popover text-popover-foreground shadow-elevated fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md rounded-t-3xl border border-b-0 px-4 pb-6 pt-2.5",
         "data-[state=open]:animate-slide-up data-[state=closed]:animate-slide-down",
         className,
       )}
@@ -48,7 +48,7 @@ const BottomSheetContent = React.forwardRef<
       {/* Drag handle */}
       <div
         aria-hidden
-        className="bg-border mx-auto mb-4 h-1.5 w-10 rounded-full"
+        className="bg-border mx-auto mb-3 h-1.5 w-10 rounded-full"
       />
       {children}
     </DialogPrimitive.Content>

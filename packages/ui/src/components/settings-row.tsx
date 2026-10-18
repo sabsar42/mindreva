@@ -41,7 +41,7 @@ const SettingsRow = React.forwardRef<HTMLDivElement, SettingsRowProps>(
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         className={cn(
-          "flex items-center gap-3.5 px-5 py-4",
+          "flex items-center gap-3 px-4 py-3",
           interactive &&
             "hover:bg-secondary focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
           className,

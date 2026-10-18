@@ -418,13 +418,13 @@ export function ComponentsGallery() {
       <Section title="Cards">
         <Card>
           <CardHeader>
-            <CardTitle>More time to think out loud</CardTitle>
+            <CardTitle>A calm card</CardTitle>
             <CardDescription>
-              Mindreva Pro gives you 30 hours and 30 notes a month.
+              One idea per card, with room to breathe.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button size="sm">See plans</Button>
+            <Button size="sm">Open</Button>
           </CardContent>
         </Card>
       </Section>

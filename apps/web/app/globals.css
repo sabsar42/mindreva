@@ -14,6 +14,10 @@
     background-color: var(--color-canvas);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    /* A notch smaller and tighter than the browser default (see the type
+       scale in tokens.css). */
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }

@@ -23,6 +23,7 @@ import {
   TaskChecklist,
   buttonVariants,
   cn,
+  haptic,
   toast,
   type TaskChecklistTask,
 } from "@mindreva/ui";
@@ -273,6 +274,7 @@ export function EntryDetail({
         return persistText(keepalive);
       }
       setTextState("saved");
+      haptic("success");
       return true;
     } catch {
       textSavingRef.current = false;

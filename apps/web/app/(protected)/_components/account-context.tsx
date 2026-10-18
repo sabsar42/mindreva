@@ -6,8 +6,6 @@ import * as React from "react";
 export interface AccountSummary {
   name: string;
   email: string;
-  plan: string;
-  minutesUsed: number;
 }
 
 /**

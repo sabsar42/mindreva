@@ -51,6 +51,18 @@ The long-press option (today at a glance + Quiet mode) and the card hover/tap
 effect (lift + green edge) were not specified precisely. Not yet tried on a real
 phone or iOS Safari (long-press timing, `dvh`, haptics).
 
+## Haptics do nothing on iOS Safari, and the native app is not in this repo
+
+**Status:** Open.
+
+`haptic()` uses `navigator.vibrate` (Android browsers only) and the Capacitor Haptics plugin when `window.Capacitor` exists. iOS Safari has no vibration API, so web users there get no haptics. There is no Capacitor project here yet, so the native path is untested on a device.
+
+## Entry body has no ruled lines
+
+**Status:** Open (optional polish).
+
+Faint notebook lines would drift against the text because paragraph spacing (12px) isn't a multiple of the line height. Needs the editor's paragraph spacing changed to a whole number of lines first.
+
 ## Fixed Journal header leaves little room for the list on short screens
 
 **Status:** Open — owner's call.
@@ -61,14 +73,11 @@ less in landscape. If that is too tight, collapse the graph (or the header)
 while the list scrolls. Not tried on a real phone or iOS Safari (`dvh`,
 safe-area at the top).
 
-## Privacy, Terms, Support and "Delete account" links are dead (404)
+## Privacy and Terms are drafts; there is no account-deletion flow
 
-**Status:** Open — needs owner input.
+**Status:** Open — needs the owner.
 
-The sign-in/sign-up footer and the Account page link to `/privacy`,
-`/terms` and `/support`, none of which exist; "Delete account" also points to
-`/support`. Needs real policy text and a support contact (not something to
-generate), or the links should be hidden until those exist.
+`/privacy` and `/terms` now exist (plain-language drafts written from what the app does). They should be read and adjusted by the owner, and `NEXT_PUBLIC_CONTACT_EMAIL` set so people have a way to ask for deletion or a copy of their data. There is still no in-app "Delete account" (the old link was dead and was removed): deletion is by request only.
 
 ## Older photos still load full size in lists
 

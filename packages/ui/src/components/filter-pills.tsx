@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "../lib/utils";
+import { haptic } from "../lib/haptics";
 
 export interface FilterPillOption {
   value: string;
@@ -43,12 +44,15 @@ function FilterPills({
             type="button"
             role="tab"
             aria-selected={selected}
-            onClick={() => onValueChange(option.value)}
+            onClick={() => {
+              if (!selected) haptic("tap");
+              onValueChange(option.value);
+            }}
             className={cn(
-              "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1.5 text-sm font-medium transition-colors sm:px-3",
+              "spring inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1.5 text-sm font-medium transition-[background-color,color,box-shadow] sm:px-3",
               "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
               selected
-                ? "bg-card text-foreground shadow-subtle"
+                ? "bg-card text-foreground shadow-pressed"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

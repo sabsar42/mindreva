@@ -7,6 +7,41 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-19 — One Apple-style theme: neutral palette, flat dark mode, no cream
+
+Owner feedback: the dashboard and dark mode didn't match the sign-in page; wanted one coherent, compact, techy Apple look with no cream on edges or borders.
+
+- **Diagnosis.** The sign-in page works because it is flat: ink and green gradient pills, pill inputs, soft shadow. The dashboard had warm cream surfaces (page `#f8f6f2`, borders `#e6e3dd`, inputs `#e1ded7`), a bright 1px inner rim on every card, and a paper grain; dark mode had a page and cards only a few shades apart (`#151617` / `#1e2022`) with a glowing rim, which read as outlined and muddy.
+- **Light:** neutral Apple grays. Page `#f5f5f7`, cards white, text `#1d1d1f`, secondary text `#6a6a70`, hairline `#e5e5ea`, input edge `#d2d2d7`, fills `#efeff2`. Cards are flat with a soft shadow and no rim. Card radius 28px to 22px.
+- **Dark:** Apple-style layers on true black. Page `#000`, cards `#1c1c1e`, raised fills `#2c2c2e`, sheets `#242426`, hairline `#2c2c2e`, text `#f5f5f7`, secondary `#9c9ca3`. No shadows or rim on cards (depth comes from the surface step); inputs `#3a3a3c`.
+- **Filled buttons** (primary, ink, destructive) keep a hairline of light along the top edge (new `--shadow-button`), as on the sign-in buttons; cards do not. Ink gradient is neutral (`#3a3a3c` to `#1d1d1f`; dark `#48484a` to `#303032`).
+- **Paper grain removed** (it was neither Apple nor techy). The brand green, mint and Mori are unchanged.
+- All colors live in `packages/ui/src/styles/tokens.css`; nothing was hard-coded elsewhere, so every screen, including the recording bar, the week strip, sheets and the legal pages, follows from the tokens alone.
+- **Contrast re-checked** on the new pairs, both themes: everything meets 4.5:1. Two small adjustments: dark day numbers on the brightest heat shades are pure black (they were 4.26:1), and dark destructive text is `#ff6b66`.
+
+## 2026-10-19 — Tactile and compact polish, and no more plans: a voluntary support link
+
+### Polish (through `packages/ui` tokens and components, so every screen follows)
+
+- **Pressed states everywhere.** Every button and `role="button|tab|switch|menuitem"` scales to 0.975 in about 100ms while its raised shadow gives way to an inset one (`press` utility plus a base-layer rule; no per-screen edits). Verified live: `matrix(0.975…)` and an inset shadow while pressed.
+- **Raised and inset.** `--shadow-subtle` / `--shadow-elevated` are now two soft layers plus a faint 1px top highlight (white in light, 6-8% white in dark); new `--shadow-pressed` is the inset look used for pressed and _selected_ states (tabs, pills).
+- **Springs.** `--ease-spring` and a `spring` utility drive the Switch thumb and track and tab/pill changes.
+- **Haptics.** `haptic()` in `packages/ui/src/lib/haptics.ts`: the Capacitor Haptics plugin in the native app (read from the global `Capacitor`, no new dependency), `navigator.vibrate(10)` on supporting browsers, silent everywhere else (iOS Safari, desktop, server). Wired to record start/stop/discard, every Switch, segmented pills, a successful entry save, and a memory finishing. 7 tests.
+- **Reduced motion.** No scale and no spring: `*:active { transform: none }` plus the existing collapse of durations. Verified live.
+- ~~Paper grain~~ (added, then removed the same day; see the Apple-style theme entry above).
+- **Compact.** Type scale one notch smaller and tighter through the theme tokens (base 15px / 1.45, sm 13px, lg 17px, 4xl 34px); body picks it up. Less padding in Card, SettingsRow and bottom sheets. **Every list card is exactly 108px** (cover 80px, padding 14px) with 8px gaps; a card still forming may be taller until it settles.
+- **Tap targets stay 44px.** A base-layer `::after` gives every tappable a hit area of at least 44 x 44 however small it looks. Packed grids of tiny cells (the activity graph's days) opt out with `data-dense` so their hit areas don't overlap. Live check: all 28 real tappables on the Journal are >= 44px.
+- **Contrast re-checked** (script of real token pairs, both themes, including the grain as a worst-case background shift): everything meets 4.5:1 except one pair that already failed, the dark-mode destructive button (label 3.33:1 at the top of its gradient). Fixed with a deeper dark red (`#d23b38` to `#b82a28`) and a white label (4.75:1 / 6.18:1). Muted text on the page with grain: 5.14:1 light, 7.06:1 dark.
+- Not done: faint ruled lines in the entry body. The editor's paragraph spacing (12px) isn't a multiple of its line height, so the lines would drift out of line with the text; it needs a paragraph-spacing change first.
+
+### Plans removed, voluntary support added (no payments)
+
+- **Removed:** the plan badge (Account screen and avatar sheet), the "This month" usage bars, "Free plan" / "· Free" copy, the "on the free plan" conversation counter in Past Self (now "n of 2 for this period"; constant renamed `MAX_CONVERSATIONS_PER_HALF`), and the Pro / "See plans" demo card in the dev gallery. `AccountSummary` no longer carries `plan` or `minutesUsed`. The `profiles` plan and usage columns stay in the database, unused.
+- **Support Mindreva** (`NEXT_PUBLIC_SUPPORT_URL`): a row on the Account screen and a small footer link (Account footer and the sign-in/sign-up footer). Opens in a new tab with `rel="noopener noreferrer"`; only http(s) URLs are accepted; **hidden entirely when the variable is empty**. Copy: "Entirely voluntary. It unlocks nothing: every feature is free for everyone." Nothing is gated behind it.
+- **Friendly limits.** A provider limit (HTTP 429/402, quota, rate limit) now returns a calm message, never an upgrade prompt: summaries show "Today's summary limit is reached. Your recording is saved; try again tomorrow." on the card; Past Self shows "We've reached today's limit for this. Nothing is lost, and it will work again tomorrow." `lib/limit-error.ts` (tests assert the copy never mentions plans, upgrades or payment).
+- **Privacy and Terms pages** at `/privacy` and `/terms` (public, in a new `(legal)` route group), linked from the Account screen and the sign-in footer. Written from what the code actually does: what is stored, which services see audio and text (Supabase, Groq/Hugging Face, OpenRouter/Gemini/Claude, Vercel, Sentry if enabled with text and media masked), sharing, and soft-deleted Trash. The support section appears only when the link is set; a contact address (`NEXT_PUBLIC_CONTACT_EMAIL`) appears only when set.
+- The dead `/support` and "Delete account" links are gone.
+
 ## 2026-10-18 — One button hierarchy across every page and theme
 
 `packages/ui/src/components/button-variants.tsx` is now the single scale, with

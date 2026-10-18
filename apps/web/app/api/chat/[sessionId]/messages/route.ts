@@ -1,3 +1,4 @@
+import { LIMIT_MESSAGE, isLimitError } from "@/lib/limit-error";
 import { NextResponse } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import {
@@ -66,7 +67,9 @@ export async function POST(
         send({
           error: message.includes("message limit")
             ? message
-            : "Failed to send message",
+            : isLimitError(err)
+              ? LIMIT_MESSAGE
+              : "Failed to send message",
         });
       } finally {
         controller.close();

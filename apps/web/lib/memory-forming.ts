@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { SUMMARY_LIMIT_MESSAGE } from "@/lib/limit-error";
 
 /**
  * Memories that are being made right now, shared across the app.
@@ -123,6 +124,7 @@ async function run(id: string) {
       method: "POST",
       signal: controller.signal,
     });
+    if (res.status === 429) return fail(id, SUMMARY_LIMIT_MESSAGE);
     if (!res.ok) throw new Error("summarize failed");
   } catch {
     return fail(

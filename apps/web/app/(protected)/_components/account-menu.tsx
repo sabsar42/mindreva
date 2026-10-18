@@ -10,10 +10,8 @@ import {
   BottomSheetDescription,
   BottomSheetTitle,
   BottomSheetTrigger,
-  Badge,
   Button,
   IconTile,
-  ProgressBar,
   cn,
   initialsFromName,
 } from "@mindreva/ui";
@@ -22,11 +20,8 @@ import { useAccount } from "./account-context";
 import { PrefetchLink } from "./prefetch-link";
 import { ThemeSwitchRow } from "./theme-switch-row";
 
-/** Matches the quota shown on the full Account page. */
-const MONTHLY_MINUTES = 60;
-
 /**
- * The avatar button and the sheet it opens: who you are, how much you've used,
+ * The avatar button and the sheet it opens: who you are,
  * and the controls that are about you rather than about your entries.
  * The full settings (summary style, languages, archive, trash) stay on
  * /account; this is the quick version.
@@ -39,7 +34,6 @@ function AccountMenuInner({ className }: { className?: string }) {
   if (!account) return null;
 
   const close = () => setOpen(false);
-  const minutes = Math.min(account.minutesUsed, MONTHLY_MINUTES);
 
   return (
     <BottomSheet open={open} onOpenChange={setOpen}>
@@ -67,7 +61,7 @@ function AccountMenuInner({ className }: { className?: string }) {
       <BottomSheetContent>
         <BottomSheetTitle className="sr-only">Account</BottomSheetTitle>
         <BottomSheetDescription className="sr-only">
-          Your profile, usage and quick settings.
+          Your profile and quick settings.
         </BottomSheetDescription>
 
         <div className="flex items-center gap-3">
@@ -84,18 +78,6 @@ function AccountMenuInner({ className }: { className?: string }) {
               {account.email}
             </p>
           </div>
-          <Badge variant="neutral" className="capitalize">
-            {account.plan}
-          </Badge>
-        </div>
-
-        <div className="border-border bg-card shadow-subtle mt-5 rounded-2xl border p-4">
-          <ProgressBar
-            label="Recording time this month"
-            valueLabel={`${minutes}m of ${MONTHLY_MINUTES}m`}
-            current={minutes}
-            max={MONTHLY_MINUTES}
-          />
         </div>
 
         <div className="border-border bg-card shadow-subtle mt-3 divide-y overflow-hidden rounded-2xl border">

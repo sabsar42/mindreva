@@ -23,12 +23,11 @@ const MATCH_LIMIT = 8;
 // disappears fast if one conversation can run unbounded turns."
 export const MAX_MESSAGES_PER_SESSION = 40;
 
-// Free-tier cap: at most this many conversations per half-year session. A
-// paid tier can raise or remove this later — not configured yet, so for now
-// it's a single constant, not a plan lookup. Starting a conversation that
-// would exceed it soft-deletes the OLDEST live one in that half first, same
-// as entries: never a hard delete.
-export const MAX_FREE_CONVERSATIONS_PER_HALF = 2;
+// At most this many conversations per half-year session, so each period stays
+// focused. This is a plain limit, not a plan: nothing can be bought to change
+// it. Starting a conversation that would exceed it soft-deletes the OLDEST live
+// one in that half first, same as entries: never a hard delete.
+export const MAX_CONVERSATIONS_PER_HALF = 2;
 
 async function requireUserId(): Promise<string> {
   const user = await getUser();
@@ -85,10 +84,10 @@ export async function startPersonaChatSession(input: {
       input.yearStart,
       half,
     );
-    if (existing.length >= MAX_FREE_CONVERSATIONS_PER_HALF) {
+    if (existing.length >= MAX_CONVERSATIONS_PER_HALF) {
       const toRemove = existing.slice(
         0,
-        existing.length - MAX_FREE_CONVERSATIONS_PER_HALF + 1,
+        existing.length - MAX_CONVERSATIONS_PER_HALF + 1,
       );
       for (const old of toRemove) {
         await ChatRepository.softDeleteSession(old.id, userId);

@@ -15,8 +15,6 @@ async function loadAccount(): Promise<AccountSummary | null> {
     return {
       name: profile?.displayName || email.split("@")[0] || "You",
       email,
-      plan: profile?.plan ?? "free",
-      minutesUsed: profile?.minutesUsedThisPeriod ?? 0,
     };
   } catch {
     // The avatar menu is a convenience; never let it take a page down.

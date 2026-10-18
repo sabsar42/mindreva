@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LeafMark } from "@mindreva/ui";
+import { SupportFooterLink } from "../_components/support-link";
 
 export default function AuthLayout({
   children,
@@ -35,12 +36,7 @@ export default function AuthLayout({
           >
             Terms
           </Link>
-          <Link
-            href="/support"
-            className="text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
-          >
-            Support
-          </Link>
+          <SupportFooterLink className="text-muted-foreground hover:text-foreground underline-offset-2 hover:underline" />
         </nav>
         <p className="text-muted-foreground text-xs">
           Recording works best in the Mindreva mobile app. The web can&apos;t

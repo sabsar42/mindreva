@@ -111,3 +111,4 @@ export {
   type ActivitySheetProps,
 } from "./components/activity-graph";
 export { Mori, type MoriMood, type MoriProps } from "./components/mori";
+export { haptic, type HapticKind } from "./lib/haptics";

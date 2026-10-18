@@ -175,6 +175,7 @@ const WeekPage = React.memo(function WeekPage({
             <button
               type="button"
               data-key={key}
+              data-dense
               aria-label={describe(day, key)}
               className={cn(
                 "h-9 w-full max-w-[34px] rounded-[10px]",
@@ -602,6 +603,7 @@ function YearGrid({
                     key={key}
                     type="button"
                     data-key={key}
+                    data-dense
                     aria-label={describe(getDay(key), key)}
                     className={cn(
                       "rounded-[3px]",
