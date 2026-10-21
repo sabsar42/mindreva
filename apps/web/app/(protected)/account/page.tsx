@@ -44,8 +44,8 @@ export default async function AccountPage() {
 
   return (
     <>
-      <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
-        <PageHeader back="/journal" title="Account" className="mb-6" />
+      <main className="min-h-app mx-auto px-5 pb-24 pt-6">
+        <PageHeader back="/journal" title="Account" className="mb-4" />
 
         <div className="space-y-4">
           {/* Profile */}
@@ -61,7 +61,7 @@ export default async function AccountPage() {
             </div>
           </Card>
 
-          <Card className="divide-border divide-y p-0">
+          <Card className="grouped-list overflow-hidden p-0">
             <SettingsRow
               icon={<RefreshCw />}
               title="Cloud sync"
@@ -93,12 +93,9 @@ export default async function AccountPage() {
             </PrefetchLink>
           </Card>
 
-          <Card className="divide-border divide-y overflow-hidden p-0">
+          <Card className="grouped-list overflow-hidden p-0">
             <SupportRow />
-            <Link
-              href="/privacy"
-              className="hover:bg-secondary block transition-colors"
-            >
+            <Link href="/privacy" className="hover:bg-secondary block">
               <SettingsRow
                 icon={<ShieldCheck />}
                 title="Privacy"
@@ -106,10 +103,7 @@ export default async function AccountPage() {
                 chevron
               />
             </Link>
-            <Link
-              href="/terms"
-              className="hover:bg-secondary block transition-colors"
-            >
+            <Link href="/terms" className="hover:bg-secondary block">
               <SettingsRow
                 icon={<FileText />}
                 title="Terms"
@@ -133,14 +127,14 @@ export default async function AccountPage() {
           <div className="flex flex-col items-center gap-4 py-4">
             <SignOutButton />
             <nav className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs">
-              <Link href="/privacy" className="hover:underline">
+              <Link href="/privacy" className="hit-44 hover:underline">
                 Privacy
               </Link>
               <span aria-hidden>·</span>
-              <Link href="/terms" className="hover:underline">
+              <Link href="/terms" className="hit-44 hover:underline">
                 Terms
               </Link>
-              <SupportFooterLink className="before:mr-3 before:content-['·'] hover:underline" />
+              <SupportFooterLink className="hit-44 before:mr-3 before:content-['·'] hover:underline" />
             </nav>
           </div>
         </div>

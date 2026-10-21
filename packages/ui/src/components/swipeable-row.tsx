@@ -24,7 +24,16 @@ export interface SwipeableRowProps {
 
 const ACTION_WIDTH = 76;
 const OPEN_THRESHOLD = 40;
-const DRAG_THRESHOLD_PX = 4;
+const DRAG_THRESHOLD_PX = 6;
+// A flick faster than this (px/ms) opens or closes regardless of distance.
+const FLICK_VELOCITY = 0.4;
+
+/** Past an edge the row still follows the finger, but with resistance. */
+function rubberBand(value: number, min: number, max: number): number {
+  if (value > max) return max + Math.sqrt(value - max) * 2;
+  if (value < min) return min - Math.sqrt(min - value) * 2;
+  return value;
+}
 
 /**
  * Wraps a card (NoteCard) so swiping it left reveals one or more actions
@@ -39,14 +48,12 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
   const [offset, setOffset] = React.useState(0);
   const [dragging, setDragging] = React.useState(false);
   const startXRef = React.useRef(0);
+  const startYRef = React.useRef(0);
   const startOffsetRef = React.useRef(0);
   const pointerDownRef = React.useRef(false);
   const draggedRef = React.useRef(false);
+  const velocityRef = React.useRef({ x: 0, t: 0, v: 0 });
   const maxOffset = actions.length * ACTION_WIDTH;
-
-  function clamp(value: number): number {
-    return Math.min(0, Math.max(-maxOffset, value));
-  }
 
   // Pointer-down itself stays free of any state update or DOM API call — a
   // plain tap (by far the most common interaction) should cost nothing here
@@ -57,9 +64,11 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (actions.length === 0) return;
     startXRef.current = e.clientX;
+    startYRef.current = e.clientY;
     startOffsetRef.current = offset;
     pointerDownRef.current = true;
     draggedRef.current = false;
+    velocityRef.current = { x: e.clientX, t: e.timeStamp, v: 0 };
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -67,20 +76,38 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
     const delta = e.clientX - startXRef.current;
 
     if (!draggedRef.current) {
+      const dy = Math.abs(e.clientY - startYRef.current);
+      // Mostly vertical: it's a scroll, so let the list have it.
+      if (dy > DRAG_THRESHOLD_PX && dy > Math.abs(delta)) {
+        pointerDownRef.current = false;
+        return;
+      }
       if (Math.abs(delta) <= DRAG_THRESHOLD_PX) return;
       draggedRef.current = true;
       setDragging(true);
       e.currentTarget.setPointerCapture(e.pointerId);
     }
 
-    setOffset(clamp(startOffsetRef.current + delta));
+    const last = velocityRef.current;
+    const dt = Math.max(1, e.timeStamp - last.t);
+    velocityRef.current = {
+      x: e.clientX,
+      t: e.timeStamp,
+      v: (e.clientX - last.x) / dt,
+    };
+    setOffset(rubberBand(startOffsetRef.current + delta, -maxOffset, 0));
   }
 
   function handlePointerUp() {
     pointerDownRef.current = false;
     if (!dragging) return;
     setDragging(false);
-    setOffset((current) => (current <= -OPEN_THRESHOLD ? -maxOffset : 0));
+    const v = velocityRef.current.v;
+    setOffset((current) => {
+      if (v < -FLICK_VELOCITY) return -maxOffset; // flicked left: open
+      if (v > FLICK_VELOCITY) return 0; // flicked right: close
+      return current <= -OPEN_THRESHOLD ? -maxOffset : 0;
+    });
   }
 
   function close() {
@@ -100,7 +127,8 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
   return (
     <div
       data-swipeable-row=""
-      className={cn("relative overflow-hidden rounded-lg", className)}
+      // Same radius as the card inside, so the revealed actions match it.
+      className={cn("relative overflow-hidden rounded-2xl", className)}
     >
       <div
         className="absolute inset-y-0 right-0 flex"
@@ -133,7 +161,17 @@ function SwipeableRow({ children, actions, className }: SwipeableRowProps) {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onClickCapture={handleClickCapture}
-        className={cn(!dragging && "transition-transform duration-200")}
+        // With a mouse, pressing and moving on the card's link (or its cover
+        // image) starts the browser's own drag-and-drop, which swallows the
+        // pointer after the first move. The row is the drag here.
+        onDragStart={(e) => e.preventDefault()}
+        // pan-y: vertical scrolling stays native; horizontal moves come to
+        // us instead of being claimed (and cancelled) by the browser.
+        className={cn(
+          "touch-pan-y",
+          !dragging &&
+            "duration-(--duration-base) ease-sheet transition-transform",
+        )}
         style={{ transform: `translateX(${offset}px)` }}
       >
         {children}

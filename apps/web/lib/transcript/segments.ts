@@ -42,7 +42,9 @@ export function formatRange(startMs: number, endMs: number): string {
  * "1:02:05". Returns milliseconds, or null when it isn't a time.
  */
 export function parseTimestamp(input: string): number | null {
-  const value = input.trim();
+  // "." and "," count as ":" too: the phone's decimal keypad (the field's
+  // inputMode) has one of those, depending on locale, but never a colon.
+  const value = input.trim().replace(/[.,]/g, ":");
   if (!/^\d+(:\d{1,2}){0,2}$/.test(value)) return null;
   const parts = value.split(":").map(Number);
   if (parts.length === 1) return parts[0]! * 1000;

@@ -126,7 +126,7 @@ export function TranscriptSheet({
 
   return (
     <BottomSheet open={open} onOpenChange={onOpenChange}>
-      <BottomSheetContent className="flex max-h-[90vh] flex-col">
+      <BottomSheetContent className="flex max-h-[90dvh] flex-col">
         <div className="flex items-center gap-3">
           <IconTile>
             <FileText />
@@ -178,11 +178,13 @@ export function TranscriptSheet({
                         setJump(e.target.value);
                         setJumpError(null);
                       }}
-                      inputMode="numeric"
+                      inputMode="decimal"
+                      enterKeyHint="go"
+                      autoComplete="off"
                       placeholder="Jump to a time, e.g. 1:15"
                       aria-label="Jump to a time"
                       aria-invalid={jumpError ? true : undefined}
-                      className="h-11 pl-10 text-sm"
+                      className="h-11 pl-10"
                     />
                   </div>
                   {jumpError && (

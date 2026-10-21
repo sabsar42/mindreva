@@ -4,7 +4,7 @@ import { Skeleton } from "@mindreva/ui/skeleton";
 
 export default function IntegrationsLoading() {
   return (
-    <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
       <div className="flex items-center gap-3">
         <Skeleton className="size-10 rounded-full" />
         <Skeleton className="h-7 w-40" />

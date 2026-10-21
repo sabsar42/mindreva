@@ -35,6 +35,13 @@ describe("parseTimestamp", () => {
     expect(parseTimestamp("1:02:05")).toBe(3_725_000);
   });
 
+  it("accepts . and , from a phone's decimal keypad as separators", () => {
+    expect(parseTimestamp("1.15")).toBe(75_000);
+    expect(parseTimestamp("1,15")).toBe(75_000);
+    expect(parseTimestamp("1.02.05")).toBe(3_725_000);
+    expect(parseTimestamp("1.75")).toBeNull();
+  });
+
   it("rejects things that are not times", () => {
     expect(parseTimestamp("")).toBeNull();
     expect(parseTimestamp("abc")).toBeNull();

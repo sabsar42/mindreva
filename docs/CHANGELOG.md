@@ -7,6 +7,52 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-22 — iOS-native polish pass (tokens, components, gestures, safe areas)
+
+A refinement pass toward an iOS feel, on top of the 2026-10-19 Apple-style theme. No business logic, API, schema, auth or routing changed. Branch `feat/ios-polish`.
+
+### Tokens (`packages/ui/src/styles/tokens.css`)
+
+- **System font.** Sans is the San Francisco system stack (`-apple-system, BlinkMacSystemFont, "SF Pro Text", …`); Geist and Geist Mono are no longer downloaded (mono was unused). Fraunces stays for the serif, now `display: swap`. Webfont files in the build: 14 (248 KB) to 3 (84 KB).
+- **iOS type names** alongside the existing compact scale, which already lined up with it: `text-large-title`, `title-1..3`, `headline`, `body`, `callout`, `subhead`, `footnote`, `caption` (rem, so system text size scales them). `cn()` knows they are font sizes, so `tailwind-merge` doesn't drop a text colour next to them.
+- New tokens: `--separator` (0.5px hairline), `--label-tertiary`, `--material` / `--material-solid`, `--row-pressed`, `--duration-fast/base/slow`, `--ease-standard/-exit/-sheet`, `--radius-sheet` (28px), `--safe-top/bottom/left/right`. Dark-mode success / warning / info colours lifted to at least 4.5:1 on dark surfaces.
+- **Materials:** `bg-material` / `bg-glass` use `saturate(180%) blur(20px)` and fall back to solid surfaces without `backdrop-filter` or under `prefers-reduced-transparency`.
+- **Accessibility media:** `prefers-contrast: more` firms up hairlines and secondary text; `forced-colors` keeps a real focus outline.
+- **Mobile basics:** no tap highlight, `touch-action: manipulation` on controls (no double-tap-zoom delay), no text selection or callout on buttons, `text-size-adjust: 100%`.
+- **Press timing:** presses land in 80ms (scale 0.97) and release over 220ms with an ease-out, instead of 100ms both ways.
+- Utilities: `grouped-list` (Settings-style inset separators and row highlight), `hit-44` (44 × 44 hit area for links), `pb-safe`, `pb-safe-*`, `pt-safe`, `h-app` / `min-h-app` (visible height minus the top inset).
+
+### Layout and safe areas
+
+- `viewport-fit=cover`; `.app-frame` pads for the notch and landscape sides; every `min-h-screen` (100vh) is now `min-h-app` (dvh), so iOS Safari's toolbars never hide the bottom of a screen. The Journal list, the chat composer, bottom sheets and toasts clear the home indicator or notch.
+- `theme-color` follows the app's own theme switch (light by default, dark when chosen), set in the head script and in `applyTheme`.
+
+### Components (`packages/ui`)
+
+- **Button:** labels 13 / 15 / 17px for sm / default / lg; new optional `loading` prop (spinner, same width, `aria-busy`); link-styled buttons get the 44px hit area.
+- **Input / Textarea:** 17px at every width (under 16px iOS zooms the page on focus; two call sites that shrank it again were fixed); softer 3px focus halo; `aria-invalid` styling.
+- **Switch:** iOS 51 × 31 track, 27px thumb.
+- **BottomSheet:** drag the grabber to dismiss (distance or flick velocity; upward pulls rubber-band; a short drag springs back; the exit starts where the finger let go); 28px top radius; same width as the app column; home-indicator padding; no backdrop blur behind the dim.
+- **Dialog:** a compact, centred, inset alert (was full-width on phones): centred text, equal-width side-by-side actions.
+- **SwipeableRow:** `touch-action: pan-y`, a vertical-scroll direction lock, flick velocity, rubber-band edges, and the card's radius. Fixed: with a mouse, the card link's native drag-and-drop swallowed the swipe after the first move, so swiping never opened on desktop.
+- **SettingsRow / grouped lists:** 44px minimum rows, separators inset to the text, rows highlight while pressed instead of shrinking (Account, preferences, avatar sheet).
+- **Toasts:** below the notch, soft elevated card, 3.2s.
+- **Back buttons:** iOS chevron (was an arrow). `PageHeader` is now a sticky nav bar: transparent at rest, translucent material plus a hairline once content scrolls under it.
+
+### Screens and data
+
+- **Optimistic removals** (archive, unarchive, trash, restore on Journal, Archive and Trash): the row leaves immediately and slides back into its old place with a specific message if the request fails (`useOptimisticRemove`, `lib/optimistic.ts`, 4 tests).
+- **Journal search:** each keystroke aborts the previous request, so an older, slower response can't overwrite newer results; search failures say so instead of failing silently; `enterKeyHint`/`inputMode` set; "Searching…" is a live status.
+- **Chat composer:** translucent material bar, `enterKeyHint="send"`, and `readOnly` instead of `disabled` while sending, so the iOS keyboard no longer drops after every message.
+- **Transcript "Jump to a time":** the phone keypad has no colon, so `1:15` couldn't be typed; `.` and `,` now work as separators too, with the decimal keypad (2 tests).
+- Auth fields: email keyboard, no autocapitalise or spellcheck, Next/Go return keys; submit uses the `loading` button.
+- **Skeletons match their screens:** the Journal has its own (header, week strip, record bar, 108px cards); Archive and Trash mirror their lists. Archive and Trash cards now use the Journal's 8px gap.
+- `global-error.tsx` uses the current neutral palette and a 44px pill.
+
+### Verified
+
+Production build in headless Edge with a throwaway account (deleted, cascade confirmed): 6 widths (375, 390, 430, 768, 1024, 1440) × light and dark × 8 routes, with no horizontal overflow, no unnamed controls, no field under 16px, no undersized tap targets at 390px, and no console errors or warnings. Interactions: sheet drag-dismiss, spring-back, Escape and focus restore; swipe-open; trash alert layout; optimistic trash (row gone before the server answers); offline archive restores the row in place with an error toast; sticky nav material; reduced motion. Typecheck, lint, 123 tests and build green. First Load JS +1–2 kB per route (journal 194 to 196 kB).
+
 ## 2026-10-22 — Consistency data made production-safe (timezone, New Year, archive)
 
 Audit of the contribution graph / streak storage. Saved data: `app_logins` (visits) and `entries.entry_date`; graph colours and streak are derived. Fixed:

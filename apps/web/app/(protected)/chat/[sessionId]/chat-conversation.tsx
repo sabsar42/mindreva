@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Send } from "lucide-react";
+import { ChevronLeft, Send } from "lucide-react";
 import { Button, Input, buttonVariants, cn, toast } from "@mindreva/ui";
 // Imported via the direct subpath, NOT the "@mindreva/llm" barrel: the barrel
 // re-exports getLLMProvider, which pulls the Anthropic/Google/Groq SDKs into
@@ -202,7 +202,7 @@ export function ChatConversation({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen flex-col px-5 py-5">
+    <main className="min-h-app mx-auto flex flex-col px-5 py-5">
       <header className="flex items-center gap-3">
         <button
           type="button"
@@ -219,10 +219,10 @@ export function ChatConversation({
           aria-label="Back"
           className={cn(
             buttonVariants({ variant: "ghost", size: "icon" }),
-            "-ml-2",
+            "-ml-3 [&_svg]:size-7",
           )}
         >
-          <ArrowLeft />
+          <ChevronLeft />
         </button>
         <div>
           <h1 className="text-foreground text-2xl font-bold leading-none tracking-tight">
@@ -315,7 +315,7 @@ export function ChatConversation({
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-border bg-glass sticky bottom-0 -mx-5 flex items-center gap-2 border-t px-5 py-3">
+      <div className="border-separator bg-material pb-safe-3 sticky bottom-0 -mx-5 flex items-center gap-2 border-t-[0.5px] px-5 pt-3">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -326,7 +326,12 @@ export function ChatConversation({
             }
           }}
           placeholder="Ask your past self…"
-          disabled={sending}
+          aria-label="Ask your past self"
+          enterKeyHint="send"
+          autoComplete="off"
+          // readOnly, not disabled: a disabled field loses focus, which
+          // drops the iOS keyboard after every message.
+          readOnly={sending}
           className="flex-1"
         />
         <Button

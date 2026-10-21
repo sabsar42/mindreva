@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Undo2 } from "lucide-react";
-import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
+import { NoteCard, SwipeableRow } from "@mindreva/ui";
+import { useOptimisticRemove } from "../_components/use-optimistic-remove";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { DATE_PLACEHOLDER, formatEntryDateTime } from "@/lib/format-entry";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -21,31 +21,31 @@ export function TrashList({
 }: {
   entries: EntryListItemWithThumbnail[];
 }) {
-  const router = useRouter();
   const [entries, setEntries] = React.useState(initial);
+  const remove = useOptimisticRemove(entries, setEntries);
   const entryIds = React.useMemo(() => entries.map((e) => e.id), [entries]);
   const { thumbnails, resolved } = useEntryThumbnails(entryIds);
   const hydrated = useHydrated();
 
-  async function restore(id: string) {
-    const res = await fetch(`/api/entries/${id}/restore`, { method: "POST" });
-    if (!res.ok) {
-      toast.error("Something went wrong.");
-      return;
-    }
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-    toast.success("Restored");
-    router.refresh();
+  function restore(id: string) {
+    return remove(
+      id,
+      { url: `/api/entries/${id}/restore`, method: "POST" },
+      {
+        done: "Restored",
+        failed: "Couldn't restore that entry. It's still in Trash; try again.",
+      },
+    );
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
       <PageHeader back="/account" title="Trash" />
       <p className="text-muted-foreground mt-1 text-sm">
         Restore a note, or leave it here. Nothing is permanently deleted yet.
       </p>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-2">
         {entries.length === 0 && <EmptyState message="Trash is empty." />}
 
         {entries.map((entry) => (

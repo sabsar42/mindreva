@@ -7,7 +7,7 @@ import { buttonVariants } from "@mindreva/ui/button-variants";
 // the journal was deleted), so a visitor can't tell which it was.
 export default function SharedEntryNotFound() {
   return (
-    <main className="mx-auto flex min-h-screen flex-col justify-center px-6 py-12 text-center">
+    <main className="min-h-app mx-auto flex flex-col justify-center px-6 py-12 text-center">
       <div className="border-border bg-card shadow-subtle flex flex-col items-center rounded-3xl border px-6 py-10">
         <span className="bg-secondary text-muted-foreground flex size-14 items-center justify-center rounded-[1.25rem]">
           <Link2Off className="size-6" />

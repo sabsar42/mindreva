@@ -1,5 +1,31 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// The iOS type-scale names from tokens.css are font sizes. Without this,
+// tailwind-merge reads `text-body` as a text *color* and drops a
+// `text-foreground` next to it (or vice versa).
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [
+        {
+          text: [
+            "large-title",
+            "title-1",
+            "title-2",
+            "title-3",
+            "headline",
+            "body",
+            "callout",
+            "subhead",
+            "footnote",
+            "caption",
+          ],
+        },
+      ],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

@@ -43,6 +43,7 @@ import { SwipeNav } from "./swipe-nav";
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { useEntryThumbnails } from "./use-entry-thumbnails";
+import { useOptimisticRemove } from "./use-optimistic-remove";
 import { PrefetchLink } from "./prefetch-link";
 import { getDefaultArtwork } from "@/lib/default-artwork";
 
@@ -146,26 +147,30 @@ export function EntryListScreen({
     setLocalEntries(entries);
   }, [entries]);
 
-  async function archiveEntry(id: string) {
-    const res = await fetch(`/api/entries/${id}/archive`, { method: "POST" });
-    if (!res.ok) {
-      toast.error("Something went wrong.");
-      return;
-    }
-    setLocalEntries((prev) => prev.filter((e) => e.id !== id));
-    toast.success("Archived");
-    router.refresh();
+  const remove = useOptimisticRemove(localEntries, setLocalEntries);
+
+  function archiveEntry(id: string) {
+    return remove(
+      id,
+      { url: `/api/entries/${id}/archive`, method: "POST" },
+      {
+        done: "Archived",
+        failed:
+          "Couldn't archive that entry. It's back in your list; try again.",
+      },
+    );
   }
 
-  async function trashEntry(id: string) {
-    const res = await fetch(`/api/entries/${id}/trash`, { method: "POST" });
-    if (!res.ok) {
-      toast.error("Something went wrong.");
-      return;
-    }
-    setLocalEntries((prev) => prev.filter((e) => e.id !== id));
-    toast.success("Moved to Trash");
-    router.refresh();
+  function trashEntry(id: string) {
+    return remove(
+      id,
+      { url: `/api/entries/${id}/trash`, method: "POST" },
+      {
+        done: "Moved to Trash",
+        failed:
+          "Couldn't move that entry to Trash. It's back in your list; try again.",
+      },
+    );
   }
 
   function openSearch() {
@@ -188,22 +193,34 @@ export function EntryListScreen({
       return;
     }
     setSearching(true);
+    // Each keystroke cancels the previous request, so a slow response for
+    // an older query can never overwrite the results for the newer one.
+    const controller = new AbortController();
     const handle = setTimeout(async () => {
       try {
         const res = await fetch(
           `/api/entries?type=${type}&q=${encodeURIComponent(trimmed)}`,
+          { signal: controller.signal },
         );
         if (res.ok) {
           const data = (await res.json()) as {
             entries: EntryListItemWithThumbnail[];
           };
           setSearchResults(data.entries);
+        } else {
+          toast.error("Search isn't working right now. Try again in a moment.");
         }
+      } catch {
+        if (controller.signal.aborted) return;
+        toast.error("Search needs a connection. Check yours and try again.");
       } finally {
-        setSearching(false);
+        if (!controller.signal.aborted) setSearching(false);
       }
-    }, 350);
-    return () => clearTimeout(handle);
+    }, 300);
+    return () => {
+      clearTimeout(handle);
+      controller.abort();
+    };
   }, [query, type]);
 
   // Memories still forming take the place of their (blank) entry, newest on
@@ -231,7 +248,7 @@ export function EntryListScreen({
 
   return (
     <SwipeNav>
-      <main className="mx-auto flex h-dvh flex-col px-5 pt-6">
+      <main className="h-app mx-auto flex flex-col px-5 pt-6">
         {/* Everything above the entries is fixed; only the list scrolls. */}
         <div className="shrink-0">
           <HomeHeader
@@ -270,6 +287,10 @@ export function EntryListScreen({
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Escape" && closeSearch()}
                   placeholder={`Search ${heading.toLowerCase()}…`}
+                  aria-label={`Search ${heading.toLowerCase()}`}
+                  inputMode="search"
+                  enterKeyHint="search"
+                  autoComplete="off"
                   className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                 />
                 <button
@@ -304,10 +325,12 @@ export function EntryListScreen({
 
         <div
           data-entry-list
-          className="-mx-5 mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 pb-10 pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_10px)]"
+          className="-mx-5 mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 pb-[calc(2.5rem+var(--safe-bottom))] pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_10px)]"
         >
           {searching && (
-            <p className="text-muted-foreground text-sm">Searching…</p>
+            <p role="status" className="text-muted-foreground text-sm">
+              Searching…
+            </p>
           )}
 
           {!searching &&

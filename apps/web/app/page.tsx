@@ -3,7 +3,7 @@ import { LeafMark } from "@mindreva/ui";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
+    <main className="min-h-app flex flex-col items-center justify-center px-6 py-12 text-center">
       <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-8">
         {/* Wordmark */}
         <span className="text-primary font-serif text-2xl font-bold tracking-tight">
