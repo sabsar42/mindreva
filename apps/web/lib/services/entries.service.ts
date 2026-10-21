@@ -19,6 +19,7 @@ import { stripFormatting } from "@mindreva/types";
 import { getUser, createClient } from "@mindreva/auth/server";
 import { transcribeEntry } from "./transcription.service";
 import { summarizeEntry } from "./summarization.service";
+import { getMyToday } from "./profile.service";
 
 /**
  * Business rules for entries (journals + notes). Route handlers call this;
@@ -422,6 +423,7 @@ export async function createVoiceEntry(input: {
     storagePath: objectPath,
     durationMs: input.durationMs,
     mimeType: input.mimeType,
+    entryDate: await getMyToday(),
   });
 
   // Transcription is a real ASR API call and can take several seconds for a
@@ -458,6 +460,7 @@ export async function createTextEntry(input: {
     userId,
     type: input.type ?? "note",
     text,
+    entryDate: await getMyToday(),
   });
 
   after(async () => {

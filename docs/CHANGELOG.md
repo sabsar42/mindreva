@@ -7,6 +7,18 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-22 — Consistency data made production-safe (timezone, New Year, archive)
+
+Audit of the contribution graph / streak storage. Saved data: `app_logins` (visits) and `entries.entry_date`; graph colours and streak are derived. Fixed:
+
+- **Timezone.** New `profiles.timezone` (migration 0015, default `UTC`, applied to the live project). A `TimezoneSync` client component posts the browser's IANA zone to `POST /api/profile/timezone` (once per zone per device); that also records today's visit in the right zone. Visits, new voice/text entries and the streak now use the user's own midnight (`lib/day-key.ts`, `getMyToday()`), not the server's UTC clock.
+- **New Year.** The streak walk loads earlier years on demand, so a streak survives 1 January.
+- **Archive.** `countsByDateForUser` now includes archived entries (deleted ones still excluded), so archiving doesn't lighten a day's cell; the selected-day list includes them too.
+- **History re-cut, once.** Migration 0016 adds `profiles.timezone_synced_at`. The first sync (`ProfilesRepository.syncTimezone`, one transaction) moves existing entries whose `entry_date` is still the UTC date of `created_at` to the local date (hand-edited dates untouched) and rebuilds `app_logins` from `created_at`, merging UTC days that share a local day. Later zone changes (travel) never rewrite history.
+- **No UTC guess on first load.** The layout's visit write waits until the zone has been synced; the sync records that visit itself.
+
+Verified live against the real Supabase project with a throwaway user (deleted, cascade confirmed): 02:00 Dhaka entry moved to the right day, a hand-moved entry kept its date, two UTC visit days merged into one Dhaka day, a second (travel) sync changed nothing. Caught a real bug there first: a parameterised time zone in GROUP BY failed in Postgres (fixed with positional grouping). 118 tests pass; typecheck and lint green.
+
 ## 2026-10-19 — One Apple-style theme: neutral palette, flat dark mode, no cream
 
 Owner feedback: the dashboard and dark mode didn't match the sign-in page; wanted one coherent, compact, techy Apple look with no cream on edges or borders.

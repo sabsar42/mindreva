@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { ProfilesRepository, type Profile } from "@mindreva/database";
 import { getUser } from "@mindreva/auth/server";
+import { dayKeyInZone } from "../day-key";
 
 /**
  * Business logic for the current user's profile. Route handlers / server
@@ -33,6 +34,12 @@ export const getMyProfile = cache(async (): Promise<Profile | null> => {
   const userId = await requireUserId();
   return ProfilesRepository.getById(userId);
 });
+
+/** The user's own calendar day ("YYYY-MM-DD"), cut at their midnight. */
+export async function getMyToday(): Promise<string> {
+  const profile = await getMyProfile();
+  return dayKeyInZone(profile?.timezone);
+}
 
 /** Save the onboarding language + use-case selections. */
 export async function saveOnboarding(input: {

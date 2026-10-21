@@ -33,6 +33,15 @@ export const profiles = pgTable("profiles", {
   // text is fine for MVP — no separate join table.
   languages: text("languages"),
   summaryStyle: text("summary_style").notNull().default("general"),
+  // IANA zone (e.g. "Asia/Dhaka"), synced from the browser. Decides which
+  // calendar day a visit or a new entry belongs to — the server runs in UTC,
+  // so without this a late-night or early-morning entry lands on the wrong
+  // day and breaks the streak.
+  timezone: text("timezone").notNull().default("UTC"),
+  // Null until the browser has reported a zone. The first sync re-cuts this
+  // user's existing days into the zone (once); later changes (travel) don't
+  // rewrite history.
+  timezoneSyncedAt: timestamp("timezone_synced_at", { withTimezone: true }),
   // Monetization groundwork — present now, unenforced until Phase 9.
   plan: text("plan").notNull().default("free"),
   minutesUsedThisPeriod: integer("minutes_used_this_period")

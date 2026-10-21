@@ -2,9 +2,12 @@ import "server-only";
 import {
   AppLoginsRepository,
   EntriesRepository,
+  ProfilesRepository,
   type EntryType,
 } from "@mindreva/database";
 import { getUser } from "@mindreva/auth/server";
+import { addDays, dayKeyInZone, resolveTimeZone } from "../day-key";
+import { getMyProfile, getMyToday } from "./profile.service";
 import {
   listMyEntries,
   type EntryListItemWithThumbnail,
@@ -28,11 +31,6 @@ async function requireUserId(): Promise<string> {
   return user.id;
 }
 
-function todayKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 /**
  * Records today as a visited day for the current user, once per calendar
  * day (insert-if-missing). Called once per navigation into the protected
@@ -48,11 +46,30 @@ export async function recordMyVisit(): Promise<void> {
   try {
     const user = await getUser();
     if (!user) return;
-    await AppLoginsRepository.recordVisit(user.id, todayKey());
+    // Until the browser has reported a zone we don't know which day "today"
+    // is; syncMyTimeZone records this visit once it does.
+    const profile = await getMyProfile();
+    if (!profile?.timezoneSyncedAt) return;
+    await AppLoginsRepository.recordVisit(user.id, await getMyToday());
   } catch {
     // Non-fatal: at worst, today's cell falls back to "not visited" until
     // the next successful call records it.
   }
+}
+
+/**
+ * Saves the browser's time zone and records today's visit in it. The first
+ * sync also re-cuts the user's existing days into the zone (see
+ * ProfilesRepository.syncTimezone); later syncs only update the zone.
+ */
+export async function syncMyTimeZone(timezone: string): Promise<void> {
+  const userId = await requireUserId();
+  const tz = resolveTimeZone(timezone);
+  const profile = await getMyProfile();
+  if (profile?.timezone !== tz || !profile?.timezoneSyncedAt) {
+    await ProfilesRepository.syncTimezone(userId, tz);
+  }
+  await AppLoginsRepository.recordVisit(userId, dayKeyInZone(tz));
 }
 
 /** 0 = no activity, 1 = opened the app only, 2-4 = also recorded (1, 2,
@@ -125,25 +142,53 @@ export interface YearHeatmap {
   currentStreak: number;
 }
 
-function addDays(dateKey: string, delta: number): string {
-  const [y, m, d] = dateKey.split("-").map(Number) as [number, number, number];
-  const date = new Date(y, m - 1, d + delta);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+/** One year's merged day data. */
+async function loadYearDays(
+  userId: string,
+  year: number,
+  type?: EntryType,
+): Promise<{
+  days: Record<string, DayCount>;
+  entryCounts: { entryDate: string; count: number }[];
+}> {
+  const dateFrom = `${year}-01-01`;
+  const dateTo = `${year}-12-31`;
+  const [visitedDays, entryCounts] = await Promise.all([
+    AppLoginsRepository.listDaysForUser(userId, dateFrom, dateTo),
+    EntriesRepository.countsByDateForUser(userId, { type, dateFrom, dateTo }),
+  ]);
+  return { days: mergeDayData(visitedDays, entryCounts), entryCounts };
 }
 
 /** Walks backward day by day from today (or yesterday, if today has nothing
- * yet) counting consecutive visited days — opening the app keeps a streak
- * alive, same as recording does, since every visit is a contribution.
+ * yet) counting consecutive active days — opening the app keeps a streak
+ * alive, same as recording does, since every visit is a contribution. It
+ * loads earlier years on demand, so a streak carries across New Year.
  * Purely derived from the same day data the grid renders — nothing stored,
  * nothing invented. */
-function computeStreak(days: Record<string, DayCount>): number {
-  let cursor = todayKey();
-  if (!days[cursor]) {
+async function computeStreak(
+  userId: string,
+  today: string,
+  loaded: Map<number, Record<string, DayCount>>,
+  type?: EntryType,
+): Promise<number> {
+  const isActive = async (key: string): Promise<boolean> => {
+    const y = Number(key.slice(0, 4));
+    let days = loaded.get(y);
+    if (!days) {
+      days = (await loadYearDays(userId, y, type)).days;
+      loaded.set(y, days);
+    }
+    return Boolean(days[key]);
+  };
+
+  let cursor = today;
+  if (!(await isActive(cursor))) {
     cursor = addDays(cursor, -1);
-    if (!days[cursor]) return 0;
+    if (!(await isActive(cursor))) return 0;
   }
   let streak = 0;
-  while (days[cursor]) {
+  while (await isActive(cursor)) {
     streak += 1;
     cursor = addDays(cursor, -1);
   }
@@ -156,13 +201,8 @@ export async function getMyYearHeatmap(
   type?: EntryType,
 ): Promise<YearHeatmap> {
   const userId = await requireUserId();
-  const dateFrom = `${year}-01-01`;
-  const dateTo = `${year}-12-31`;
-  const [visitedDays, entryCounts] = await Promise.all([
-    AppLoginsRepository.listDaysForUser(userId, dateFrom, dateTo),
-    EntriesRepository.countsByDateForUser(userId, { type, dateFrom, dateTo }),
-  ]);
-  const days = mergeDayData(visitedDays, entryCounts);
+  const today = await getMyToday();
+  const { days, entryCounts } = await loadYearDays(userId, year, type);
   const totalEntries = entryCounts.reduce((n, r) => n + r.count, 0);
   const totalDaysJournaled = entryCounts.length;
 
@@ -174,7 +214,10 @@ export async function getMyYearHeatmap(
     // A streak is only meaningful against the CURRENT year's trailing edge;
     // a past year's grid still shows its own data but doesn't claim a
     // "current streak" that isn't about now.
-    currentStreak: year === new Date().getFullYear() ? computeStreak(days) : 0,
+    currentStreak:
+      year === Number(today.slice(0, 4))
+        ? await computeStreak(userId, today, new Map([[year, days]]), type)
+        : 0,
   };
 }
 
@@ -185,5 +228,11 @@ export async function getMyEntriesForDay(
   date: string,
   type?: EntryType,
 ): Promise<EntryListItemWithThumbnail[]> {
-  return listMyEntries({ type, dateFrom: date, dateTo: date });
+  // Archived entries count toward a day's cell, so they're listed too.
+  return listMyEntries({
+    type,
+    includeArchived: true,
+    dateFrom: date,
+    dateTo: date,
+  });
 }

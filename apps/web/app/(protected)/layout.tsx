@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import { getMyProfile } from "@/lib/services/profile.service";
 import { recordMyVisit } from "@/lib/services/heatmap.service";
+import { TimezoneSync } from "./_components/timezone-sync";
 import { AppShell } from "./_components/app-shell";
 import type { AccountSummary } from "./_components/account-context";
 
@@ -38,5 +39,10 @@ export default function ProtectedLayout({
   // makes repeats within the same day free no-ops.
   after(() => recordMyVisit());
 
-  return <AppShell account={loadAccount()}>{children}</AppShell>;
+  return (
+    <>
+      <TimezoneSync />
+      <AppShell account={loadAccount()}>{children}</AppShell>
+    </>
+  );
 }

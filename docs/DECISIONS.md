@@ -11,6 +11,11 @@ rather than resolved.
 
 ---
 
+## 2026-10-22 — A day is the user's local day, stored per profile
+
+**What happened:** Visits and entry dates used the server clock (UTC on Vercel), so users outside UTC had early/late entries filed on the wrong day, breaking streaks.
+**Decided:** Store an IANA `timezone` on `profiles`, synced from the browser, and cut every day (visit, `entry_date`, streak "today") in that zone. The first sync re-cuts existing days into the zone once (`timezone_synced_at` marks it); later changes don't rewrite history, so a trip doesn't shuffle past days. Entries with a hand-edited date are never moved. Archived entries count toward the graph and appear in the day list; deleted ones don't.
+
 ## 2026-10-19 — The sign-in page is the design reference; neutral, flat, no rim
 
 The sign-in and sign-up pages are the reference for the whole app. Surfaces use Apple's neutral grays instead of a warm cream; borders are plain hairlines; cards carry no inner rim light and (in dark) no shadow, because a bright 1px rim on a near-black card reads as an outline, not as depth. Dark mode steps surfaces up from true black instead of lifting the page. Filled buttons keep their top-edge highlight because that is what gives the sign-in buttons their depth. The paper grain added earlier the same day was removed for the same reason. Radius tightened to 22px for a more compact feel.

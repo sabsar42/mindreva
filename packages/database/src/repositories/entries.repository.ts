@@ -25,6 +25,7 @@ import {
   type Transcript,
 } from "../schema";
 
+/** UTC fallback only; callers pass the user's own calendar day. */
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -144,7 +145,7 @@ export const EntriesRepository = {
 
   /**
    * Entry counts per calendar day — the activity heatmap's raw material.
-   * Same scoping as listEntryDatesForUser (non-deleted, non-archived), with
+   * Non-deleted entries, archived ones included (archiving must not erase a contribution), with
    * an optional inclusive date range so the caller can ask for just one
    * year at a time rather than a user's whole history.
    */
@@ -155,7 +156,6 @@ export const EntriesRepository = {
     const conditions = [
       eq(entries.userId, userId),
       isNull(entries.deletedAt),
-      isNull(entries.archivedAt),
       isNotNull(entries.entryDate),
     ];
     if (options.type) conditions.push(eq(entries.type, options.type));
@@ -396,6 +396,8 @@ export const EntriesRepository = {
     storagePath: string;
     durationMs: number;
     mimeType: string;
+    /** The user's local calendar day, "YYYY-MM-DD". */
+    entryDate?: string;
   }): Promise<{ entry: Entry; recording: Recording; transcript: Transcript }> {
     return getDb().transaction(async (tx) => {
       const [entry] = await tx
@@ -404,7 +406,7 @@ export const EntriesRepository = {
           userId: input.userId,
           type: input.type,
           source: "voice",
-          entryDate: today(),
+          entryDate: input.entryDate ?? today(),
         })
         .returning();
       if (!entry) throw new Error("Failed to create entry");
@@ -442,6 +444,8 @@ export const EntriesRepository = {
     userId: string;
     type: EntryType;
     text: string;
+    /** The user's local calendar day, "YYYY-MM-DD". */
+    entryDate?: string;
   }): Promise<{ entry: Entry; transcript: Transcript }> {
     return getDb().transaction(async (tx) => {
       const [entry] = await tx
@@ -450,7 +454,7 @@ export const EntriesRepository = {
           userId: input.userId,
           type: input.type,
           source: "text",
-          entryDate: today(),
+          entryDate: input.entryDate ?? today(),
         })
         .returning();
       if (!entry) throw new Error("Failed to create entry");

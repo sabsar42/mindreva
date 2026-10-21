@@ -9,19 +9,25 @@ const listDaysForUser = vi.fn();
 const recordVisit = vi.fn();
 const getUser = vi.fn();
 const listMyEntries = vi.fn();
+const getMyToday = vi.fn();
+const getMyProfile = vi.fn();
+const syncTimezone = vi.fn();
 
 vi.mock("@mindreva/database", () => ({
   EntriesRepository: { countsByDateForUser },
+  ProfilesRepository: { syncTimezone },
   AppLoginsRepository: { listDaysForUser, recordVisit },
 }));
 vi.mock("@mindreva/auth/server", () => ({ getUser }));
 vi.mock("./entries.service", () => ({ listMyEntries }));
+vi.mock("./profile.service", () => ({ getMyToday, getMyProfile }));
 
 const {
   getMyMonthHeatmap,
   getMyYearHeatmap,
   getMyEntriesForDay,
   recordMyVisit,
+  syncMyTimeZone,
 } = await import("./heatmap.service");
 
 const USER = "user-id";
@@ -29,6 +35,12 @@ const USER = "user-id";
 beforeEach(() => {
   vi.clearAllMocks();
   getUser.mockResolvedValue({ id: USER });
+  getMyToday.mockResolvedValue("2026-06-15");
+  recordVisit.mockResolvedValue(undefined);
+  getMyProfile.mockResolvedValue({
+    timezone: "UTC",
+    timezoneSyncedAt: new Date(),
+  });
   listDaysForUser.mockResolvedValue([]);
   countsByDateForUser.mockResolvedValue([]);
 });
@@ -107,22 +119,8 @@ describe("getMyMonthHeatmap", () => {
 });
 
 describe("getMyYearHeatmap", () => {
-  const REAL_DATE = Date;
   function mockToday(iso: string) {
-    class MockDate extends REAL_DATE {
-      constructor(...args: unknown[]) {
-        if (args.length === 0) {
-          super(iso);
-        } else {
-          // @ts-expect-error - forwarding varargs to the real Date constructor
-          super(...args);
-        }
-      }
-      static override now() {
-        return new REAL_DATE(iso).getTime();
-      }
-    }
-    vi.stubGlobal("Date", MockDate);
+    getMyToday.mockResolvedValue(iso.slice(0, 10));
   }
 
   it("computes totals from the raw entry rows, independent of visited days", async () => {
@@ -139,7 +137,6 @@ describe("getMyYearHeatmap", () => {
     const year = await getMyYearHeatmap(2026);
     expect(year.totalDaysJournaled).toBe(2);
     expect(year.totalEntries).toBe(4);
-    vi.unstubAllGlobals();
   });
 
   it("a visit-only streak stays alive without any recording", async () => {
@@ -152,7 +149,6 @@ describe("getMyYearHeatmap", () => {
     countsByDateForUser.mockResolvedValue([]);
     const year = await getMyYearHeatmap(2026);
     expect(year.currentStreak).toBe(3);
-    vi.unstubAllGlobals();
   });
 
   it("computes a current streak ending today, broken by a gap", async () => {
@@ -168,7 +164,6 @@ describe("getMyYearHeatmap", () => {
     ]);
     const year = await getMyYearHeatmap(2026);
     expect(year.currentStreak).toBe(3);
-    vi.unstubAllGlobals();
   });
 
   it("keeps a streak alive when today has nothing yet but yesterday does", async () => {
@@ -177,7 +172,6 @@ describe("getMyYearHeatmap", () => {
     countsByDateForUser.mockResolvedValue([]);
     const year = await getMyYearHeatmap(2026);
     expect(year.currentStreak).toBe(2);
-    vi.unstubAllGlobals();
   });
 
   it("reports zero streak when neither today nor yesterday has an entry", async () => {
@@ -186,7 +180,6 @@ describe("getMyYearHeatmap", () => {
     countsByDateForUser.mockResolvedValue([]);
     const year = await getMyYearHeatmap(2026);
     expect(year.currentStreak).toBe(0);
-    vi.unstubAllGlobals();
   });
 
   it("never reports a streak for a year that isn't the current one", async () => {
@@ -195,7 +188,6 @@ describe("getMyYearHeatmap", () => {
     countsByDateForUser.mockResolvedValue([]);
     const year = await getMyYearHeatmap(2025);
     expect(year.currentStreak).toBe(0);
-    vi.unstubAllGlobals();
   });
 });
 
@@ -205,6 +197,7 @@ describe("getMyEntriesForDay", () => {
     await getMyEntriesForDay("2026-05-01", "journal");
     expect(listMyEntries).toHaveBeenCalledWith({
       type: "journal",
+      includeArchived: true,
       dateFrom: "2026-05-01",
       dateTo: "2026-05-01",
     });
@@ -212,20 +205,17 @@ describe("getMyEntriesForDay", () => {
 });
 
 describe("recordMyVisit", () => {
-  it("records today under the signed-in user's id", async () => {
-    const REAL_DATE = Date;
-    class MockDate extends REAL_DATE {
-      constructor(...args: unknown[]) {
-        if (args.length === 0) super("2026-07-04T10:00:00Z");
-        // @ts-expect-error - forwarding varargs to the real Date constructor
-        else super(...args);
-      }
-    }
-    vi.stubGlobal("Date", MockDate);
+  it("records the user's own today under their id", async () => {
+    getMyToday.mockResolvedValue("2026-07-04");
     recordVisit.mockResolvedValue(undefined);
     await recordMyVisit();
     expect(recordVisit).toHaveBeenCalledWith(USER, "2026-07-04");
-    vi.unstubAllGlobals();
+  });
+
+  it("waits for the first timezone sync instead of guessing UTC", async () => {
+    getMyProfile.mockResolvedValue({ timezone: "UTC", timezoneSyncedAt: null });
+    await recordMyVisit();
+    expect(recordVisit).not.toHaveBeenCalled();
   });
 
   it("does nothing when nobody is signed in", async () => {
@@ -243,5 +233,42 @@ describe("recordMyVisit", () => {
     getUser.mockRejectedValue(new Error("Dynamic server usage: cookies"));
     await expect(recordMyVisit()).resolves.toBeUndefined();
     expect(recordVisit).not.toHaveBeenCalled();
+  });
+});
+
+describe("streak across New Year", () => {
+  it("keeps counting into the previous year", async () => {
+    getMyToday.mockResolvedValue("2026-01-02");
+    listDaysForUser.mockImplementation(async (_u: string, from: string) =>
+      from.startsWith("2026")
+        ? ["2026-01-02", "2026-01-01"]
+        : ["2025-12-31", "2025-12-30", "2025-12-20"],
+    );
+    countsByDateForUser.mockResolvedValue([]);
+    const year = await getMyYearHeatmap(2026);
+    expect(year.currentStreak).toBe(4);
+  });
+});
+
+describe("syncMyTimeZone", () => {
+  it("saves a changed zone and records the visit on the user's own day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-04T20:00:00Z")); // 02:00 on the 5th in Dhaka
+    await syncMyTimeZone("Asia/Dhaka");
+    expect(syncTimezone).toHaveBeenCalledWith(USER, "Asia/Dhaka");
+    expect(recordVisit).toHaveBeenCalledWith(USER, "2026-07-05");
+    vi.useRealTimers();
+  });
+
+  it("does not rewrite an unchanged zone, and falls back to UTC for junk", async () => {
+    await syncMyTimeZone("Not/AZone");
+    expect(syncTimezone).not.toHaveBeenCalled();
+    expect(recordVisit).toHaveBeenCalled();
+  });
+
+  it("runs the first sync even when the zone is already UTC", async () => {
+    getMyProfile.mockResolvedValue({ timezone: "UTC", timezoneSyncedAt: null });
+    await syncMyTimeZone("UTC");
+    expect(syncTimezone).toHaveBeenCalledWith(USER, "UTC");
   });
 });
