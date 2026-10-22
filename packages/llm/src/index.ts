@@ -4,6 +4,7 @@ export type {
   LLMMessage,
   CompleteOptions,
   CompletionResult,
+  StreamOptions,
   SummaryStyle,
 } from "./types";
 export { getLLMProvider } from "./factory";

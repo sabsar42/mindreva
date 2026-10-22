@@ -9,6 +9,13 @@ export interface CompleteOptions {
   maxTokens?: number;
 }
 
+export interface StreamOptions extends CompleteOptions {
+  /** Called with each new piece of visible text, in order. */
+  onDelta: (text: string) => void;
+  /** Aborting stops the request; the promise then rejects. */
+  signal?: AbortSignal;
+}
+
 /** What a completion returned, and who actually wrote it. With fallbacks
  * (OpenRouter's model list, then LLM_FALLBACK_PROVIDER) the answering model
  * is often not the configured one, so callers store these alongside output. */
@@ -32,6 +39,14 @@ export interface LLMProvider {
    * (see apps/web/lib/usage-limits.ts), so callers batch per entry.
    */
   embedMany(texts: string[]): Promise<number[][]>;
+  /**
+   * Like complete(), but reports text as it is generated. Providers without
+   * real streaming deliver the whole answer as one piece.
+   */
+  stream(
+    messages: LLMMessage[],
+    options: StreamOptions,
+  ): Promise<CompletionResult>;
 }
 
 /**

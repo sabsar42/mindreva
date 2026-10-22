@@ -3,7 +3,9 @@ import type {
   CompletionResult,
   LLMMessage,
   LLMProvider,
+  StreamOptions,
 } from "../types";
+import { ThinkTagFilter } from "../stream-filter";
 
 const CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 const EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
@@ -177,6 +179,131 @@ export class OpenRouterLLMProvider implements LLMProvider {
     return {
       text: cleaned,
       model: data.model ?? models[0]!,
+      provider: this.name,
+    };
+  }
+
+  /**
+   * Streaming completion over the same model list and 3-per-request batches
+   * as complete(). A batch that fails before producing any text falls
+   * through to the next; once text has been shown, a failure is final (we
+   * never splice two models' answers together).
+   */
+  async stream(
+    messages: LLMMessage[],
+    options: StreamOptions,
+  ): Promise<CompletionResult> {
+    const apiKey = this.getApiKey();
+    const model = process.env.OPENROUTER_MODEL;
+    if (!model) {
+      throw new Error(
+        "OPENROUTER_MODEL is not set. Add it to your environment to use the OpenRouter LLM provider.",
+      );
+    }
+    const body = {
+      messages: withNoReasoningInstruction(messages),
+      max_tokens: options.maxTokens,
+      reasoning: { exclude: true },
+      stream: true,
+    };
+
+    let lastError: Error | null = null;
+    for (const batch of chunk(
+      completionModelList(model, process.env.OPENROUTER_FALLBACK_MODELS),
+      MAX_MODELS_PER_REQUEST,
+    )) {
+      let emitted = false;
+      try {
+        return await this.requestStream(apiKey, batch, body, {
+          ...options,
+          onDelta: (t) => {
+            emitted = true;
+            options.onDelta(t);
+          },
+        });
+      } catch (err) {
+        if (emitted || options.signal?.aborted) throw err;
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    throw lastError ?? new Error("OpenRouter: no models configured");
+  }
+
+  private async requestStream(
+    apiKey: string,
+    models: string[],
+    body: Record<string, unknown>,
+    options: StreamOptions,
+  ): Promise<CompletionResult> {
+    const response = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...body, models }),
+      signal: options.signal,
+    });
+    if (!response.ok || !response.body) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(
+        `OpenRouter completion failed (${response.status}): ${detail.slice(0, 500)}`,
+      );
+    }
+
+    // Server-sent events: "data: {json}" lines, ": comment" keep-alives,
+    // and "data: [DONE]" at the end. Errors can also arrive mid-stream as a
+    // data line with an `error` object.
+    const filter = new ThinkTagFilter();
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let text = "";
+    let answeredBy: string | undefined;
+    const emit = (piece: string) => {
+      if (!piece) return;
+      text += piece;
+      options.onDelta(piece);
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        let event: {
+          model?: string;
+          error?: { message?: string; code?: number };
+          choices?: { delta?: { content?: string | null } }[];
+        };
+        try {
+          event = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+        if (event.error) {
+          throw new Error(
+            `OpenRouter completion failed (${event.error.code ?? "stream"}): ${event.error.message ?? ""}`,
+          );
+        }
+        answeredBy ??= event.model;
+        emit(filter.push(event.choices?.[0]?.delta?.content ?? ""));
+      }
+    }
+    emit(filter.flush());
+
+    const cleaned = text.trim();
+    if (!cleaned) {
+      throw new Error("OpenRouter returned an empty completion");
+    }
+    return {
+      text: cleaned,
+      model: answeredBy ?? models[0]!,
       provider: this.name,
     };
   }

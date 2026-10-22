@@ -4,7 +4,9 @@ import type {
   CompletionResult,
   LLMMessage,
   LLMProvider,
+  StreamOptions,
 } from "../types";
+import { ThinkTagFilter } from "../stream-filter";
 
 // Groq retires models without notice (llama-3.3-70b-versatile started
 // returning 404 in October 2026), so the model is an env var with a default
@@ -48,6 +50,40 @@ export class GroqLLMProvider implements LLMProvider {
     const text = completion.choices[0]?.message?.content?.trim();
     if (!text) throw new Error("Groq returned an empty completion");
     return { text, model: completion.model || model, provider: this.name };
+  }
+
+  async stream(
+    messages: LLMMessage[],
+    options: StreamOptions,
+  ): Promise<CompletionResult> {
+    const client = this.getClient();
+    const model = process.env.GROQ_LLM_MODEL || DEFAULT_COMPLETION_MODEL;
+    const stream = await client.chat.completions.create(
+      {
+        model,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        max_tokens: options.maxTokens,
+        reasoning_format: "hidden",
+        stream: true,
+      },
+      { signal: options.signal },
+    );
+    const filter = new ThinkTagFilter();
+    let text = "";
+    let answeredBy: string | undefined;
+    const emit = (piece: string) => {
+      if (!piece) return;
+      text += piece;
+      options.onDelta(piece);
+    };
+    for await (const part of stream) {
+      answeredBy ??= part.model;
+      emit(filter.push(part.choices[0]?.delta?.content ?? ""));
+    }
+    emit(filter.flush());
+    const cleaned = text.trim();
+    if (!cleaned) throw new Error("Groq returned an empty completion");
+    return { text: cleaned, model: answeredBy || model, provider: this.name };
   }
 
   async embed(_text: string): Promise<number[]> {

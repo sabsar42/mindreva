@@ -5,7 +5,7 @@ import {
   listMyChatMessages,
   SUGGESTED_MIN_ENTRIES,
 } from "@/lib/services/persona-chat.service";
-import { getMyEntryDatesByIds } from "@/lib/services/entries.service";
+import { getMyCitationInfo } from "@/lib/services/entries.service";
 import { getMyRiver } from "@/lib/services/mindmap.service";
 import { describeChatSession } from "@/lib/services/persona-chat.service";
 import { ChatConversation } from "./chat-conversation";
@@ -39,7 +39,7 @@ export default async function ChatSessionPage({
       ),
     ),
   ];
-  const entryDates = await getMyEntryDatesByIds(allCitedIds);
+  const citationInfo = await getMyCitationInfo(allCitedIds);
 
   return (
     <ChatConversation
@@ -53,7 +53,7 @@ export default async function ChatSessionPage({
         content: m.content,
         citedEntryIds: m.citedEntryIds?.split(",").filter(Boolean) ?? [],
       }))}
-      initialEntryDates={entryDates}
+      initialCitationInfo={citationInfo}
       entryCountInRange={rangeContext.entryCount}
       suggestedMinEntries={SUGGESTED_MIN_ENTRIES}
       entriesPerMonth={rangeContext.entriesPerMonth}

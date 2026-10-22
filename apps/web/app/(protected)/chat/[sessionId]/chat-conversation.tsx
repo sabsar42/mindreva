@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Send } from "lucide-react";
-import { Button, Input, buttonVariants, cn, toast } from "@mindreva/ui";
+import { ChevronDown, ChevronLeft } from "lucide-react";
+import { buttonVariants, cn, toast } from "@mindreva/ui";
 // Imported via the direct subpath, NOT the "@mindreva/llm" barrel: the barrel
 // re-exports getLLMProvider, which pulls the Anthropic/Google/Groq SDKs into
 // whatever bundle imports it. This is a client component, so that would ship
@@ -14,13 +14,16 @@ import type { ChatRole } from "@mindreva/database";
 import { RangeContextPanel } from "./range-context-panel";
 import { RiverPanel } from "../../river/river-panel";
 import type { RiverData } from "@/lib/services/mindmap.service";
-import { PrefetchLink } from "../../_components/prefetch-link";
+import { CitationChips, type CitationInfo } from "./citation-chips";
+import { MessageBubble, type BubbleStatus } from "./message-bubble";
+import { ChatComposer } from "./chat-composer";
 
 interface Message {
   id: string;
   role: ChatRole;
   content: string;
   citedEntryIds: string[];
+  status?: BubbleStatus;
 }
 
 /** The real pipeline steps, mirrored from persona-chat.service.ts. */
@@ -36,45 +39,49 @@ const STAGE_COPY: Record<Stage, string> = {
   generating: "Finding the words you used back then…",
 };
 
-// A reply that honestly reports having nothing for this period gets a softer
-// treatment than a normal reply (it's a gentle answer, not an error). The
-// matcher, isNoRecordReply, lives next to the prompt's NO_RECORD_REPLY so the
-// two can't drift apart, and also recognises the older wording.
+/** Questions that exercise retrieval well; shown before the first message. */
+const SUGGESTIONS = [
+  "What was on my mind most in these months?",
+  "What made me happy back then?",
+  "What was I worried about?",
+  "Who did I spend time with?",
+];
 
-function shortDateLabel(dateKey: string | null | undefined): string {
-  if (!dateKey) return "undated";
-  const d = new Date(`${dateKey}T00:00:00`);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function CitationChips({
-  entryIds,
-  entryDates,
-}: {
-  entryIds: string[];
-  entryDates: Record<string, string | null>;
-}) {
-  if (entryIds.length === 0) return null;
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-2">
-      <span className="text-muted-foreground text-xs">From your entries:</span>
-      {entryIds.map((id) => (
-        <PrefetchLink
-          key={id}
-          href={`/entries/${id}`}
-          className="border-border text-foreground hover:bg-secondary rounded-full border px-3 py-1 text-xs font-medium transition-colors"
-        >
-          {shortDateLabel(entryDates[id])}
-        </PrefetchLink>
-      ))}
-    </div>
-  );
-}
+/** Follow new content only if the reader is already near the bottom. */
+const NEAR_BOTTOM_PX = 140;
+const draftKey = (sessionId: string) => `mindreva:chat-draft:${sessionId}`;
 
 export interface OpeningLine {
   entryId: string;
   entryDate: string | null;
   text: string;
+}
+
+interface FinalEvent {
+  reply?: { id: string; content: string };
+  citedEntries?: {
+    entryId: string;
+    entryDate: string | null;
+    entryTitle?: string | null;
+  }[];
+  stopped?: boolean;
+  error?: string;
+  notice?: string;
+}
+
+function isNearBottom(): boolean {
+  return (
+    window.innerHeight + window.scrollY >=
+    document.documentElement.scrollHeight - NEAR_BOTTOM_PX
+  );
+}
+
+function scrollToBottom(behavior: ScrollBehavior) {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({
+    top: document.documentElement.scrollHeight,
+    behavior: reduce ? "auto" : behavior,
+  });
 }
 
 export function ChatConversation({
@@ -83,7 +90,7 @@ export function ChatConversation({
   rangeLabel,
   yearStart,
   initialMessages,
-  initialEntryDates,
+  initialCitationInfo,
   entryCountInRange,
   suggestedMinEntries,
   entriesPerMonth,
@@ -98,7 +105,7 @@ export function ChatConversation({
   rangeLabel: string;
   yearStart: number | null;
   initialMessages: Message[];
-  initialEntryDates: Record<string, string | null>;
+  initialCitationInfo: Record<string, CitationInfo>;
   entryCountInRange: number;
   suggestedMinEntries: number;
   entriesPerMonth: Record<number, number>;
@@ -109,53 +116,144 @@ export function ChatConversation({
 }) {
   const router = useRouter();
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
-  const [entryDates, setEntryDates] =
-    React.useState<Record<string, string | null>>(initialEntryDates);
+  const [info, setInfo] =
+    React.useState<Record<string, CitationInfo>>(initialCitationInfo);
   const [input, setInput] = React.useState("");
-  const [sending, setSending] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
   const [stage, setStage] = React.useState<Stage | null>(null);
+  /** The reply being written right now, or null. */
+  const [streaming, setStreaming] = React.useState<string | null>(null);
   // A calm "come back tomorrow" note when today's chat limit is reached.
   const [notice, setNotice] = React.useState<string | null>(null);
-  const bottomRef = React.useRef<HTMLDivElement>(null);
+  const [showJump, setShowJump] = React.useState(false);
+  const abortRef = React.useRef<AbortController | null>(null);
+  const followRef = React.useRef(true);
+
+  // The draft survives leaving the screen (restored after hydration, so the
+  // server and client render the same empty box first).
   React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, stage]);
+    try {
+      const saved = sessionStorage.getItem(draftKey(sessionId));
+      if (saved) setInput(saved);
+    } catch {
+      /* storage blocked */
+    }
+  }, [sessionId]);
+  const updateInput = React.useCallback(
+    (value: string) => {
+      setInput(value);
+      try {
+        if (value) sessionStorage.setItem(draftKey(sessionId), value);
+        else sessionStorage.removeItem(draftKey(sessionId));
+      } catch {
+        /* storage blocked */
+      }
+    },
+    [sessionId],
+  );
 
-  async function handleSend() {
-    const question = input.trim();
-    if (!question || sending) return;
-    setSending(true);
-    setNotice(null);
-    setInput("");
-
-    const userMessage: Message = {
-      id: `local-${Date.now()}`,
-      role: "user",
-      content: question,
-      citedEntryIds: [],
+  // Track whether the reader is at the bottom, and offer a way back if not.
+  React.useEffect(() => {
+    const onScroll = () => {
+      const near = isNearBottom();
+      followRef.current = near;
+      setShowJump(!near);
     };
-    setMessages((prev) => [...prev, userMessage]);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Start at the latest message.
+  React.useEffect(() => {
+    if (initialMessages.length) scrollToBottom("auto");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // New content: follow it only if the reader was already at the bottom.
+  React.useEffect(() => {
+    if (followRef.current)
+      scrollToBottom(streaming !== null ? "auto" : "smooth");
+  }, [messages, streaming, stage, notice]);
+
+  // The keyboard opening shrinks the visual viewport: keep the last message
+  // in view instead of letting it slide under the keyboard.
+  React.useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (followRef.current) scrollToBottom("auto");
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
+
+  const lastAssistantIndex = messages.findLastIndex(
+    (m) => m.role === "assistant",
+  );
+
+  async function run(opts: {
+    question: string;
+    regenerate?: boolean;
+    retryId?: string;
+  }) {
+    if (busy) return;
+    const { question, regenerate = false, retryId } = opts;
+    setBusy(true);
+    setNotice(null);
+    setStage(null);
+    followRef.current = true;
+
+    // Optimistic: the question appears at once (or a failed one is retried
+    // in place). Regenerate keeps the old reply visible until the new one
+    // starts, and restores it if anything goes wrong.
+    const localId = retryId ?? `local-${Date.now()}`;
+    let replaced: Message | null = null;
+    if (regenerate) {
+      const last = messages.at(-1);
+      if (last?.role === "assistant") replaced = last;
+    } else if (retryId) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === retryId ? { ...m, status: "sending" } : m)),
+      );
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: localId,
+          role: "user",
+          content: question,
+          citedEntryIds: [],
+          status: "sending",
+        },
+      ]);
+      updateInput("");
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let text = "";
+    let frame = 0;
+    const flush = () => {
+      frame = 0;
+      setStreaming(text);
+    };
 
     try {
       const res = await fetch(`/api/chat/${sessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify(regenerate ? { regenerate: true } : { question }),
+        signal: controller.signal,
       });
-      if (!res.ok || !res.body) throw new Error("Failed to send");
+      if (!res.ok || !res.body) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to send");
+      }
 
-      // Newline-delimited JSON: a {stage} event as each real pipeline step
-      // begins, then a final {reply, citedEntries} or {error}.
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let final: {
-        reply?: { id: string; content: string };
-        citedEntries?: { entryId: string; entryDate: string | null }[];
-        error?: string;
-        notice?: string;
-      } | null = null;
-
+      let final: FinalEvent | null = null;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -165,76 +263,148 @@ export function ChatConversation({
         for (const line of lines) {
           if (!line.trim()) continue;
           const event = JSON.parse(line);
-          if (event.stage) setStage(event.stage as Stage);
-          else final = event;
+          if (event.stage) {
+            setStage(event.stage as Stage);
+          } else if (typeof event.delta === "string") {
+            if (!text && regenerate && replaced) {
+              setMessages((prev) => prev.filter((m) => m.id !== replaced!.id));
+            }
+            text += event.delta;
+            // One render per frame, however fast the tokens arrive.
+            if (!frame) frame = requestAnimationFrame(flush);
+          } else {
+            final = event as FinalEvent;
+          }
         }
       }
+      if (frame) cancelAnimationFrame(frame);
 
       if (final?.notice) {
-        // Not an error: keep their question in the box for tomorrow.
+        // Not an error: the question goes back in the box for tomorrow.
         setNotice(final.notice);
-        setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
-        setInput(question);
+        if (regenerate) {
+          if (replaced) {
+            setMessages((prev) =>
+              prev.some((m) => m.id === replaced!.id)
+                ? prev
+                : [...prev, replaced!],
+            );
+          }
+        } else {
+          setMessages((prev) => prev.filter((m) => m.id !== localId));
+          updateInput(question);
+        }
         return;
       }
-      if (!final || final.error || !final.reply) {
-        throw new Error(final?.error ?? "Failed to send");
-      }
-      const { reply, citedEntries = [] } = final;
+      if (!final?.reply) throw new Error(final?.error ?? "Failed to send");
 
-      setEntryDates((prev) => {
+      const { reply, citedEntries = [], stopped = false } = final;
+      setInfo((prev) => {
         const next = { ...prev };
-        for (const c of citedEntries) next[c.entryId] = c.entryDate;
+        for (const c of citedEntries) {
+          next[c.entryId] = { date: c.entryDate, title: c.entryTitle ?? null };
+        }
         return next;
       });
-
       setMessages((prev) => [
-        ...prev,
+        ...prev
+          .filter((m) => !(regenerate && replaced && m.id === replaced.id))
+          .map((m) =>
+            m.id === localId ? { ...m, status: "sent" as const } : m,
+          ),
         {
           id: reply.id,
           role: "assistant",
           content: reply.content,
           citedEntryIds: citedEntries.map((c) => c.entryId),
+          status: stopped ? "stopped" : "sent",
         },
       ]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
-      setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
-      setInput(question);
+      if (frame) cancelAnimationFrame(frame);
+      if (controller.signal.aborted) {
+        // Stopped by the user: keep what was already written (the server
+        // saved the same partial reply).
+        setMessages((prev) => {
+          const kept = prev.map((m) =>
+            m.id === localId ? { ...m, status: "sent" as const } : m,
+          );
+          if (text.trim()) {
+            return [
+              ...kept.filter((m) => !(replaced && m.id === replaced.id)),
+              {
+                id: `stopped-${Date.now()}`,
+                role: "assistant" as const,
+                content: text.trim(),
+                citedEntryIds: [],
+                status: "stopped" as const,
+              },
+            ];
+          }
+          return replaced && !kept.some((m) => m.id === replaced!.id)
+            ? [...kept, replaced]
+            : kept;
+        });
+      } else {
+        const message =
+          err instanceof Error ? err.message : "Something went wrong";
+        if (regenerate) {
+          if (replaced) {
+            setMessages((prev) =>
+              prev.some((m) => m.id === replaced!.id)
+                ? prev
+                : [...prev, replaced!],
+            );
+          }
+          toast.error(message);
+        } else {
+          // The question stays on screen, marked, with an inline Retry.
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === localId ? { ...m, status: "failed" } : m,
+            ),
+          );
+          if (
+            message !== "Failed to send" &&
+            message !== "Failed to send message"
+          ) {
+            toast.error(message);
+          }
+        }
+      }
     } finally {
-      setSending(false);
+      abortRef.current = null;
+      setBusy(false);
       setStage(null);
+      setStreaming(null);
     }
   }
 
+  const empty = messages.length === 0;
+
   return (
-    <main className="min-h-app mx-auto flex flex-col px-5 py-5">
-      <header className="flex items-center gap-3">
+    <main className="min-h-app mx-auto flex flex-col px-4 pb-2">
+      <header className="bg-material border-separator pt-safe sticky top-0 z-10 -mx-4 flex items-center gap-1 border-b-[0.5px] px-2 pb-2">
         <button
           type="button"
           onClick={() => {
             // router.back() reuses the Router Cache for /chat instead of a
             // fresh server render; router.push() to the same URL is always a
             // fresh navigation. See entry-detail.tsx's back button.
-            if (window.history.length > 1) {
-              router.back();
-            } else {
-              router.push("/chat");
-            }
+            if (window.history.length > 1) router.back();
+            else router.push("/chat");
           }}
           aria-label="Back"
           className={cn(
             buttonVariants({ variant: "ghost", size: "icon" }),
-            "-ml-3 [&_svg]:size-7",
+            "[&_svg]:size-7",
           )}
         >
           <ChevronLeft />
         </button>
-        <div>
-          <h1 className="text-foreground text-2xl font-bold leading-none tracking-tight">
-            {title}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-xs">{rangeLabel}</p>
+        <div className="min-w-0 pt-2">
+          <h1 className="text-foreground text-headline truncate">{title}</h1>
+          <p className="text-muted-foreground text-caption">{rangeLabel}</p>
         </div>
       </header>
 
@@ -258,106 +428,146 @@ export function ChatConversation({
         />
       )}
 
-      <div className="mt-4 flex-1 space-y-4 overflow-y-auto pb-4">
-        {/* Opens with something the user actually wrote, so the conversation
-            starts from real text rather than a blank box or an invented
-            greeting. Only shown before the first exchange. */}
-        {openingLine && messages.length === 0 && (
-          <div className="flex flex-col items-start">
-            <p className="text-foreground max-w-[90%] font-serif text-base leading-relaxed">
-              {openingLine.text}
+      <div className="mt-5 flex-1 pb-4">
+        {empty && (
+          <section aria-label="Start the conversation" className="mb-6">
+            {/* Opens with something the user actually wrote, so the
+                conversation starts from real text rather than an invented
+                greeting. */}
+            {openingLine && (
+              <MessageBubble role="assistant" content={openingLine.text}>
+                <CitationChips
+                  entryIds={[openingLine.entryId]}
+                  info={{
+                    [openingLine.entryId]: {
+                      date: openingLine.entryDate,
+                      title: null,
+                    },
+                  }}
+                />
+              </MessageBubble>
+            )}
+            <p className="text-muted-foreground text-subhead mb-3 mt-2">
+              Ask about anything you wrote in these months. A few ideas:
             </p>
-            <CitationChips
-              entryIds={[openingLine.entryId]}
-              entryDates={{ [openingLine.entryId]: openingLine.entryDate }}
-            />
+            <div className="flex flex-col items-start gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void run({ question: s })}
+                  className="border-separator bg-card text-foreground text-subhead focus-visible:ring-ring press min-h-11 rounded-full border-[0.5px] px-4 text-left focus-visible:outline-none focus-visible:ring-2"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Finished messages are a log: screen readers hear each new one
+            once. The reply being written is outside it (below), so it isn't
+            read out token by token. */}
+        <div role="log" aria-live="polite" aria-label="Conversation">
+          {messages.map((m, i) => {
+            const next = messages[i + 1];
+            const lastInGroup = !next || next.role !== m.role;
+            const noRecord =
+              m.role === "assistant" && isNoRecordReply(m.content);
+            return (
+              <MessageBubble
+                key={m.id}
+                role={m.role}
+                content={m.content}
+                status={m.status}
+                noRecord={noRecord}
+                lastInGroup={lastInGroup}
+                canRegenerate={
+                  m.role === "assistant" &&
+                  i === lastAssistantIndex &&
+                  i === messages.length - 1 &&
+                  !busy
+                }
+                onRegenerate={() =>
+                  void run({ question: "", regenerate: true })
+                }
+                onRetry={() => void run({ question: m.content, retryId: m.id })}
+              >
+                {m.role === "assistant" && !noRecord && (
+                  <CitationChips entryIds={m.citedEntryIds} info={info} />
+                )}
+              </MessageBubble>
+            );
+          })}
+        </div>
+
+        {busy && streaming === null && (
+          <div className="mb-3 flex flex-col items-start">
+            <div
+              className="bg-card border-separator flex h-10 items-center gap-1 rounded-xl rounded-bl-md border-[0.5px] px-4"
+              aria-hidden
+            >
+              {[0, 1, 2].map((d) => (
+                <span
+                  key={d}
+                  className="bg-muted-foreground/60 size-2 rounded-full motion-safe:animate-bounce"
+                  style={{ animationDelay: `${d * 140}ms` }}
+                />
+              ))}
+            </div>
+            <p
+              className="text-muted-foreground text-caption mt-1 px-1"
+              role="status"
+            >
+              {stage ? STAGE_COPY[stage] : "Thinking back…"}
+            </p>
           </div>
         )}
 
-        {messages.map((m) =>
-          m.role === "user" ? (
-            <div
-              key={m.id}
-              className="motion-safe:animate-page-in flex justify-end"
-            >
-              <p className="bg-gradient-primary text-primary-foreground shadow-subtle max-w-[85%] rounded-3xl rounded-br-lg px-4 py-2.5 text-sm leading-relaxed">
-                {m.content}
-              </p>
-            </div>
-          ) : (
-            <div
-              key={m.id}
-              className="motion-safe:animate-page-in flex flex-col items-start"
-            >
-              <p
-                className={cn(
-                  "max-w-[90%] font-serif text-base leading-relaxed",
-                  // An honest "nothing written about that" is a gentle
-                  // answer, not an error — softer than a normal reply.
-                  isNoRecordReply(m.content)
-                    ? "text-muted-foreground italic"
-                    : "text-foreground",
-                )}
-              >
-                {m.content}
-              </p>
-              <CitationChips
-                entryIds={m.citedEntryIds}
-                entryDates={entryDates}
-              />
-            </div>
-          ),
+        {streaming !== null && (
+          <div aria-hidden>
+            <MessageBubble role="assistant" content={streaming || " "} />
+          </div>
+        )}
+        {streaming !== null && (
+          <p className="sr-only" role="status">
+            Writing a reply…
+          </p>
         )}
 
         {notice && (
-          <p
-            role="status"
-            className="text-muted-foreground font-serif text-base italic leading-relaxed"
-          >
-            {notice}
-          </p>
+          <div className="mb-3 flex flex-col items-start" role="status">
+            <div className="border-border text-muted-foreground max-w-[80%] rounded-xl rounded-bl-md border border-dashed px-4 py-2.5 font-serif text-[1.0625rem] italic leading-relaxed">
+              {notice}
+            </div>
+          </div>
         )}
-
-        {stage && (
-          <p
-            aria-live="polite"
-            className="text-muted-foreground animate-pulse text-sm italic"
-          >
-            {STAGE_COPY[stage]}
-          </p>
-        )}
-
-        <div ref={bottomRef} />
       </div>
 
-      <div className="border-separator bg-material pb-safe-3 sticky bottom-0 -mx-5 flex items-center gap-2 border-t-[0.5px] px-5 pt-3">
-        <Input
+      <div className="bg-material border-separator pb-safe-3 sticky bottom-0 -mx-4 border-t-[0.5px] px-4 pt-2.5">
+        {showJump && (messages.length > 0 || busy) && (
+          <button
+            type="button"
+            onClick={() => {
+              followRef.current = true;
+              scrollToBottom("smooth");
+            }}
+            className="bg-card border-separator text-foreground text-footnote shadow-elevated press motion-safe:animate-fade-in absolute -top-12 left-1/2 inline-flex h-9 -translate-x-1/2 items-center gap-1 rounded-full border-[0.5px] px-3 font-semibold"
+          >
+            <ChevronDown className="size-4" aria-hidden />
+            Jump to latest
+          </button>
+        )}
+        <ChatComposer
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void handleSend();
-            }
-          }}
-          placeholder="Ask your past self…"
-          aria-label="Ask your past self"
-          enterKeyHint="send"
-          autoComplete="off"
-          // readOnly, not disabled: a disabled field loses focus, which
-          // drops the iOS keyboard after every message.
-          readOnly={sending}
-          className="flex-1"
+          onChange={updateInput}
+          onSend={() => void run({ question: input.trim() })}
+          onStop={() => abortRef.current?.abort()}
+          busy={busy}
+          paused={notice !== null}
+          pausedHint="You can ask again tomorrow"
         />
-        <Button
-          size="icon"
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          aria-label="Send"
-          variant="primary"
-        >
-          <Send />
-        </Button>
       </div>
     </main>
   );

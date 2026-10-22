@@ -225,13 +225,17 @@ export async function getMyEntry(id: string): Promise<Entry | null> {
   return EntriesRepository.getByIdForUser(id, userId);
 }
 
-/** Batch lookup for chat citation chips — maps entryId to its entry_date. */
-export async function getMyEntryDatesByIds(
+/** Date and title for each entry id, for chat citation chips (one batched
+ * query; ids that aren't the user's are simply absent). */
+export async function getMyCitationInfo(
   ids: string[],
-): Promise<Record<string, string | null>> {
+): Promise<Record<string, { date: string | null; title: string | null }>> {
+  if (ids.length === 0) return {};
   const userId = await requireUserId();
   const found = await EntriesRepository.listByIds(ids, userId);
-  return Object.fromEntries(found.map((e) => [e.id, e.entryDate]));
+  return Object.fromEntries(
+    found.map((e) => [e.id, { date: e.entryDate, title: e.title }]),
+  );
 }
 
 /** Entry + its transcript (if any) + its latest summary (if any) + its ordered

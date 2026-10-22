@@ -153,6 +153,35 @@ export const ChatRepository = {
     return rows[0]!;
   },
 
+  /** Removes one message (used to replace the last reply on "regenerate").
+   * Scoped through the session's owner, like every other method here. */
+  async deleteMessage(
+    messageId: string,
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const owned = await getDb()
+      .select({ id: chatSessions.id })
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.id, sessionId),
+          eq(chatSessions.userId, userId),
+          isNull(chatSessions.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!owned[0]) throw new Error("Chat session not found for user");
+    await getDb()
+      .delete(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.id, messageId),
+          eq(chatMessages.sessionId, sessionId),
+        ),
+      );
+  },
+
   async listMessages(
     sessionId: string,
     userId: string,

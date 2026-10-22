@@ -17,6 +17,7 @@ function fake(
     complete: vi.fn(complete),
     embed: vi.fn(async () => [1]),
     embedMany: vi.fn(async (t: string[]) => t.map(() => [1])),
+    stream: vi.fn(),
   };
 }
 const MSG = [{ role: "user" as const, content: "hi" }];

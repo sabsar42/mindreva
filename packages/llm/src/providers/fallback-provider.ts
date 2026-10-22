@@ -3,6 +3,7 @@ import type {
   CompletionResult,
   LLMMessage,
   LLMProvider,
+  StreamOptions,
 } from "../types";
 
 // After the primary says "rate limited", skip straight to the fallback for a
@@ -59,6 +60,56 @@ export class FallbackLLMProvider implements LLMProvider {
     } catch (fallbackError) {
       // Keep both causes in the message so callers can still tell "limit
       // reached" (see apps/web/lib/limit-error.ts) from a real failure.
+      const describe = (e: unknown) =>
+        e instanceof Error ? e.message : String(e ?? "");
+      throw new Error(
+        `All LLM providers failed. ${this.primary.name}: ${
+          primaryError
+            ? describe(primaryError)
+            : "skipped (recently rate limited (429))"
+        } | ${this.fallback.name}: ${describe(fallbackError)}`,
+      );
+    }
+  }
+
+  /**
+   * Streams from the primary; if it fails before showing any text (and the
+   * caller didn't abort), the same request streams from the fallback. After
+   * the first piece of text a failure is final: two models' answers are
+   * never spliced into one reply.
+   */
+  async stream(
+    messages: LLMMessage[],
+    options: StreamOptions,
+  ): Promise<CompletionResult> {
+    let emitted = false;
+    const tracked: StreamOptions = {
+      ...options,
+      onDelta: (t) => {
+        emitted = true;
+        options.onDelta(t);
+      },
+    };
+    let primaryError: unknown = null;
+    if (this.now() >= this.primaryBlockedUntil) {
+      try {
+        return await this.primary.stream(messages, tracked);
+      } catch (err) {
+        if (emitted || options.signal?.aborted) throw err;
+        primaryError = err;
+        if (isRateLimited(err)) {
+          this.primaryBlockedUntil = this.now() + PRIMARY_COOLDOWN_MS;
+        }
+        console.warn(
+          `LLM primary (${this.primary.name}) stream failed, falling back to ${this.fallback.name}:`,
+          err instanceof Error ? err.message.slice(0, 200) : err,
+        );
+      }
+    }
+    try {
+      return await this.fallback.stream(messages, tracked);
+    } catch (fallbackError) {
+      if (emitted || options.signal?.aborted) throw fallbackError;
       const describe = (e: unknown) =>
         e instanceof Error ? e.message : String(e ?? "");
       throw new Error(

@@ -35,6 +35,14 @@ postgres-js and `prepare: false`, every parameterised query is two round trips
 
 ---
 
+## 2026-10-22 — Chat redesign: what was kept, what was not done
+
+- **Kept the header navigation** instead of the brief's bottom tab bar: the app's navigation is a deliberate earlier design (header icons, Mori), and the brief says to keep an existing feature over a conflicting requirement. Flagged for the owner.
+- **Kept the serif voice** inside the past self's bubbles: it is the feature's established identity, now on an iMessage-style neutral surface.
+- **No fallback mid-answer.** Streaming falls back to Groq only before the first token; afterwards a failure ends the reply (the partial text is kept if the user stopped it), because splicing two models into one answer could read as one coherent but unfounded reply.
+- **Stopped replies are saved** (partial text) so what the user read stays in the conversation and in its history for the next turn.
+- **Not done:** message timestamps on tap, opening a cited entry in a sheet (it pushes the entry screen; whether scroll position is kept on Back depends on the router and was not verified), list virtualisation (sessions are capped at 40 messages).
+
 ## 2026-10-22 — Retrieval backend design choices (Phase 1)
 
 **Title is not embedded.** New entries get an auto-title from their own first sentence after the summary lands; embedding it would re-embed every new entry (a second quota call) for no new information. Citations still show the title (joined at query time).

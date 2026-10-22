@@ -292,35 +292,78 @@ export type PersonaChatStage = "embedding" | "retrieving" | "generating";
  * fills gaps with guesses. Citations only ever name entries whose chunks
  * were given to the model, and none are shown when the reply is no-record.
  */
+export interface SendChatOptions {
+  onStage?: (stage: PersonaChatStage) => void;
+  /** Each new piece of the reply as the model writes it. */
+  onDelta?: (text: string) => void;
+  /** Aborting stops generation; whatever was written so far is kept. */
+  signal?: AbortSignal;
+  /** Replace the last reply (same question) instead of asking a new one. */
+  regenerate?: boolean;
+}
+
 export async function sendPersonaChatMessage(
   sessionId: string,
   question: string,
-  onStage?: (stage: PersonaChatStage) => void,
-): Promise<{ reply: ChatMessage; citedEntries: CitedEntry[] }> {
+  options: SendChatOptions = {},
+): Promise<{
+  reply: ChatMessage;
+  citedEntries: CitedEntry[];
+  /** True when the user stopped it: `reply` holds the partial text. */
+  stopped: boolean;
+} | null> {
+  const { onStage, onDelta, signal, regenerate = false } = options;
   const userId = await requireUserId();
   const session = await ChatRepository.getSession(sessionId, userId);
   if (!session) throw new Error("Chat session not found");
 
-  const priorMessages = await ChatRepository.listMessages(sessionId, userId);
-  if (priorMessages.length >= MAX_MESSAGES_PER_SESSION) {
+  let priorMessages = await ChatRepository.listMessages(sessionId, userId);
+  if (regenerate) {
+    // Re-answer the last question: drop the last reply and ask again with
+    // the history as it was before that question.
+    const last = priorMessages.at(-1);
+    const lastQuestion = priorMessages.at(-2);
+    if (last?.role !== "assistant" || lastQuestion?.role !== "user") {
+      throw new Error("There is no reply to regenerate yet.");
+    }
+    question = lastQuestion.content;
+    priorMessages = priorMessages.slice(0, -2);
+  } else if (priorMessages.length >= MAX_MESSAGES_PER_SESSION) {
     throw new Error(
       `This conversation has reached its ${MAX_MESSAGES_PER_SESSION}-message limit. Start a new session to keep exploring.`,
     );
   }
 
-  // Checked before the question is stored, so a turn that won't be answered
+  // Checked before anything is stored, so a turn that won't be answered
   // today doesn't leave an unanswered message in the conversation.
   const profile = await getMyProfile();
   if (!(await tryUseDaily(userId, profile?.timezone, "chatMessages"))) {
     throw new DailyLimitReachedError(DAILY_CHAT_LIMIT_MESSAGE);
   }
 
-  await ChatRepository.addMessage({
-    sessionId,
-    userId,
-    role: "user",
-    content: question,
-  });
+  // On regenerate the old reply stays until the new one is written, so a
+  // failed or stopped regenerate never loses it.
+  const replacing = regenerate
+    ? (await ChatRepository.listMessages(sessionId, userId)).at(-1)
+    : undefined;
+  const asked = regenerate
+    ? null
+    : await ChatRepository.addMessage({
+        sessionId,
+        userId,
+        role: "user",
+        content: question,
+      });
+  // A turn that fails leaves no trace, so "Retry" can't duplicate the
+  // question in the history.
+  const undoQuestion = async () => {
+    if (!asked) return;
+    try {
+      await ChatRepository.deleteMessage(asked.id, sessionId, userId);
+    } catch (err) {
+      console.error("Couldn't remove the unanswered question:", err);
+    }
+  };
 
   const { start, end } = dateRangeForSession(session);
   const provider = getLLMProvider();
@@ -352,6 +395,7 @@ export async function sendPersonaChatMessage(
   }
 
   let replyText: string;
+  let stopped = false;
   if (chunks.length === 0) {
     replyText = NO_RECORD_REPLY;
   } else {
@@ -372,11 +416,28 @@ export async function sendPersonaChatMessage(
       question,
     });
     onStage?.("generating");
+    let partial = "";
     try {
-      replyText = (await provider.complete(messages)).text;
+      replyText = (
+        await provider.stream(messages, {
+          signal,
+          onDelta: (t) => {
+            partial += t;
+            onDelta?.(t);
+          },
+        })
+      ).text;
     } catch (err) {
-      await refundDaily(userId, "chatMessages");
-      throw err;
+      if (signal?.aborted && partial.trim()) {
+        // Stopped by the user mid-answer: keep what they already read.
+        replyText = partial.trim();
+        stopped = true;
+      } else {
+        await refundDaily(userId, "chatMessages");
+        if (signal?.aborted) return null; // stopped before any text
+        await undoQuestion();
+        throw err;
+      }
     }
   }
 
@@ -384,6 +445,9 @@ export async function sendPersonaChatMessage(
     ? []
     : citationsFor(chunks);
 
+  if (replacing?.role === "assistant") {
+    await ChatRepository.deleteMessage(replacing.id, sessionId, userId);
+  }
   const reply = await ChatRepository.addMessage({
     sessionId,
     userId,
@@ -392,5 +456,5 @@ export async function sendPersonaChatMessage(
     citedEntryIds: citedEntries.map((e) => e.entryId),
   });
 
-  return { reply, citedEntries };
+  return { reply, citedEntries, stopped };
 }

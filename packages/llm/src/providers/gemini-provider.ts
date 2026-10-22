@@ -4,6 +4,7 @@ import type {
   CompletionResult,
   LLMMessage,
   LLMProvider,
+  StreamOptions,
 } from "../types";
 
 const COMPLETION_MODEL = "gemini-2.5-flash";
@@ -57,6 +58,16 @@ export class GeminiLLMProvider implements LLMProvider {
     const text = response.text;
     if (!text) throw new Error("Gemini returned an empty completion");
     return { text, model: COMPLETION_MODEL, provider: this.name };
+  }
+
+  /** No real streaming here: the whole answer arrives as one piece. */
+  async stream(
+    messages: LLMMessage[],
+    options: StreamOptions,
+  ): Promise<CompletionResult> {
+    const result = await this.complete(messages, options);
+    options.onDelta(result.text);
+    return result;
   }
 
   async embed(text: string): Promise<number[]> {
