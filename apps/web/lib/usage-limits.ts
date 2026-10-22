@@ -31,3 +31,24 @@ export const DAILY_CHAT_LIMIT_MESSAGE =
  * limit — the services behind it). The entry is safe either way. */
 export const SUMMARY_PENDING_MESSAGE =
   "Your entry is saved. The summary will be written a little later.";
+
+/**
+ * Embedding API calls per user per day. Counted once per HTTP call: an
+ * entry's chunks are embedded in ONE batched call, so this is roughly
+ * "entry saves with changed text per day". A chat question's own embedding
+ * is not counted here — it is part of that message's DAILY_CHAT_MESSAGE_LIMIT
+ * unit (one message = one query embedding + one completion).
+ */
+export const DAILY_EMBEDDING_CALL_LIMIT = 40;
+
+/** Embedding retry queue: backoff for real failures (doubling from 5 min,
+ * capped at 12 h), parked as 'failed' after this many. Rate limits and
+ * daily limits wait without spending an attempt. */
+export const EMBEDDING_MAX_ATTEMPTS = 8;
+export const EMBEDDING_BACKOFF_BASE_MS = 5 * 60 * 1000;
+export const EMBEDDING_BACKOFF_MAX_MS = 12 * 60 * 60 * 1000;
+export const EMBEDDING_RATE_LIMIT_WAIT_MS = 60 * 60 * 1000;
+/** How long a worker holds a claimed job. */
+export const EMBEDDING_LEASE_MS = 5 * 60 * 1000;
+/** While an entry is still being transcribed, check back after this. */
+export const EMBEDDING_WAIT_FOR_TRANSCRIPT_MS = 5 * 60 * 1000;

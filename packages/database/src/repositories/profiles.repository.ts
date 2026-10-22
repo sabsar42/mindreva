@@ -80,6 +80,15 @@ export const ProfilesRepository = {
         delete from ${appLogins}
         where user_id = ${userId}
           and day <> (created_at at time zone ${timezone})::date`);
+      // Keep retrieval chunks on the same (re-cut) day as their entry, so the
+      // chat's date-range filter stays right. Their "Date:" text line catches
+      // up on the next index pass (the content hash includes the date).
+      await tx.execute(sql`
+        update entry_chunks c set entry_date = e.entry_date
+        from entries e
+        where c.entry_id = e.id
+          and c.user_id = ${userId}
+          and c.entry_date is distinct from e.entry_date`);
     });
   },
 
@@ -96,22 +105,21 @@ export const ProfilesRepository = {
     limit: number,
     nextResetAt: Date,
   ): Promise<boolean> {
-    const [used, other] =
-      kind === "summaries"
-        ? [profiles.summariesUsedToday, profiles.chatMessagesUsedToday]
-        : [profiles.chatMessagesUsedToday, profiles.summariesUsedToday];
-    const usedKey =
-      kind === "summaries" ? "summariesUsedToday" : "chatMessagesUsedToday";
-    const otherKey =
-      kind === "summaries" ? "chatMessagesUsedToday" : "summariesUsedToday";
+    const used = profiles[USAGE_COLUMN[kind]];
     const expired = sql`(${profiles.usageResetsAt} is null or ${profiles.usageResetsAt} <= now())`;
+    const set: Record<string, unknown> = {
+      usageResetsAt: sql`case when ${expired} then ${nextResetAt.toISOString()}::timestamptz else ${profiles.usageResetsAt} end`,
+    };
+    for (const k of DAILY_USAGE_KINDS) {
+      const col = profiles[USAGE_COLUMN[k]];
+      set[USAGE_COLUMN[k]] =
+        k === kind
+          ? sql`case when ${expired} then 1 else ${col} + 1 end`
+          : sql`case when ${expired} then 0 else ${col} end`;
+    }
     const rows = await getDb()
       .update(profiles)
-      .set({
-        [usedKey]: sql`case when ${expired} then 1 else ${used} + 1 end`,
-        [otherKey]: sql`case when ${expired} then 0 else ${other} end`,
-        usageResetsAt: sql`case when ${expired} then ${nextResetAt.toISOString()}::timestamptz else ${profiles.usageResetsAt} end`,
-      })
+      .set(set)
       .where(
         and(eq(profiles.id, userId), sql`(${expired} or ${used} < ${limit})`),
       )
@@ -122,19 +130,26 @@ export const ProfilesRepository = {
   /** Gives back a unit when the AI call it was reserved for never produced
    * anything. No-op once the counters have reset. */
   async releaseDailyUsage(userId: string, kind: DailyUsageKind): Promise<void> {
-    const used =
-      kind === "summaries"
-        ? profiles.summariesUsedToday
-        : profiles.chatMessagesUsedToday;
-    const usedKey =
-      kind === "summaries" ? "summariesUsedToday" : "chatMessagesUsedToday";
+    const key = USAGE_COLUMN[kind];
     await getDb()
       .update(profiles)
-      .set({ [usedKey]: sql`greatest(${used} - 1, 0)` })
+      .set({ [key]: sql`greatest(${profiles[key]} - 1, 0)` })
       .where(
         and(eq(profiles.id, userId), sql`${profiles.usageResetsAt} > now()`),
       );
   },
 };
 
-export type DailyUsageKind = "summaries" | "chatMessages";
+export const DAILY_USAGE_KINDS = [
+  "summaries",
+  "chatMessages",
+  "embeddings",
+] as const;
+export type DailyUsageKind = (typeof DAILY_USAGE_KINDS)[number];
+
+/** Which profiles counter each kind uses. All reset together. */
+const USAGE_COLUMN = {
+  summaries: "summariesUsedToday",
+  chatMessages: "chatMessagesUsedToday",
+  embeddings: "embeddingCallsToday",
+} as const satisfies Record<DailyUsageKind, keyof typeof profiles.$inferSelect>;

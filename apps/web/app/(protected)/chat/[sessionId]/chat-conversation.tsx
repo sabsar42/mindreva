@@ -9,7 +9,7 @@ import { Button, Input, buttonVariants, cn, toast } from "@mindreva/ui";
 // whatever bundle imports it. This is a client component, so that would ship
 // all three to the browser (the same barrel-leak mistake documented twice in
 // docs/CHANGELOG.md for @mindreva/ui's Lexical export).
-import { NO_RECORD_REPLY } from "@mindreva/llm/persona-chat-prompt";
+import { isNoRecordReply } from "@mindreva/llm/persona-chat-prompt";
 import type { ChatRole } from "@mindreva/database";
 import { RangeContextPanel } from "./range-context-panel";
 import { RiverPanel } from "../../river/river-panel";
@@ -36,15 +36,10 @@ const STAGE_COPY: Record<Stage, string> = {
   generating: "Finding the words you used back then…",
 };
 
-/**
- * A reply that honestly reports having nothing for this period gets a softer
- * treatment than a normal reply — it's a gentle answer, not an error. Matched
- * against the exact sentence the prompt instructs the model to use
- * (NO_RECORD_REPLY), so prompt and UI can't drift apart.
- */
-function isNoRecordReply(content: string): boolean {
-  return content.trim().toLowerCase().includes(NO_RECORD_REPLY.toLowerCase());
-}
+// A reply that honestly reports having nothing for this period gets a softer
+// treatment than a normal reply (it's a gentle answer, not an error). The
+// matcher, isNoRecordReply, lives next to the prompt's NO_RECORD_REPLY so the
+// two can't drift apart, and also recognises the older wording.
 
 function shortDateLabel(dateKey: string | null | undefined): string {
   if (!dateKey) return "undated";

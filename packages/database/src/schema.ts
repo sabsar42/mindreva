@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -54,6 +55,9 @@ export const profiles = pgTable("profiles", {
     .default(0),
   /** DB column: notes_used_this_period. AI summaries generated today. */
   summariesUsedToday: integer("notes_used_this_period").notNull().default(0),
+  /** Embedding API calls today (one per batched call, i.e. per entry index
+   * pass). Reset with the two counters above. */
+  embeddingCallsToday: integer("embedding_calls_today").notNull().default(0),
   /** DB column: period_resets_at. The user's next local midnight; both
    * counters start again from 0 once it has passed. */
   usageResetsAt: timestamp("period_resets_at", { withTimezone: true }),
@@ -400,6 +404,99 @@ export const entryShareRecipients = pgTable(
   (t) => [unique("entry_share_recipients_unique").on(t.shareId, t.email)],
 );
 
+/** Postgres full-text vector, only ever written by a generated column. */
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
+
+/**
+ * Retrieval chunks for the past-self chat: one row per chunk of an entry's
+ * plain text (see apps/web/lib/retrieval/chunker.ts). `content` is the exact
+ * date-prefixed text that was embedded — the same string feeds the keyword
+ * index (content_tsv) and the answer prompt. `content_hash` (per entry,
+ * repeated on each of its chunks) lets an unchanged entry skip re-embedding.
+ * `user_id` is stored (not only reachable through entries) so RLS and every
+ * search filter on it directly. HNSW index (on embedding::halfvec(2048)) and
+ * RLS are in the SQL migrations.
+ */
+export const entryChunks = pgTable(
+  "entry_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => entries.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunk_index").notNull(),
+    content: text("content").notNull(),
+    tokenCount: integer("token_count").notNull(),
+    entryDate: date("entry_date"),
+    contentHash: text("content_hash").notNull(),
+    embedding: vector("embedding", { dimensions: 2048 }).notNull(),
+    // 'simple' (no stemming, no stop words): entries are written in English,
+    // Bangla and Urdu, and an English dictionary would mangle the other two.
+    contentTsv: tsvector("content_tsv").generatedAlwaysAs(
+      sql`to_tsvector('simple', content)`,
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("entry_chunks_entry_chunk_unique").on(t.entryId, t.chunkIndex),
+    index("entry_chunks_user_date_idx").on(t.userId, t.entryDate),
+    index("entry_chunks_tsv_idx").using("gin", t.contentTsv),
+  ],
+);
+
+/**
+ * Embedding work that hasn't happened yet: one row per entry, re-armed on
+ * every save. Never deleted on failure: after MAX attempts it is parked as
+ * 'failed' (with last_error) so it stays visible.
+ */
+export const embeddingJobs = pgTable(
+  "embedding_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => entries.id, { onDelete: "cascade" })
+      .unique("embedding_jobs_entry_unique"),
+    status: text("status")
+      .notNull()
+      .default("pending")
+      .$type<EmbeddingJobStatus>(),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "embedding_jobs_status_check",
+      sql`${t.status} in ('pending','processing','done','failed')`,
+    ),
+    index("embedding_jobs_due_idx").on(t.status, t.nextAttemptAt),
+  ],
+);
+
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
 export type Entry = typeof entries.$inferSelect;
@@ -436,6 +533,9 @@ export type ChatRole = "user" | "assistant";
 export type EntryPhotoKind = "cover" | "inline";
 export type ShareVisibility = "public" | "private";
 export type PersonaHalf = 1 | 2;
+export type EmbeddingJobStatus = "pending" | "processing" | "done" | "failed";
+export type EntryChunk = typeof entryChunks.$inferSelect;
+export type EmbeddingJob = typeof embeddingJobs.$inferSelect;
 /** One timed piece of an ASR transcript, as stored in transcripts.segments. */
 export interface TranscriptSegmentRow {
   text: string;

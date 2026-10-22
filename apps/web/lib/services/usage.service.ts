@@ -1,11 +1,16 @@
 import "server-only";
 import { ProfilesRepository, type DailyUsageKind } from "@mindreva/database";
 import { nextMidnightInZone } from "../day-key";
-import { DAILY_CHAT_MESSAGE_LIMIT, DAILY_SUMMARY_LIMIT } from "../usage-limits";
+import {
+  DAILY_CHAT_MESSAGE_LIMIT,
+  DAILY_EMBEDDING_CALL_LIMIT,
+  DAILY_SUMMARY_LIMIT,
+} from "../usage-limits";
 
 const LIMITS: Record<DailyUsageKind, number> = {
   summaries: DAILY_SUMMARY_LIMIT,
   chatMessages: DAILY_CHAT_MESSAGE_LIMIT,
+  embeddings: DAILY_EMBEDDING_CALL_LIMIT,
 };
 
 /**

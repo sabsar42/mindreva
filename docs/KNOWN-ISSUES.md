@@ -20,6 +20,13 @@ If `[timing]` shows queries queueing on the single connection, set
 
 ---
 
+## Retrieval Phase 1 not applied yet; branch must not deploy before it is
+
+**Status:** Open — waiting for owner approval.
+Migrations 0018/0019 and the embedding backfill are written but not run. Until they are, this branch's saves log a failed job write (harmless, caught) and the past-self chat finds nothing (every answer is the no-record reply). Apply order: `pnpm --filter @mindreva/database db:migrate`, then the backfill dry run, then `--apply --confirm <ref>`. The similarity threshold (0.30) is provisional until the Phase 2 eval.
+
+---
+
 ## Free-tier AI is thin and unstable
 
 **Status:** Open (mitigated).

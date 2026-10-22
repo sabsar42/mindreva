@@ -8,8 +8,16 @@ import {
 function fake(
   name: LLMProvider["name"],
   complete: LLMProvider["complete"],
-): LLMProvider & { embed: ReturnType<typeof vi.fn> } {
-  return { name, complete: vi.fn(complete), embed: vi.fn(async () => [1]) };
+): LLMProvider & {
+  embed: ReturnType<typeof vi.fn>;
+  embedMany: ReturnType<typeof vi.fn>;
+} {
+  return {
+    name,
+    complete: vi.fn(complete),
+    embed: vi.fn(async () => [1]),
+    embedMany: vi.fn(async (t: string[]) => t.map(() => [1])),
+  };
 }
 const MSG = [{ role: "user" as const, content: "hi" }];
 const ok = (provider: LLMProvider["name"], model: string) => async () => ({

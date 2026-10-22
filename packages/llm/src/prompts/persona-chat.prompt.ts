@@ -4,7 +4,7 @@ import type { LLMMessage } from "../types";
 // docs/roadmap.md Phase 6 "The grounding prompt" and Common mistakes. Bump
 // this any time the wording changes so past sessions stay traceable to which
 // grounding rules they ran under.
-export const PROMPT_VERSION = "persona-chat-v2";
+export const PROMPT_VERSION = "persona-chat-v3";
 
 /**
  * The exact sentence the model is instructed to use when a question isn't
@@ -14,7 +14,20 @@ export const PROMPT_VERSION = "persona-chat-v2";
  * `isNoRecordReply` check follows automatically via this same export.
  */
 export const NO_RECORD_REPLY =
+  "I don't see anything about that in what I wrote during these months. If I did write about it, try asking with different words, or look in another period.";
+
+/** The v2 wording, still stored on older messages. */
+const LEGACY_NO_RECORD_REPLY =
   "I don't have a journal entry from this period about that.";
+
+/** True for an honest "nothing written about that" reply, current or old
+ * wording — the chat gives these a gentle style and no citation chips. */
+export function isNoRecordReply(content: string): boolean {
+  const text = content.trim().toLowerCase();
+  return [NO_RECORD_REPLY, LEGACY_NO_RECORD_REPLY].some((r) =>
+    text.includes(r.toLowerCase()),
+  );
+}
 
 export interface PersonaChatExcerpt {
   entryId: string;
@@ -27,7 +40,7 @@ export interface PersonaChatExcerpt {
  * the grounded system prompt (with the date range and retrieved excerpts
  * baked in), the session's prior turns, and the new question. Excerpts must
  * already be hard-filtered to [startDate, endDate] by the caller (see
- * EmbeddingsRepository.matchEntries) — this prompt only adds the second
+ * apps/web/lib/retrieval/retrieve.ts) — this prompt only adds the second
  * layer of defense (instructing the model not to go beyond them), it is not
  * a substitute for the date-range filter itself.
  */
@@ -40,7 +53,8 @@ export function buildPersonaChatMessages(input: {
 }): LLMMessage[] {
   const excerptsText = input.excerpts.length
     ? input.excerpts
-        .map((e) => `[${e.entryDate ?? "undated"}] ${e.text}`)
+        // Each excerpt already starts with its "Date: …" line.
+        .map((e) => e.text)
         .join("\n\n---\n\n")
     : "(No journal excerpts were found for this date range.)";
 

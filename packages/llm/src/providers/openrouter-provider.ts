@@ -52,7 +52,7 @@ interface OpenRouterChatResponse {
 }
 
 interface OpenRouterEmbeddingsResponse {
-  data?: { embedding?: number[] }[];
+  data?: { embedding?: number[]; index?: number }[];
 }
 
 /**
@@ -182,6 +182,13 @@ export class OpenRouterLLMProvider implements LLMProvider {
   }
 
   async embed(text: string): Promise<number[]> {
+    const [values] = await this.embedMany([text]);
+    return values!;
+  }
+
+  /** One HTTP call for all `texts` (OpenAI-compatible array input). */
+  async embedMany(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) return [];
     const apiKey = this.getApiKey();
     const model = process.env.OPENROUTER_EMBEDDING_MODEL;
     if (!model) {
@@ -196,7 +203,7 @@ export class OpenRouterLLMProvider implements LLMProvider {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ model, input: text }),
+      body: JSON.stringify({ model, input: texts }),
     });
 
     if (!response.ok) {
@@ -207,17 +214,26 @@ export class OpenRouterLLMProvider implements LLMProvider {
     }
 
     const data = (await response.json()) as OpenRouterEmbeddingsResponse;
-    const values = data.data?.[0]?.embedding;
-    if (!values || values.length === 0) {
-      throw new Error("OpenRouter returned no embedding values");
-    }
-
-    if (values.length !== EXPECTED_EMBEDDING_DIMENSIONS) {
+    const rows = [...(data.data ?? [])].sort(
+      (x, y) => (x.index ?? 0) - (y.index ?? 0),
+    );
+    if (rows.length !== texts.length) {
       throw new Error(
-        `OpenRouter embedding model "${model}" returned a ${values.length}-dimension vector, but packages/database/src/schema.ts's embeddings.embedding column expects ${EXPECTED_EMBEDDING_DIMENSIONS} (vector(${EXPECTED_EMBEDDING_DIMENSIONS})). Not truncating or padding — either pick a model with matching output dimensions, or migrate the column.`,
+        `OpenRouter returned ${rows.length} embeddings for ${texts.length} inputs`,
       );
     }
 
-    return values;
+    return rows.map((row) => {
+      const values = row.embedding;
+      if (!values || values.length === 0) {
+        throw new Error("OpenRouter returned no embedding values");
+      }
+      if (values.length !== EXPECTED_EMBEDDING_DIMENSIONS) {
+        throw new Error(
+          `OpenRouter embedding model "${model}" returned a ${values.length}-dimension vector, but packages/database/src/schema.ts expects ${EXPECTED_EMBEDDING_DIMENSIONS} (vector(${EXPECTED_EMBEDDING_DIMENSIONS})). Not truncating or padding — either pick a model with matching output dimensions, or migrate the column.`,
+        );
+      }
+      return values;
+    });
   }
 }

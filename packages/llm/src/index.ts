@@ -17,6 +17,7 @@ export {
 export {
   buildPersonaChatMessages,
   NO_RECORD_REPLY,
+  isNoRecordReply,
   PROMPT_VERSION as PERSONA_CHAT_PROMPT_VERSION,
   type PersonaChatExcerpt,
 } from "./prompts/persona-chat.prompt";

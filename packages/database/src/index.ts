@@ -85,3 +85,14 @@ export type {
   PersonaHalf,
   TranscriptSegmentRow,
 } from "./schema";
+export {
+  ChunksRepository,
+  type ChunkHit,
+  type ChunkToStore,
+  type KeywordHit,
+  type VectorHit,
+} from "./repositories/entry-chunks.repository";
+export {
+  EmbeddingJobsRepository,
+  type ClaimedEmbeddingJob,
+} from "./repositories/embedding-jobs.repository";

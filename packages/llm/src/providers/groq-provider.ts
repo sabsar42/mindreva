@@ -55,4 +55,10 @@ export class GroqLLMProvider implements LLMProvider {
       "GroqLLMProvider does not support embeddings. The factory must never route embed() calls to this provider.",
     );
   }
+
+  async embedMany(_texts: string[]): Promise<number[][]> {
+    throw new Error(
+      "GroqLLMProvider does not support embeddings. The factory must never route embed() calls to this provider.",
+    );
+  }
 }

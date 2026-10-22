@@ -35,6 +35,24 @@ postgres-js and `prepare: false`, every parameterised query is two round trips
 
 ---
 
+## 2026-10-22 — Retrieval backend design choices (Phase 1)
+
+**Title is not embedded.** New entries get an auto-title from their own first sentence after the summary lands; embedding it would re-embed every new entry (a second quota call) for no new information. Citations still show the title (joined at query time).
+
+**No pg_trgm.** Keyword search uses Postgres full-text ('simple' config, so English, Bangla and Urdu are tokenized alike without stemming) plus ILIKE for quoted phrases and names. ILIKE runs only over one user's in-range chunks, which is small; no new extension is needed. Revisit if fuzzy name matching (typos) becomes a need.
+
+**Keyword evidence rule.** A keyword hit counts as evidence (even below the vector threshold) only if it matches a quoted phrase or name, or at least two distinct content words of the question. A single shared everyday word is not evidence; otherwise almost any question would "find" something and reach the model with weak context.
+
+**Exact per-user search is fine, HNSW is the fallback.** The planner picks the (user_id, entry_date) B-tree plus exact distance sort when a user's rows are few, which gives exact recall; the halfvec HNSW index (with iterative scan, SET LOCAL) takes over as data grows. Measured: filtered HNSW without iterative scan returned 2 of 8 rows in a narrow window, with it 8 of 8.
+
+**Mindmap unchanged.** It keeps reading the per-entry `embeddings` row, now derived as the normalized mean of the entry's chunk vectors (no extra API call). Clusters may reshuffle once after the backfill because the vectors now include the date line.
+
+**Usage accounting.** One batched embedding HTTP call = one unit of a new per-user daily embedding limit (40). A chat question's own embedding belongs to that message's chat unit. This reuses the profiles usage-counter pattern from earlier today (new column `embedding_calls_today`); the Phase 0 brief said to leave usage columns unused, but they already power the daily limits the owner asked for, so the feature was kept.
+
+**Scheduler.** Jobs run right after a save, one per page load, and from a daily Vercel cron (`/api/cron/embeddings`, Hobby allows daily) that fails closed until CRON_SECRET exists. Supabase pg_cron + pg_net was the alternative; it needs the same secret plus two extensions, for no gain at this size.
+
+**No-record wording.** The brief's example ("I don't see anything in your entries…") speaks about the user in the second person, which the persona prompt forbids. Kept the intent in first person: "I don't see anything about that in what I wrote during these months. If I did write about it, try asking with different words, or look in another period."
+
 ## 2026-10-22 — Free-tier AI quotas: what they really are, and how the app copes
 
 **What was measured (2026-10-22, from the live accounts and docs, not assumed):**

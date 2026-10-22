@@ -70,4 +70,11 @@ export class GeminiLLMProvider implements LLMProvider {
     if (!values) throw new Error("Gemini returned no embedding values");
     return values;
   }
+
+  /** Gemini's SDK call here embeds one text at a time; done sequentially. */
+  async embedMany(texts: string[]): Promise<number[][]> {
+    const out: number[][] = [];
+    for (const text of texts) out.push(await this.embed(text));
+    return out;
+  }
 }

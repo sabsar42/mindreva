@@ -1,9 +1,13 @@
 import "server-only";
-import { buildPersonaChatMessages, getLLMProvider } from "@mindreva/llm";
+import {
+  NO_RECORD_REPLY,
+  buildPersonaChatMessages,
+  getLLMProvider,
+  isNoRecordReply,
+} from "@mindreva/llm";
 import { stripFormatting } from "@mindreva/types";
 import {
   ChatRepository,
-  EmbeddingsRepository,
   EntriesRepository,
   type ChatMessage,
   type ChatSession,
@@ -17,6 +21,8 @@ import {
   tryUseDaily,
 } from "./usage.service";
 import { DAILY_CHAT_LIMIT_MESSAGE } from "../usage-limits";
+import { retrieveChunks } from "../retrieval/retrieve";
+import { citationsFor, type RetrievedChunk } from "../retrieval/fuse";
 import {
   halfLabel,
   rangeLabel,
@@ -24,7 +30,6 @@ import {
   windowFor,
 } from "@/lib/past-self/sessions";
 
-const MATCH_LIMIT = 8;
 // A simple cap bounding LLM usage per conversation — see docs/roadmap.md
 // Phase 6 Common mistakes: "No cap on messages per session. A free LLM tier
 // disappears fast if one conversation can run unbounded turns."
@@ -260,17 +265,14 @@ export async function listMyChatMessages(
   return ChatRepository.listMessages(sessionId, userId);
 }
 
-/**
- * One turn: embed the question, retrieve top-k excerpts hard-filtered to the
- * session's date range (see EmbeddingsRepository.matchEntries — the range
- * filter runs BEFORE vector ranking, not after), build the grounded prompt,
- * and store both the question and the reply. citedEntryIds is the
- * deduplicated set of entries whose excerpts were actually included in the
- * prompt context for this reply.
- */
+/** One citation chip: an entry that was actually given to the model for this
+ * reply, in relevance order (its best chunk decides). entryTitle and snippet
+ * were added alongside the original entryId/entryDate fields. */
 export interface CitedEntry {
   entryId: string;
   entryDate: string | null;
+  entryTitle: string | null;
+  snippet: string;
 }
 
 /**
@@ -280,6 +282,16 @@ export interface CitedEntry {
  */
 export type PersonaChatStage = "embedding" | "retrieving" | "generating";
 
+/**
+ * One turn: embed the question, retrieve chunks (hybrid vector + keyword,
+ * hard-filtered to the session's date range FIRST — see retrieveChunks),
+ * build the grounded prompt, and store both the question and the reply.
+ *
+ * If retrieval finds no evidence at all, the honest no-record reply is
+ * stored WITHOUT calling the model: weak context is exactly when a model
+ * fills gaps with guesses. Citations only ever name entries whose chunks
+ * were given to the model, and none are shown when the reply is no-record.
+ */
 export async function sendPersonaChatMessage(
   sessionId: string,
   question: string,
@@ -313,57 +325,64 @@ export async function sendPersonaChatMessage(
   const { start, end } = dateRangeForSession(session);
   const provider = getLLMProvider();
 
-  let excerpts: { entryId: string; entryDate: string | null; text: string }[] =
-    [];
+  // A failed query embedding degrades to keyword-only retrieval instead of
+  // failing the turn.
+  onStage?.("embedding");
+  let queryVector: number[] | null = null;
   try {
-    onStage?.("embedding");
-    const queryVector = await provider.embed(question);
-    onStage?.("retrieving");
-    const matches = await EmbeddingsRepository.matchEntries(
-      userId,
-      queryVector,
-      start,
-      end,
-      MATCH_LIMIT,
-    );
-    excerpts = matches
-      .filter((m) => m.chunkText)
-      .map((m) => ({
-        entryId: m.entryId,
-        entryDate: m.entryDate,
-        text: m.chunkText!,
-      }));
+    queryVector = await provider.embed(question);
   } catch (err) {
-    // Retrieval failure shouldn't crash the conversation — fall back to no
-    // excerpts, which the grounding prompt explicitly handles ("I don't have
-    // a journal entry from this period about that").
+    console.error(`Query embedding failed for chat session ${sessionId}:`, err);
+  }
+
+  onStage?.("retrieving");
+  let chunks: RetrievedChunk[] = [];
+  try {
+    chunks = (
+      await retrieveChunks({
+        userId,
+        question,
+        dateFrom: start,
+        dateTo: end,
+        queryVector,
+      })
+    ).chunks;
+  } catch (err) {
     console.error(`Retrieval failed for chat session ${sessionId}:`, err);
   }
 
-  const conversationHistory = priorMessages.map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
-
-  const messages = buildPersonaChatMessages({
-    startDate: start,
-    endDate: end,
-    excerpts,
-    conversationHistory,
-    question,
-  });
-
-  onStage?.("generating");
   let replyText: string;
-  try {
-    replyText = (await provider.complete(messages)).text;
-  } catch (err) {
-    await refundDaily(userId, "chatMessages");
-    throw err;
+  if (chunks.length === 0) {
+    replyText = NO_RECORD_REPLY;
+  } else {
+    const messages = buildPersonaChatMessages({
+      startDate: start,
+      endDate: end,
+      excerpts: chunks.map((c) => ({
+        entryId: c.entryId,
+        entryDate: c.entryDate,
+        // The stored chunk text, date line included: the same string that was
+        // embedded and keyword-indexed.
+        text: c.content,
+      })),
+      conversationHistory: priorMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      question,
+    });
+    onStage?.("generating");
+    try {
+      replyText = (await provider.complete(messages)).text;
+    } catch (err) {
+      await refundDaily(userId, "chatMessages");
+      throw err;
+    }
   }
-  const citedEntries = [
-    ...new Map(excerpts.map((e) => [e.entryId, e])).values(),
-  ].map((e) => ({ entryId: e.entryId, entryDate: e.entryDate }));
+
+  const citedEntries: CitedEntry[] = isNoRecordReply(replyText)
+    ? []
+    : citationsFor(chunks);
 
   const reply = await ChatRepository.addMessage({
     sessionId,

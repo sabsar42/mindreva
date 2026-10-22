@@ -26,6 +26,12 @@ export interface LLMProvider {
     options?: CompleteOptions,
   ): Promise<CompletionResult>;
   embed(text: string): Promise<number[]>;
+  /**
+   * Embeds several texts in ONE provider call where the API allows it, in
+   * input order. One call counts once against the daily embedding limit
+   * (see apps/web/lib/usage-limits.ts), so callers batch per entry.
+   */
+  embedMany(texts: string[]): Promise<number[][]>;
 }
 
 /**

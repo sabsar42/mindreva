@@ -127,6 +127,20 @@
       "when": 1792613646302,
       "tag": "0017_ai_resilience",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792656809581,
+      "tag": "0018_retrieval_chunks",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792656838803,
+      "tag": "0019_retrieval_chunks_rls",
+      "breakpoints": true
     }
   ]
 }

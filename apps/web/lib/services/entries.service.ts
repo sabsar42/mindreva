@@ -24,6 +24,11 @@ import {
   type SummarizeOutcome,
 } from "./summarization.service";
 import { SUMMARY_GRACE_MS } from "../usage-limits";
+import {
+  drainEmbeddingJobs,
+  enqueueEntryIndex,
+  indexEntryNow,
+} from "./embedding-index.service";
 import { getMyToday } from "./profile.service";
 import { timed } from "../timing";
 
@@ -497,6 +502,9 @@ export async function createVoiceEntry(input: {
     // client asks for it once transcription is done, but may be closed).
     summaryRetryAt: new Date(Date.now() + SUMMARY_GRACE_MS),
   });
+  // Armed now so the entry gets indexed even if the background work below
+  // is cut short; until its transcript exists the job just waits.
+  await enqueueEntryIndex(entry.id, user.id);
 
   // Transcription is a real ASR API call and can take several seconds for a
   // longer recording — the upload response shouldn't block on it. The
@@ -509,6 +517,13 @@ export async function createVoiceEntry(input: {
       await transcribeEntry(entry.id, user.id);
     } catch (err) {
       console.error(`Background transcribe failed for entry ${entry.id}:`, err);
+    }
+    // Text exists now: make the job due again and index right away.
+    try {
+      await enqueueEntryIndex(entry.id, user.id);
+      await indexEntryNow(entry.id, user.id);
+    } catch (err) {
+      console.error(`Background index failed for entry ${entry.id}:`, err);
     }
   });
 
@@ -536,7 +551,14 @@ export async function createTextEntry(input: {
     summaryRetryAt: new Date(Date.now() + SUMMARY_GRACE_MS),
   });
 
+  await enqueueEntryIndex(entry.id, userId);
+
   after(async () => {
+    try {
+      await indexEntryNow(entry.id, userId);
+    } catch (err) {
+      console.error(`Background index failed for entry ${entry.id}:`, err);
+    }
     try {
       await summarizeEntry(entry.id, userId);
     } catch (err) {
@@ -589,6 +611,12 @@ export async function saveMyTranscriptEdit(
   );
   if (!updated) return null;
 
+  // Every text save arms the embedding job (cheap: one DB write). Autosave
+  // only arms it; the run happens with the "refresh after you stop editing"
+  // pass below, so typing doesn't spend an embedding call per pause. An
+  // unchanged text costs nothing either way (content hash).
+  await enqueueEntryIndex(entryId, userId);
+
   // Re-summarizing runs an LLM call that can take several seconds — saving
   // the user's edited text should never block on that. Respond with the
   // text write confirmed and the PREVIOUS summary/tasks immediately, and
@@ -604,6 +632,11 @@ export async function saveMyTranscriptEdit(
       new Date(Date.now() + SUMMARY_GRACE_MS),
     );
     after(async () => {
+      try {
+        await indexEntryNow(entryId, userId);
+      } catch (err) {
+        console.error(`Background index failed for entry ${entryId}:`, err);
+      }
       try {
         await summarizeEntry(entryId, userId);
       } catch (err) {
@@ -650,6 +683,8 @@ export async function retryMyPendingSummary(): Promise<void> {
     const user = await getUser();
     if (!user) return;
     await retryDueSummary(user.id);
+    // ...and one due embedding job (see embedding-index.service.ts).
+    await drainEmbeddingJobs({ userId: user.id, max: 1, budgetMs: 20_000 });
   } catch (err) {
     // Same reasoning as recordMyVisit: during build probing there is no
     // request, and a failed retry just waits for the next page load.

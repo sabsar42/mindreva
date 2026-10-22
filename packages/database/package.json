@@ -15,7 +15,8 @@
     "db:rls-check": "node scripts/rls-check.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no tests yet\" && exit 0"
+    "test": "echo \"no tests yet\" && exit 0",
+    "db:backfill-embeddings": "node scripts/backfill-embeddings.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

@@ -67,4 +67,10 @@ export class ClaudeLLMProvider implements LLMProvider {
       "ClaudeLLMProvider does not support embeddings (Anthropic has no embedding endpoint).",
     );
   }
+
+  async embedMany(_texts: string[]): Promise<number[][]> {
+    throw new Error(
+      "ClaudeLLMProvider does not support embeddings (Anthropic has no embedding endpoint).",
+    );
+  }
 }

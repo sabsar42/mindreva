@@ -74,4 +74,8 @@ export class FallbackLLMProvider implements LLMProvider {
   embed(text: string): Promise<number[]> {
     return this.primary.embed(text);
   }
+
+  embedMany(texts: string[]): Promise<number[][]> {
+    return this.primary.embedMany(texts);
+  }
 }
