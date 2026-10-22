@@ -1,0 +1,51 @@
+/**
+ * The leaf mark as a plain SVG element, for generated images (app icons, the
+ * share preview) where @mindreva/ui's component (Tailwind classes) can't be
+ * used. Same path as LeafMark in packages/ui/src/components/logo.tsx.
+ */
+export const LEAF_PATH =
+  "M 426.921 3.970 C 384.259 35.216, 345.969 56.116, 262 93.987 C 184.666 128.866, 147.664 149.962, 110.414 180.407 C 35.254 241.837, -2.140 317.766, 0.311 403.968 C 1.372 441.269, 7.356 464.805, 24.472 499 C 40.025 530.073, 56.375 552.173, 99.563 600.500 C 153.555 660.917, 175.464 700.354, 180.183 745.621 C 181.723 760.397, 183.280 760.948, 188.998 748.745 C 201.304 722.485, 203.320 692.630, 194.550 666.543 C 188.317 648.003, 178.592 632.386, 146.887 590 C 125.146 560.934, 120.044 553.609, 110.306 537.484 C 73.163 475.976, 64.965 412.243, 86.704 354 C 101.364 314.722, 132.218 280.552, 171 260.643 C 212.577 239.298, 258.820 234.555, 298.926 247.520 C 342.376 261.567, 372.976 292.674, 385.505 335.537 C 409.914 419.037, 360.763 501.557, 284.727 504.734 C 260.440 505.748, 240.277 499.692, 223 486.193 C 190.439 460.752, 181.535 414.784, 203.641 386.250 C 220.691 364.243, 250.390 359.382, 259.551 377.099 C 262.059 381.949, 261.424 383.568, 255.750 386.788 C 247.301 391.581, 241.394 397.455, 237.913 404.525 C 229.687 421.234, 238.352 442.431, 257 451.219 C 268.848 456.802, 289.331 457.611, 301.500 452.975 C 321.120 445.502, 337.032 427.378, 342.742 406 C 345.383 396.110, 345.086 369.251, 342.220 358.802 C 332.829 324.565, 307.069 299.619, 271 289.831 C 259.722 286.770, 234.207 286.514, 221 289.328 C 166.538 300.935, 125.460 342.874, 112.455 400.150 C 110.221 409.989, 109.370 440.913, 110.977 453.845 C 117.304 504.760, 148.782 555.222, 193.248 585.735 C 228.975 610.251, 271.921 618.384, 315.653 608.915 C 445.987 580.695, 519.453 406.568, 489.443 197 C 481.637 142.486, 466.062 84.297, 442.130 20.235 C 435.614 2.790, 434.373 0, 433.136 0 C 432.699 0, 429.902 1.787, 426.921 3.970";
+
+/** Brand colours for generated images (values from tokens.css, light). */
+export const BRAND = {
+  tint: "#26623f",
+  onTint: "#ffffff",
+  accent: "#b2efce",
+  background: "#f5f5f7",
+  foreground: "#1d1d1f",
+} as const;
+
+/** A full-bleed app icon: the leaf, centred, on the tint. */
+export function AppIcon({ size }: { size: number }) {
+  const leaf = Math.round(size * 0.56);
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: BRAND.tint,
+      }}
+    >
+      <svg
+        width={Math.round((leaf * 496) / 757)}
+        height={leaf}
+        viewBox="0 0 496 757"
+        fill={BRAND.onTint}
+      >
+        <path fillRule="evenodd" d={LEAF_PATH} />
+      </svg>
+    </div>
+  );
+}
+
+/** The public origin, for absolute URLs in metadata (Open Graph, sitemap). */
+export function siteUrl(): URL {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return new URL(explicit);
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercel) return new URL(`https://${vercel}`);
+  return new URL("http://localhost:3000");
+}

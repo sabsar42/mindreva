@@ -52,3 +52,10 @@ export const EMBEDDING_RATE_LIMIT_WAIT_MS = 60 * 60 * 1000;
 export const EMBEDDING_LEASE_MS = 5 * 60 * 1000;
 /** While an entry is still being transcribed, check back after this. */
 export const EMBEDDING_WAIT_FOR_TRANSCRIPT_MS = 5 * 60 * 1000;
+
+/** Voice recordings per user per (local) day: a ceiling on storage and
+ * transcription a single account can use, far above real journaling. */
+export const DAILY_RECORDING_LIMIT = 50;
+
+export const DAILY_RECORDING_LIMIT_MESSAGE =
+  "That's a lot of recording for one day. You can record again tomorrow; nothing you already saved is affected.";

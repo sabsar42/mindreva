@@ -20,6 +20,13 @@ If `[timing]` shows queries queueing on the single connection, set
 
 ---
 
+## Uploads go through a function with a 4.5 MB ceiling
+
+**Status:** Mitigated.
+Recordings and photos are posted to API routes, which Vercel caps at 4.5 MB per request. Recording at 32 kbps keeps a 10-minute take ~2.4 MB, and photos are resized client-side, so normal use fits; a browser that ignores the requested bitrate could still produce an oversized take (it gets a clear message and keeps the audio). The durable fix is uploading straight to Supabase Storage with a signed upload URL and then telling the API the path, which removes the function from the file path entirely. Not done: it changes the upload pipeline the brief asked to keep.
+
+---
+
 ## Retrieval eval (Phase 2) waits for the daily quota reset
 
 **Status:** Open.

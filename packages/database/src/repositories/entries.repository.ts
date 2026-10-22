@@ -256,6 +256,25 @@ export const EntriesRepository = {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   },
 
+  /** Voice entries filed on one day (the user's own date), trashed ones
+   * included: a per-day upload cap must count what was uploaded. */
+  async countVoiceEntriesOnDate(
+    userId: string,
+    entryDate: string,
+  ): Promise<number> {
+    const rows = await getDb()
+      .select({ n: sql<number>`count(*)::int` })
+      .from(entries)
+      .where(
+        and(
+          eq(entries.userId, userId),
+          eq(entries.source, "voice"),
+          eq(entries.entryDate, entryDate),
+        ),
+      );
+    return rows[0]?.n ?? 0;
+  },
+
   async countForUser(
     userId: string,
     options: { dateFrom?: string; dateTo?: string } = {},

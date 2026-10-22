@@ -1,7 +1,64 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+/**
+ * Security headers for every response. The CSP allows exactly what the app
+ * loads: its own origin, and the Supabase project (sign-in calls, signed
+ * photo/audio URLs, realtime). 'unsafe-inline' scripts are needed for Next's
+ * inline bootstrap and the pre-paint theme script (no nonce plumbing yet);
+ * everything else is locked: no framing (clickjacking), no plugins, no
+ * foreign forms, no other origins. 'unsafe-eval' only in development (React
+ * dev tooling needs it).
+ */
+function securityHeaders() {
+  const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
+    : "";
+  const supabaseWs = supabase.replace(/^http/, "ws");
+  const dev = process.env.NODE_ENV !== "production";
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data: blob: ${supabase}`,
+    `media-src 'self' blob: ${supabase}`,
+    "font-src 'self' data:",
+    `connect-src 'self' ${supabase} ${supabaseWs}`,
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "frame-ancestors 'none'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+  return [
+    { key: "Content-Security-Policy", value: csp },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "X-Frame-Options", value: "DENY" },
+    // The microphone is used by this site only; nothing else is.
+    {
+      key: "Permissions-Policy",
+      value: "microphone=(self), camera=(), geolocation=(), payment=(), usb=()",
+    },
+    { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+    ...(dev
+      ? []
+      : [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
+        ]),
+  ];
+}
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders() }];
+  },
   transpilePackages: [
     "@mindreva/types",
     "@mindreva/ui",

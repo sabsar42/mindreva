@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces } from "next/font/google";
 import { Toaster } from "@mindreva/ui/toast";
 import { THEME_COLOR, THEME_INIT_SCRIPT } from "@/lib/theme";
+import { siteUrl } from "@/lib/brand-mark";
 import "./globals.css";
 
 // Sans and mono are the system stacks (San Francisco on Apple devices, see
@@ -15,10 +16,29 @@ const serifLogotype = Fraunces({
   display: "swap",
 });
 
+const DESCRIPTION =
+  "Voice journaling and notetaking. Tap to record; keep a readable note.";
+
 export const metadata: Metadata = {
-  title: "Mindreva",
-  description:
-    "Voice journaling and notetaking. Tap to record; keep a readable note.",
+  // Absolute URLs for Open Graph images and canonical links.
+  metadataBase: siteUrl(),
+  title: { default: "Mindreva", template: "%s · Mindreva" },
+  description: DESCRIPTION,
+  applicationName: "Mindreva",
+  // Added to a home screen, it opens full-screen with its own name.
+  appleWebApp: { capable: true, title: "Mindreva", statusBarStyle: "default" },
+  formatDetection: { telephone: false },
+  openGraph: {
+    type: "website",
+    siteName: "Mindreva",
+    title: "Mindreva",
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Mindreva",
+    description: DESCRIPTION,
+  },
 };
 
 // Edge-to-edge (viewport-fit=cover): the app draws behind the notch and home

@@ -23,7 +23,12 @@ import {
   summarizeEntry,
   type SummarizeOutcome,
 } from "./summarization.service";
-import { SUMMARY_GRACE_MS } from "../usage-limits";
+import {
+  DAILY_RECORDING_LIMIT,
+  DAILY_RECORDING_LIMIT_MESSAGE,
+  SUMMARY_GRACE_MS,
+} from "../usage-limits";
+import { DailyLimitReachedError } from "./usage.service";
 import {
   drainEmbeddingJobs,
   enqueueEntryIndex,
@@ -475,6 +480,14 @@ export async function createVoiceEntry(input: {
 }): Promise<{ entryId: string }> {
   const user = await getUser();
   if (!user) throw new Error("Not authenticated");
+
+  const today = await getMyToday();
+  if (
+    (await EntriesRepository.countVoiceEntriesOnDate(user.id, today)) >=
+    DAILY_RECORDING_LIMIT
+  ) {
+    throw new DailyLimitReachedError(DAILY_RECORDING_LIMIT_MESSAGE);
+  }
 
   const objectPath = `${user.id}/${crypto.randomUUID()}.${extensionFromMimeType(input.mimeType)}`;
 

@@ -7,6 +7,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
+    // Fail fast, with a clear message, on a missing required variable.
+    const { enforceEnv } = await import("./lib/env-check");
+    enforceEnv();
   }
   if (process.env.NEXT_RUNTIME === "edge") {
     await import("./sentry.edge.config");

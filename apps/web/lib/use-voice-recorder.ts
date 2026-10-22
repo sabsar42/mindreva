@@ -138,6 +138,16 @@ export function useVoiceRecorder({
           method: "POST",
           body: form,
         });
+        if (res.status === 413 || res.status === 429) {
+          // Today's recording limit (429) or a take too large to upload
+          // (413): calm, not an error. The take stays on screen.
+          const body = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          setUploadFailed(true);
+          toast(body?.error ?? "You can record again tomorrow.");
+          return;
+        }
         if (!res.ok) throw new Error("Upload failed");
         const data = (await res.json()) as { entryId: string };
         setUploadFailed(false);
@@ -207,9 +217,12 @@ export function useVoiceRecorder({
 
       const mimeType = pickMimeType();
       mimeTypeRef.current = mimeType;
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+      // 32 kbps is plenty for speech (transcription resamples to 16 kHz) and
+      // keeps a 10-minute take ~2.4 MB, under the 4.5 MB upload ceiling.
+      // Browser defaults (~128 kbps) would make takes over ~4 minutes fail.
+      const options: MediaRecorderOptions = { audioBitsPerSecond: 32_000 };
+      if (mimeType) options.mimeType = mimeType;
+      const recorder = new MediaRecorder(stream, options);
       recorderRef.current = recorder;
       chunksRef.current = [];
 
