@@ -3,14 +3,27 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Flame, Loader2, Mic, RotateCcw, Square, X } from "lucide-react";
-import { LeafMark, buttonVariants, cn, haptic } from "@mindreva/ui";
-import { useVoiceRecorder } from "@/lib/use-voice-recorder";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  LeafMark,
+  buttonVariants,
+  cn,
+  haptic,
+} from "@mindreva/ui";
+import { useVoiceRecorder, type MicErrorKind } from "@/lib/use-voice-recorder";
 import type { RecorderPhase } from "@/lib/mori-mood";
+import { LiveWaveCanvas } from "./live-wave-canvas";
 
 /** Every state shares this exact box (76px), so nothing around it moves when
  * recording starts, stops or saves. */
 const BAR =
-  "bg-card shadow-subtle flex h-19 w-full items-center gap-3.5 rounded-full border pl-2.5 pr-2.5";
+  "bg-card shadow-subtle flex h-19 w-full items-center gap-2.5 rounded-full border pl-2.5 pr-2.5";
 
 /** iOS-style press: a small, quick scale-down, nothing more. */
 const PRESS =
@@ -21,44 +34,51 @@ function formatClock(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** Fixed per-bar weights so the waveform peaks in the middle and tapers at
- * the edges, the way a voice-memo waveform reads, instead of a flat comb. */
-const BAR_WEIGHTS = Array.from({ length: 24 }, (_, i) => {
-  const t = i / 23;
-  return 0.45 + 0.55 * Math.sin(Math.PI * t);
-});
+/** A take shorter than this is discarded without asking. */
+const CONFIRM_DISCARD_AFTER_MS = 1000;
 
-function LiveWave({
-  amplitudes,
-  active,
-}: {
-  amplitudes: number[];
-  active: boolean;
-}) {
-  return (
-    <div
-      aria-hidden
-      className="gap-0.75 flex h-10 min-w-0 flex-1 items-center overflow-hidden"
-    >
-      {BAR_WEIGHTS.map((weight, i) => {
-        const amp = amplitudes[i % amplitudes.length] ?? 0;
-        const h = active
-          ? Math.max(0.14, Math.min(1, amp * 1.6 * weight))
-          : 0.14;
-        return (
-          <span
-            key={i}
-            className={cn(
-              "bg-primary w-0.75 shrink-0 rounded-full transition-[height,opacity] duration-100",
-              !active && "opacity-40",
-            )}
-            style={{ height: `${h * 100}%` }}
-          />
-        );
-      })}
-    </div>
-  );
-}
+/** Short text that fits the bar, and the steps behind "How to fix". */
+const MIC_HELP: Record<
+  MicErrorKind,
+  { short: string; title: string; steps: string[] }
+> = {
+  denied: {
+    short: "Microphone is off for Mindreva.",
+    title: "Turn on the microphone",
+    steps: [
+      "iPhone or iPad (Safari): open Settings, then Safari, then Microphone, and choose Allow. Or tap aA in the address bar, then Website Settings, then Microphone.",
+      "Chrome, Edge or Firefox: tap the lock or settings icon next to the address, set Microphone to Allow, then reload the page.",
+      "Then come back and tap Retry.",
+    ],
+  },
+  "no-device": {
+    short: "No microphone found.",
+    title: "No microphone found",
+    steps: [
+      "Connect a microphone or headset, or check that your device's built-in microphone isn't turned off.",
+      "Then tap Retry.",
+    ],
+  },
+  busy: {
+    short: "Another app is using the microphone.",
+    title: "The microphone is busy",
+    steps: [
+      "Another app or browser tab is using it (a call, a video meeting, another recorder). Close it, then tap Retry.",
+    ],
+  },
+  unsupported: {
+    short: "This browser can't record audio.",
+    title: "Recording isn't supported here",
+    steps: [
+      "This browser doesn't support recording audio. Try a recent Safari, Chrome, Edge or Firefox.",
+    ],
+  },
+  other: {
+    short: "Couldn't start the microphone.",
+    title: "Couldn't start the microphone",
+    steps: ["Tap Retry. If it keeps happening, reload the page."],
+  },
+};
 
 function StreakLine({ streak }: { streak: number }) {
   if (streak <= 0) {
@@ -109,6 +129,31 @@ export function InlineRecorder({
   );
 
   const rec = useVoiceRecorder({ entryType: "journal", onDone });
+  const [confirmDiscard, setConfirmDiscard] = React.useState(false);
+  const [micHelpOpen, setMicHelpOpen] = React.useState(false);
+
+  /** Discard right away for a tap-and-cancel; otherwise ask first. */
+  const requestDiscard = () => {
+    if (rec.elapsedMs < CONFIRM_DISCARD_AFTER_MS && !rec.uploadFailed) {
+      rec.cancel();
+    } else {
+      setConfirmDiscard(true);
+    }
+  };
+
+  const status = rec.micError
+    ? MIC_HELP[rec.micError].short
+    : rec.uploadFailed
+      ? "Couldn't save the recording. Your audio is kept; you can retry."
+      : rec.state === "preparing"
+        ? "Starting the microphone"
+        : rec.state === "recording"
+          ? "Recording"
+          : rec.state === "paused"
+            ? "Recording paused"
+            : rec.state === "processing"
+              ? "Saving the recording"
+              : "";
 
   const live = rec.state === "recording" || rec.state === "paused";
   const busy = rec.state === "preparing" || rec.state === "processing";
@@ -167,7 +212,11 @@ export function InlineRecorder({
   }
 
   return (
-    <div className={className} aria-live="polite">
+    <div className={className}>
+      {/* Announced once per change, for screen readers. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {status}
+      </span>
       <div
         role="group"
         aria-label="Voice recording"
@@ -178,9 +227,18 @@ export function InlineRecorder({
       >
         {rec.micError ? (
           <>
-            <p className="text-foreground min-w-0 flex-1 pl-2 text-xs leading-snug">
-              Microphone blocked. Allow access in your browser, then try again.
-            </p>
+            <div className="min-w-0 flex-1 pl-2">
+              <p className="text-foreground text-footnote truncate font-semibold">
+                {MIC_HELP[rec.micError].short}
+              </p>
+              <button
+                type="button"
+                onClick={() => setMicHelpOpen(true)}
+                className="text-primary text-footnote hit-44 font-semibold"
+              >
+                How to fix
+              </button>
+            </div>
             <button
               type="button"
               onClick={rec.cancel}
@@ -258,8 +316,8 @@ export function InlineRecorder({
                 }
                 className="flex min-w-0 flex-1 items-center rounded-full focus-visible:outline-none"
               >
-                <LiveWave
-                  amplitudes={rec.amplitudes}
+                <LiveWaveCanvas
+                  analyserRef={rec.analyserRef}
                   active={rec.state === "recording"}
                 />
               </button>
@@ -268,7 +326,7 @@ export function InlineRecorder({
             {(live || rec.uploadFailed) && (
               <button
                 type="button"
-                onClick={rec.cancel}
+                onClick={requestDiscard}
                 aria-label="Discard recording"
                 className={buttonVariants({ variant: "quiet", size: "icon" })}
               >
@@ -308,19 +366,81 @@ export function InlineRecorder({
                 }}
                 disabled={!live}
                 aria-label="Stop and save recording"
+                title="Stop and save"
+                // A round red stop with a square glyph (as in Voice Memos):
+                // a labelled pill was so wide it left the waveform 0 px.
                 className={buttonVariants({
                   variant: "destructive",
-                  size: "lg",
-                  className: "px-5",
+                  size: "icon",
+                  className: "size-14 shrink-0 rounded-full [&_svg]:size-5",
                 })}
               >
                 <Square className="fill-current" />
-                Stop
               </button>
             )}
           </>
         )}
       </div>
+
+      <Dialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard this recording?</DialogTitle>
+            <DialogDescription>
+              {formatClock(rec.elapsedMs)} of audio will be deleted. This
+              can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmDiscard(false)}
+            >
+              {rec.uploadFailed ? "Keep it" : "Keep recording"}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setConfirmDiscard(false);
+                rec.cancel();
+              }}
+            >
+              Discard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {rec.micError && (
+        <Dialog open={micHelpOpen} onOpenChange={setMicHelpOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{MIC_HELP[rec.micError].title}</DialogTitle>
+              <DialogDescription asChild>
+                <ol className="list-decimal space-y-2 pl-5 text-left">
+                  {MIC_HELP[rec.micError].steps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setMicHelpOpen(false)}>
+                Close
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setMicHelpOpen(false);
+                  void rec.start();
+                }}
+              >
+                Retry
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

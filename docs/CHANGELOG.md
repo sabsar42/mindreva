@@ -36,6 +36,18 @@ See DECISIONS.md (2026-10-22, "Function region Seoul, max:1") for the reasoning.
 - Not verified: live Vercel logs (CLI not logged in) and the deployed timings
   in `icn1` (needs a deploy).
 
+## 2026-10-22 — Voice recorder: canvas level meter, reliability, clearer errors (Phase 8)
+
+The recording, upload and transcription pipeline and its data flow are unchanged; the record bar keeps its owner-approved design (leaf mic, 76px capsule).
+
+- **Bug fixed (found while testing):** at phone widths the waveform had no room. The labelled "Stop" pill (127px) plus the mic, discard and timer filled the 350px bar, so the waveform's flex slot was 0px on 375 and 390px screens (before this change too). Stop is now a round red button with a square glyph (iOS Voice Memos style), which frees ~80px: the wave is 79px at 390 and 64px at 375.
+- **Level meter on a canvas** (`live-wave-canvas.tsx`), drawn from the AnalyserNode every frame with no React state: recording caused 2 DOM mutations in 2 s (the timer) instead of 24 bars re-rendered ~12 times a second. Bar count follows the width (min 2px gaps), rise-fast/fall-gently smoothing, theme tint colour, retina-sharp, stops while the tab is hidden, still and dimmed when paused, still under reduced motion.
+- **Reliability:** screen wake lock while recording (re-acquired when the page is visible again); if the microphone track ends mid-take (call, device unplugged, permission revoked) the take is saved; `formatRecorderTimer` (unused) removed.
+- **Errors:** denied / no device / busy / unsupported each get a short message that fits the bar and a "How to fix" dialog with the steps, including iPhone Settings, and Retry. The bar never changes size.
+- **Discard asks first** once anything is recorded ("0:04 of audio will be deleted"; Keep recording / Discard).
+- **Screen readers** hear Recording / Recording paused / Saving / the error.
+- Verified on a production build in headless Edge with the fake microphone: 17/17 — canvas draws and moves, room at 390 and 375px, bar stays 76px in every state, 2 mutations/2 s, pause still, discard confirm with Keep, discarded take saves nothing, a stopped take creates its voice entry, reduced motion still, denied microphone message and steps, no console errors. Not verifiable headless: the wake lock (no API there) and a real phone call interrupting a take.
+
 ## 2026-10-22 — Past-self chat redesign with streaming (Phase 7); token touch-ups (Phase 4)
 
 Retrieval behaviour from Phase 1 is unchanged (same search, no-record rule and citation rule).

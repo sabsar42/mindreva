@@ -7,16 +7,19 @@ import type { EntryType } from "@mindreva/database";
 export type RecorderState =
   "idle" | "preparing" | "recording" | "paused" | "processing";
 
+/** Why the microphone couldn't start, so the message can say what to do. */
+export type MicErrorKind =
+  "denied" | "no-device" | "busy" | "unsupported" | "other";
+
 const SOFT_WARNING_MS = 5 * 60 * 1000;
-const HARD_STOP_MS = 10 * 60 * 1000;
-const WAVEFORM_BARS = 28;
-const AMPLITUDE_UPDATE_INTERVAL_MS = 80;
+export const MAX_RECORDING_MS = 10 * 60 * 1000;
 
 function pickMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "";
   const candidates = [
     "audio/webm;codecs=opus",
     "audio/webm",
+    // Safari records AAC in MP4.
     "audio/mp4",
     "audio/ogg",
   ];
@@ -26,18 +29,33 @@ function pickMimeType(): string {
   return "";
 }
 
-export function formatRecorderTimer(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+function classifyMicError(err: unknown): MicErrorKind {
+  const name = err instanceof DOMException ? err.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") return "denied";
+  if (name === "NotFoundError" || name === "OverconstrainedError")
+    return "no-device";
+  if (name === "NotReadableError" || name === "AbortError") return "busy";
+  return "other";
 }
 
+/** The screen-wake-lock API, where it exists (not in every browser). */
+type WakeLockSentinelLike = { release: () => Promise<void> };
+type WakeLockNavigator = Navigator & {
+  wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinelLike> };
+};
+
 /**
- * The real MediaRecorder lifecycle (start/pause/resume/stop, waveform
- * amplitudes, soft/hard stop timers, upload) shared between the dedicated
- * /record page and the inline recorder on the journal screen — one
- * implementation, not two parallel copies of the same MediaRecorder wiring.
+ * The MediaRecorder lifecycle behind the Journal's record bar: start, pause,
+ * resume, stop, discard, the 5-minute heads-up and 10-minute cap, upload with
+ * a kept copy for retry. The live level meter reads `analyserRef` directly
+ * (see LiveWaveCanvas), so the audio level never goes through React state.
+ *
+ * Reliability:
+ * - the screen is kept awake while recording, where the browser allows it;
+ * - if the microphone goes away mid-take (a call, a device unplugged,
+ *   permission revoked), what was recorded is saved instead of lost;
+ * - leaving the screen mid-recording saves the take (unmount stops it);
+ * - every microphone track is stopped when recording ends.
  */
 export function useVoiceRecorder({
   entryType,
@@ -49,10 +67,7 @@ export function useVoiceRecorder({
 }) {
   const [state, setState] = React.useState<RecorderState>("idle");
   const [elapsedMs, setElapsedMs] = React.useState(0);
-  const [amplitudes, setAmplitudes] = React.useState<number[]>(() =>
-    new Array(WAVEFORM_BARS).fill(0.1),
-  );
-  const [micError, setMicError] = React.useState<string | null>(null);
+  const [micError, setMicError] = React.useState<MicErrorKind | null>(null);
   const [uploadFailed, setUploadFailed] = React.useState(false);
 
   const streamRef = React.useRef<MediaStream | null>(null);
@@ -60,9 +75,9 @@ export function useVoiceRecorder({
   const chunksRef = React.useRef<Blob[]>([]);
   const mimeTypeRef = React.useRef<string>("");
   const audioContextRef = React.useRef<AudioContext | null>(null);
+  /** Read every animation frame by the level meter; never React state. */
   const analyserRef = React.useRef<AnalyserNode | null>(null);
-  const rafRef = React.useRef<number | null>(null);
-  const lastAmplitudeTickRef = React.useRef(0);
+  const wakeLockRef = React.useRef<WakeLockSentinelLike | null>(null);
 
   const segmentStartRef = React.useRef(0);
   const accumulatedMsRef = React.useRef(0);
@@ -82,16 +97,25 @@ export function useVoiceRecorder({
     }
   }, []);
 
-  const stopAmplitudeLoop = React.useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+  const releaseWakeLock = React.useCallback(() => {
+    wakeLockRef.current?.release().catch(() => {});
+    wakeLockRef.current = null;
+  }, []);
+
+  const requestWakeLock = React.useCallback(async () => {
+    try {
+      const nav = navigator as WakeLockNavigator;
+      if (!nav.wakeLock || document.visibilityState !== "visible") return;
+      wakeLockRef.current = await nav.wakeLock.request("screen");
+    } catch {
+      // Not allowed or not supported: recording still works, the screen
+      // may just dim on its own schedule.
     }
   }, []);
 
   const teardownMedia = React.useCallback(() => {
     stopTimer();
-    stopAmplitudeLoop();
+    releaseWakeLock();
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
@@ -99,49 +123,7 @@ export function useVoiceRecorder({
     }
     audioContextRef.current = null;
     analyserRef.current = null;
-  }, [stopAmplitudeLoop, stopTimer]);
-
-  const runAmplitudeLoop = React.useCallback(() => {
-    const analyser = analyserRef.current;
-    if (!analyser) return;
-    const data = new Uint8Array(analyser.frequencyBinCount);
-
-    const tick = (time: number) => {
-      if (!analyserRef.current) return;
-      if (time - lastAmplitudeTickRef.current >= AMPLITUDE_UPDATE_INTERVAL_MS) {
-        lastAmplitudeTickRef.current = time;
-        analyser.getByteFrequencyData(data);
-        const bucketSize = Math.floor(data.length / WAVEFORM_BARS) || 1;
-        const next: number[] = [];
-        for (let i = 0; i < WAVEFORM_BARS; i++) {
-          let sum = 0;
-          for (let j = 0; j < bucketSize; j++)
-            sum += data[i * bucketSize + j] ?? 0;
-          next.push(Math.min(1, sum / bucketSize / 255));
-        }
-        setAmplitudes(next);
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  const startTimer = React.useCallback(() => {
-    segmentStartRef.current = Date.now();
-    stopTimer();
-    timerRef.current = setInterval(() => {
-      const elapsed =
-        accumulatedMsRef.current + (Date.now() - segmentStartRef.current);
-      setElapsedMs(elapsed);
-
-      if (elapsed >= HARD_STOP_MS) {
-        finish();
-      } else if (elapsed >= SOFT_WARNING_MS && !warnedRef.current) {
-        warnedRef.current = true;
-        toast("5 minutes in. Shorter recordings transcribe fastest.");
-      }
-    }, 250);
-  }, [stopTimer]);
+  }, [releaseWakeLock, stopTimer]);
 
   const uploadRecording = React.useCallback(
     async (blob: Blob, durationMs: number) => {
@@ -159,6 +141,7 @@ export function useVoiceRecorder({
         if (!res.ok) throw new Error("Upload failed");
         const data = (await res.json()) as { entryId: string };
         setUploadFailed(false);
+        finishedBlobRef.current = null;
         setState("idle");
         setElapsedMs(0);
         onDone(data.entryId, durationMs);
@@ -170,13 +153,57 @@ export function useVoiceRecorder({
     [entryType, onDone],
   );
 
+  const finish = React.useCallback(() => {
+    setState("processing");
+    cancelledRef.current = false;
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+  }, []);
+
+  const startTimer = React.useCallback(() => {
+    segmentStartRef.current = Date.now();
+    stopTimer();
+    timerRef.current = setInterval(() => {
+      const elapsed =
+        accumulatedMsRef.current + (Date.now() - segmentStartRef.current);
+      setElapsedMs(elapsed);
+
+      if (elapsed >= MAX_RECORDING_MS) {
+        finish();
+      } else if (elapsed >= SOFT_WARNING_MS && !warnedRef.current) {
+        warnedRef.current = true;
+        toast("5 minutes in. Shorter recordings transcribe fastest.");
+      }
+    }, 250);
+  }, [finish, stopTimer]);
+
   const start = React.useCallback(async () => {
     setMicError(null);
     setUploadFailed(false);
+    if (
+      typeof MediaRecorder === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      setMicError("unsupported");
+      return;
+    }
     setState("preparing");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+
+      // The microphone can disappear mid-take: a phone call, the headset
+      // unplugged, permission revoked. Save what was recorded.
+      stream.getAudioTracks().forEach((track) => {
+        track.addEventListener("ended", () => {
+          const r = recorderRef.current;
+          if (r && r.state !== "inactive" && !cancelledRef.current) {
+            toast("The microphone stopped, so your recording was saved.");
+            finish();
+          }
+        });
+      });
 
       const mimeType = pickMimeType();
       mimeTypeRef.current = mimeType;
@@ -212,7 +239,8 @@ export function useVoiceRecorder({
       const audioContext = new AudioCtx();
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 128;
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.7;
       source.connect(analyser);
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
@@ -221,16 +249,16 @@ export function useVoiceRecorder({
       accumulatedMsRef.current = 0;
       setElapsedMs(0);
       warnedRef.current = false;
+      cancelledRef.current = false;
       setState("recording");
       startTimer();
-      runAmplitudeLoop();
-    } catch {
-      setMicError(
-        "Couldn't access your microphone. Check your browser's permission settings and try again.",
-      );
+      void requestWakeLock();
+    } catch (err) {
+      teardownMedia();
+      setMicError(classifyMicError(err));
       setState("idle");
     }
-  }, [runAmplitudeLoop, startTimer, teardownMedia, uploadRecording]);
+  }, [finish, requestWakeLock, startTimer, teardownMedia, uploadRecording]);
 
   const pause = React.useCallback(() => {
     if (state !== "recording") return;
@@ -248,14 +276,6 @@ export function useVoiceRecorder({
     setState("recording");
     startTimer();
   }, [state, startTimer]);
-
-  function finish() {
-    setState("processing");
-    cancelledRef.current = false;
-    if (recorderRef.current && recorderRef.current.state !== "inactive") {
-      recorderRef.current.stop();
-    }
-  }
 
   const cancel = React.useCallback(() => {
     cancelledRef.current = true;
@@ -279,6 +299,19 @@ export function useVoiceRecorder({
       finishedBlobRef.current.durationMs,
     );
   }, [uploadRecording]);
+
+  // A wake lock is released whenever the page is hidden; take it again when
+  // the user comes back to a recording that is still running.
+  React.useEffect(() => {
+    if (state !== "recording" && state !== "paused") return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && !wakeLockRef.current) {
+        void requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [state, requestWakeLock]);
 
   // Navigating away mid-recording (a nav icon, a swipe) saves rather than
   // drops the audio: stopping fires onstop, which tears down the mic and
@@ -308,7 +341,7 @@ export function useVoiceRecorder({
   return {
     state,
     elapsedMs,
-    amplitudes,
+    analyserRef,
     micError,
     uploadFailed,
     start,
