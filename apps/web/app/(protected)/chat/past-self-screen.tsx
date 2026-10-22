@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
-  ChevronRight,
   History,
   MessageCircle,
   Sunrise,
@@ -13,22 +12,14 @@ import {
 } from "lucide-react";
 import { Button, IconTile, SwipeableRow, cn, toast } from "@mindreva/ui";
 import { useHydrated } from "@/lib/use-hydrated";
-import {
-  entryDateKey,
-  type PastSelfSession,
-  type PastSelfYear,
-  type SessionEntry,
-} from "@/lib/past-self/sessions";
-import { pickMemories, yearsAgoLabel } from "@/lib/on-this-day";
-import { getDefaultArtwork } from "@/lib/default-artwork";
+import type { PastSelfSession, PastSelfYear } from "@/lib/past-self/sessions";
 import { PrefetchLink } from "../_components/prefetch-link";
 import { PageHeader } from "../_components/page-header";
+import { TabHeaderActions } from "../_components/tab-header-actions";
 import { SwipeNav } from "../_components/swipe-nav";
 import { trashSwipeAction } from "../_components/swipe-actions";
 import { ConfirmTrashDialog } from "../_components/confirm-trash-dialog";
-import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 import { RiverPanel } from "../river/river-panel";
-import { DayEventsInline } from "../_components/calendar-events";
 import type { RiverData } from "@/lib/services/mindmap.service";
 
 // Set when a conversation is created, consumed on this screen's next mount. A
@@ -61,13 +52,12 @@ function consumeSessionsStale(): boolean {
   }
 }
 
-/** "Sep 26" / "Sep 26, 2024". Built from the key's own parts (no TZ drift). */
-function formatDay(key: string, withYear = false): string {
+/** "Sep 26". Built from the date's own parts, so it reads the same everywhere. */
+function shortDate(key: string): string {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, d ?? 1).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    ...(withYear ? { year: "numeric" } : {}),
   });
 }
 
@@ -75,100 +65,12 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/* ------------------------------------------------------------------ */
-/* Memories carousel                                                    */
-/* ------------------------------------------------------------------ */
-
-/**
- * Horizontally paged memory cards (scroll-snap, one card and a peek of the
- * next): "On this day" when earlier years have an entry on today's date,
- * otherwise moments spread across the past. Each card opens its entry.
- */
-function MemoriesCarousel({
-  entries,
-  todayKey,
-  calendarFor,
-}: {
-  entries: SessionEntry[];
-  todayKey: string;
-  calendarFor?: (dateKey: string) => React.ReactNode;
-}) {
-  const memories = React.useMemo(
-    () => pickMemories(entries, todayKey),
-    [entries, todayKey],
-  );
-  const ids = React.useMemo(
-    () => memories.entries.map((e) => e.id),
-    [memories],
-  );
-  const { thumbnails } = useEntryThumbnails(ids);
-  if (memories.entries.length === 0) return null;
-
-  const heading = memories.kind === "on-this-day" ? "On this day" : "Moments";
-
-  return (
-    <section aria-label={heading} className="mt-6">
-      <h2 className="text-title-3 text-foreground px-1 font-bold">{heading}</h2>
-      <ul
-        data-swipe-nav-ignore
-        className="-mx-4 mt-3 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {memories.entries.map((entry) => {
-          const day = entryDateKey(entry);
-          const eyebrow =
-            memories.kind === "on-this-day"
-              ? `${yearsAgoLabel(day, todayKey)} · ${formatDay(day, true)}`
-              : formatDay(day, true);
-          const cover = thumbnails[entry.id] ?? getDefaultArtwork(entry.id);
-          return (
-            <li key={entry.id} className="w-[82%] max-w-80 shrink-0 snap-start">
-              <PrefetchLink
-                href={`/entries/${entry.id}`}
-                className="bg-card border-border shadow-subtle press focus-visible:ring-ring flex h-full flex-col overflow-hidden rounded-3xl border focus-visible:outline-none focus-visible:ring-2"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- signed Storage URLs / bundled artwork */}
-                <img
-                  src={cover}
-                  alt=""
-                  width={320}
-                  height={140}
-                  loading="lazy"
-                  className="bg-secondary aspect-[16/7] w-full object-cover"
-                />
-                <span className="flex flex-1 flex-col p-4">
-                  <span className="text-caption text-primary font-semibold uppercase tracking-wide">
-                    {eyebrow}
-                  </span>
-                  <span className="text-foreground mt-1 line-clamp-2 font-serif text-lg font-semibold leading-snug">
-                    {entry.title || "Untitled entry"}
-                  </span>
-                  {entry.snippet && (
-                    <span className="text-footnote text-muted-foreground mt-1 line-clamp-3">
-                      {entry.snippet}
-                    </span>
-                  )}
-                  {calendarFor?.(day)}
-                </span>
-              </PrefetchLink>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Seasons                                                              */
-/* ------------------------------------------------------------------ */
-
 function SessionCard({
   session,
   open,
   onToggle,
   onAsk,
   asking,
-  hiddenConversations,
   onDeleteConversation,
 }: {
   session: PastSelfSession;
@@ -176,7 +78,6 @@ function SessionCard({
   onToggle: () => void;
   onAsk: () => void;
   asking: boolean;
-  hiddenConversations: ReadonlySet<string>;
   onDeleteConversation: (conversationId: string) => void;
 }) {
   const hydrated = useHydrated();
@@ -184,34 +85,31 @@ function SessionCard({
     null,
   );
   const panelId = React.useId();
-  const conversations = session.conversations.filter(
-    (c) => !hiddenConversations.has(c.id),
-  );
-  const empty = session.entries.length === 0 && conversations.length === 0;
+  // Entries aren't listed here anymore (they live on /journal), but a session
+  // with entries and no conversations yet still needs to expand so "Ask your
+  // past self" is reachable. Only a session with neither collapses.
+  const empty =
+    session.entries.length === 0 && session.conversations.length === 0;
   const Icon = session.half === 1 ? Sunrise : Sunset;
-  const meta = [
-    session.entries.length > 0
-      ? plural(session.entries.length, "entry", "entries")
-      : null,
-    conversations.length > 0
-      ? plural(conversations.length, "conversation", "conversations")
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
-  // An empty half still appears (every year has two) as a quiet row.
+  const counts =
+    session.conversations.length > 0
+      ? plural(session.conversations.length, "conversation", "conversations")
+      : null;
+
+  // An empty half still appears (every year has exactly two sessions) but as a
+  // quiet, non-expandable row, so there is no empty content to open.
   if (empty) {
     return (
-      <div className="border-border flex items-center gap-3 rounded-2xl border border-dashed px-4 py-3">
+      <div className="border-border/70 flex items-center gap-3 rounded-2xl border border-dashed px-4 py-3">
         <IconTile size="sm" tone="neutral" className="opacity-60">
           <Icon />
         </IconTile>
         <div className="min-w-0 flex-1">
-          <p className="text-subhead text-muted-foreground truncate font-semibold">
+          <p className="text-muted-foreground truncate text-sm font-semibold">
             {session.name}
           </p>
-          <p className="text-footnote text-muted-foreground">
+          <p className="text-muted-foreground/80 text-xs">
             {session.rangeLabel} · nothing written yet
           </p>
         </div>
@@ -219,36 +117,36 @@ function SessionCard({
     );
   }
 
-  const latest = [...session.entries].reverse().slice(0, 8);
-
   return (
     <section
       aria-label={`${session.name}, ${session.rangeLabel}`}
-      className="border-border bg-card shadow-subtle overflow-hidden rounded-2xl border"
+      className="border-border bg-card shadow-subtle overflow-hidden rounded-3xl border"
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className="focus-visible:ring-ring active:bg-row-pressed flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset active:scale-100 active:shadow-none"
+        className="press hover:bg-secondary/60 focus-visible:ring-ring flex w-full items-center gap-3 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
       >
         <IconTile>
           <Icon />
         </IconTile>
         <span className="min-w-0 flex-1">
-          <span className="text-headline text-foreground block truncate">
+          <span className="text-foreground block truncate text-base font-bold tracking-tight">
             {session.name}
           </span>
-          <span className="text-footnote text-muted-foreground block tabular-nums">
+          <span className="text-muted-foreground block text-xs">
             {session.rangeLabel}
-            {meta && ` · ${meta}`}
+          </span>
+          <span className="text-muted-foreground/80 mt-0.5 block text-xs">
+            {counts}
           </span>
         </span>
         <ChevronDown
           aria-hidden
           className={cn(
-            "text-muted-foreground ease-sheet size-5 shrink-0 transition-transform duration-300",
+            "text-muted-foreground size-5 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
             open && "rotate-180",
           )}
         />
@@ -257,57 +155,37 @@ function SessionCard({
       <div
         id={panelId}
         className={cn(
-          "ease-sheet grid transition-[grid-template-rows,opacity] duration-300",
+          "grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
           open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
       >
         <div className="min-h-0 overflow-hidden" inert={!open}>
-          <div className="border-separator space-y-4 border-t-[0.5px] pb-4 pt-3">
-            {latest.length > 0 && (
-              <ul
-                data-swipe-nav-ignore
-                aria-label="Entries from this season"
-                className="flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              >
-                {latest.map((e) => (
-                  <li key={e.id} className="w-40 shrink-0 snap-start">
-                    <PrefetchLink
-                      href={`/entries/${e.id}`}
-                      className="bg-secondary press focus-visible:ring-ring block h-full rounded-xl px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2"
-                    >
-                      <span className="text-caption text-muted-foreground block tabular-nums">
-                        {formatDay(entryDateKey(e))}
-                      </span>
-                      <span className="text-footnote text-foreground mt-0.5 line-clamp-2 block font-semibold">
-                        {e.title || "Untitled entry"}
-                      </span>
-                    </PrefetchLink>
-                  </li>
-                ))}
-              </ul>
-            )}
-
+          <div className="border-border space-y-5 border-t px-4 pb-4 pt-4">
             {session.entries.length > 0 && (
-              <div className="px-4">
-                <Button className="w-full" onClick={onAsk} loading={asking}>
-                  <MessageCircle />
-                  Ask your past self
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={onAsk}
+                disabled={asking}
+              >
+                <MessageCircle />
+                {asking ? "Starting…" : "Ask your past self about this period"}
+              </Button>
             )}
 
-            {conversations.length > 0 && (
-              <div className="px-4">
-                <div className="flex items-baseline justify-between px-1">
-                  <h3 className="text-footnote text-muted-foreground font-semibold uppercase tracking-wide">
+            {session.conversations.length > 0 && (
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
                     Conversations
                   </h3>
-                  <span className="text-footnote text-muted-foreground tabular-nums">
-                    {conversations.length} of {MAX_CONVERSATIONS_PER_HALF}
+                  <span className="text-muted-foreground/80 text-xs">
+                    {session.conversations.length} of{" "}
+                    {MAX_CONVERSATIONS_PER_HALF} for this period
                   </span>
                 </div>
                 <ul className="mt-2 space-y-1.5">
-                  {conversations.map((c) => (
+                  {session.conversations.map((c) => (
                     <li key={c.id}>
                       <SwipeableRow
                         actions={[
@@ -316,26 +194,22 @@ function SessionCard({
                       >
                         <PrefetchLink
                           href={`/chat/${c.id}`}
-                          className="bg-secondary active:bg-row-pressed flex min-h-11 items-center gap-3 rounded-2xl px-3 py-2.5"
+                          className="border-border hover:bg-secondary press flex items-center gap-3 rounded-2xl border px-3 py-2.5"
                         >
                           <History
                             aria-hidden
                             className="text-primary size-4 shrink-0"
                           />
-                          <span className="text-subhead text-foreground min-w-0 flex-1 truncate font-medium">
+                          <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
                             {c.personaHalf
                               ? "Conversation"
                               : "Earlier conversation"}
                           </span>
-                          <span className="text-footnote text-muted-foreground shrink-0 tabular-nums">
+                          <span className="text-muted-foreground shrink-0 text-xs">
                             {hydrated
-                              ? formatDay(c.createdAt.slice(0, 10))
+                              ? shortDate(c.createdAt.slice(0, 10))
                               : " "}
                           </span>
-                          <ChevronRight
-                            aria-hidden
-                            className="text-label-tertiary size-4 shrink-0"
-                          />
                         </PrefetchLink>
                       </SwipeableRow>
                     </li>
@@ -360,43 +234,26 @@ function SessionCard({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Screen                                                               */
-/* ------------------------------------------------------------------ */
-
-/**
- * Re-live Me: a memories surface. Memory cards (on this day, or moments from
- * the past) first, then the river of themes, then the past by season, where
- * each half-year shows its entries and lets you ask your past self about
- * that period (at most two conversations each, enforced server-side).
- */
 export function PastSelfScreen({
   years,
   river,
-  todayKey,
-  calendarConnected = false,
 }: {
   years: PastSelfYear[];
   river: RiverData;
-  todayKey: string | null;
-  /** Show each memory's calendar events (Google Calendar connected). */
-  calendarConnected?: boolean;
 }) {
   const router = useRouter();
 
   // This page can render from the Router Cache (prefetched by AppShell), so a
   // conversation started elsewhere wouldn't be listed on return. Refresh only
-  // then: router.refresh() also empties the whole client Router Cache.
+  // then: router.refresh() also empties the whole client Router Cache, and
+  // doing it on every mount made each visit cost two server round trips.
   React.useEffect(() => {
     if (consumeSessionsStale()) router.refresh();
   }, [router]);
 
-  const allEntries = React.useMemo(
-    () => years.flatMap((y) => y.sessions.flatMap((s) => s.entries)),
-    [years],
-  );
-
-  // Open the most recent session that has anything in it.
+  // Open the most recent session that has anything in it, so the screen
+  // starts on the part of your past you most likely want, with the rest
+  // folded away.
   const defaultOpenKey = React.useMemo(() => {
     for (const year of years) {
       for (const session of [...year.sessions].reverse()) {
@@ -412,7 +269,6 @@ export function PastSelfScreen({
     () => new Set(defaultOpenKey ? [defaultOpenKey] : []),
   );
   const [askingKey, setAskingKey] = React.useState<string | null>(null);
-  const [hidden, setHidden] = React.useState<ReadonlySet<string>>(new Set());
 
   function toggle(key: string) {
     setOpenKeys((prev) => {
@@ -445,23 +301,12 @@ export function PastSelfScreen({
     }
   }
 
-  // Optimistic: the row leaves at once and comes back if the server says no.
   async function deleteConversation(conversationId: string) {
-    setHidden((prev) => new Set(prev).add(conversationId));
-    let ok = false;
-    try {
-      ok = (await fetch(`/api/chat/${conversationId}`, { method: "DELETE" }))
-        .ok;
-    } catch {
-      ok = false;
-    }
-    if (!ok) {
-      setHidden((prev) => {
-        const next = new Set(prev);
-        next.delete(conversationId);
-        return next;
-      });
-      toast.error("Couldn't delete that conversation. It's still here.");
+    const res = await fetch(`/api/chat/${conversationId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      toast.error("Couldn't delete that conversation. Please try again.");
       return;
     }
     toast.success("Conversation deleted");
@@ -470,54 +315,59 @@ export function PastSelfScreen({
 
   return (
     <SwipeNav>
-      <main className="min-h-app mx-auto px-4 pb-10 pt-6">
-        <PageHeader back={false} title="Re-live Me" large />
-        <p className="text-subhead text-muted-foreground mt-1 px-0.5">
-          Revisit what you wrote, then ask what you were thinking. Answers come
-          only from your own entries.
+      <main className="min-h-app mx-auto px-5 pb-12 pt-6">
+        <PageHeader back="/journal">
+          <TabHeaderActions />
+        </PageHeader>
+
+        <h1 className="text-foreground mt-2 text-4xl font-bold tracking-tight">
+          Re-live Me
+        </h1>
+        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+          Revisit what you wrote, then ask what you were thinking. Every answer
+          is grounded only in what you actually wrote.
         </p>
 
+        {/* The river comes first: the shape of your thinking, then the details. */}
+        <RiverPanel data={river} className="mt-6" />
+
         {years.length === 0 ? (
-          <div className="border-border bg-card shadow-subtle mt-6 flex flex-col items-center rounded-2xl border px-6 py-10 text-center">
+          <div className="border-border bg-card shadow-subtle mt-6 flex flex-col items-center rounded-3xl border p-8 text-center">
             <IconTile size="lg">
               <History />
             </IconTile>
-            <p className="text-headline text-foreground mt-4">
-              Your memories will gather here
+            <p className="text-foreground mt-4 text-base font-semibold">
+              Nothing to look back on yet
             </p>
-            <p className="text-subhead text-muted-foreground mt-1.5 max-w-xs">
-              Record a few entries. Over time they&apos;ll come back to you
-              here, by day and by season, and you can talk to them.
+            <p className="text-muted-foreground mt-1.5 max-w-xs text-sm leading-relaxed">
+              Record a few entries, and they&apos;ll gather here by season so
+              you can revisit and talk to them.
             </p>
             <Button asChild className="mt-5">
               <Link href="/journal">Record your first entry</Link>
             </Button>
           </div>
         ) : (
-          <>
-            {todayKey && (
-              <MemoriesCarousel
-                entries={allEntries}
-                todayKey={todayKey}
-                calendarFor={
-                  calendarConnected
-                    ? (day) => (
-                        <DayEventsInline dateKey={day} className="mt-2" />
-                      )
-                    : undefined
-                }
-              />
-            )}
-
-            {/* The river is a bonus: it shows its own empty state. */}
-            <RiverPanel data={river} className="mt-6" />
-
-            <div className="mt-8 space-y-8">
-              {years.map((year) => (
+          <div className="mt-8 space-y-8">
+            {years.map((year) => {
+              const totalConversations = year.sessions.reduce(
+                (n, s) => n + s.conversations.length,
+                0,
+              );
+              return (
                 <section key={year.year} aria-label={String(year.year)}>
-                  <h2 className="text-title-2 text-foreground px-1 font-bold tabular-nums">
-                    {year.year}
-                  </h2>
+                  <div className="flex items-baseline justify-between">
+                    <h2 className="text-foreground text-2xl font-bold tracking-tight">
+                      {year.year}
+                    </h2>
+                    <span className="text-muted-foreground text-xs">
+                      {plural(
+                        totalConversations,
+                        "conversation",
+                        "conversations",
+                      )}
+                    </span>
+                  </div>
                   <div className="mt-3 space-y-3">
                     {year.sessions.map((session) => (
                       <SessionCard
@@ -527,7 +377,6 @@ export function PastSelfScreen({
                         onToggle={() => toggle(session.key)}
                         onAsk={() => void ask(session)}
                         asking={askingKey === session.key}
-                        hiddenConversations={hidden}
                         onDeleteConversation={(id) =>
                           void deleteConversation(id)
                         }
@@ -535,9 +384,9 @@ export function PastSelfScreen({
                     ))}
                   </div>
                 </section>
-              ))}
-            </div>
-          </>
+              );
+            })}
+          </div>
         )}
       </main>
     </SwipeNav>

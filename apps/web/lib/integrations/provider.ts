@@ -17,8 +17,5 @@ export interface IntegrationProvider {
   getConnection(userId: string): Promise<IntegrationConnection>;
   /** Begin connecting. Throws IntegrationNotConfiguredError if !isConfigured(). */
   connect(userId: string): Promise<ConnectResult>;
-  /** Finish connecting from the provider's redirect (OAuth callback). */
-  handleCallback?(params: URLSearchParams): Promise<void>;
-  /** Revoke at the provider and delete stored credentials. */
   disconnect(userId: string): Promise<void>;
 }

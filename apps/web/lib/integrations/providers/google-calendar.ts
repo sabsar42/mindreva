@@ -1,44 +1,37 @@
-import "server-only";
 import type { IntegrationProvider } from "../provider";
 import { IntegrationNotConfiguredError } from "../types";
-import {
-  completeCalendarConnect,
-  disconnectCalendarForUser,
-  getCalendarStatusForUser,
-  isCalendarConfigured,
-  startCalendarConnect,
-} from "@/lib/services/calendar.service";
 
 /**
- * Google Calendar, read-only: shows your events beside your entries (on an
- * entry's day, on Home and on Re-live Me). Nothing is written to your
- * calendar and nothing is sent to an AI model. Off unless GOOGLE_CLIENT_ID,
- * GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI and CALENDAR_TOKEN_KEY are set.
+ * Google Calendar: a placeholder provider, deliberately inert.
+ *
+ * No OAuth flow, token storage or sync behaviour exists yet, because the
+ * requirements for them haven't been specified (which scopes, what gets
+ * written to the calendar, one-way or two-way). When they arrive, this file is
+ * the only place that changes: implement the four methods, add a table for the
+ * connection (with RLS) and flip isConfigured(). The registry, service, API
+ * routes and UI are already shaped around this interface.
  */
 export const googleCalendarProvider: IntegrationProvider = {
   definition: {
     id: "google-calendar",
     name: "Google Calendar",
     description:
-      "See the day's events beside your entries and memories. Read-only: Mindreva never changes your calendar.",
+      "Add dates and deadlines from your entries to your Google Calendar.",
   },
 
-  isConfigured: () => isCalendarConfigured(),
+  isConfigured: () => false,
 
-  getConnection: async (userId) => {
-    const { status, email, connectedAt } =
-      await getCalendarStatusForUser(userId);
-    return { status, accountLabel: email, connectedAt };
-  },
+  getConnection: async () => ({
+    status: "disconnected",
+    accountLabel: null,
+    connectedAt: null,
+  }),
 
   connect: async () => {
-    if (!isCalendarConfigured()) {
-      throw new IntegrationNotConfiguredError("google-calendar");
-    }
-    return { redirectUrl: await startCalendarConnect() };
+    throw new IntegrationNotConfiguredError("google-calendar");
   },
 
-  handleCallback: (params) => completeCalendarConnect(params),
-
-  disconnect: (userId) => disconnectCalendarForUser(userId),
+  disconnect: async () => {
+    // Nothing to disconnect until a connection can exist.
+  },
 };

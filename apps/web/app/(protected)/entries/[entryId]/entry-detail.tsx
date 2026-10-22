@@ -41,7 +41,6 @@ import { rememberEntryThumbnail, stablePhotoUrl } from "@/lib/photo-url-cache";
 import { ConfirmTrashDialog } from "../../_components/confirm-trash-dialog";
 import { ShareSheet } from "./share-sheet";
 import { TranscriptSheet } from "./transcript-sheet";
-import { DayEventsInline } from "../../_components/calendar-events";
 
 // Lexical is a client-only interactive widget — its SSR output for the
 // contentEditable div doesn't match what it renders once hydrated (a known
@@ -131,7 +130,6 @@ export function EntryDetail({
   summaryPending,
   initialPhotos,
   initialTasks,
-  calendarConnected = false,
 }: {
   entryId: string;
   source: EntrySource;
@@ -146,8 +144,6 @@ export function EntryDetail({
   summaryPending: boolean;
   initialPhotos: EntryPhoto[];
   initialTasks: TaskChecklistTask[];
-  /** Google Calendar is connected: show that day's events under the date. */
-  calendarConnected?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = React.useState<TranscriptStatus | null>(
@@ -566,7 +562,7 @@ export function EntryDetail({
   const coverInputRef = React.useRef<HTMLInputElement>(null);
 
   return (
-    <main className="min-h-app mx-auto px-4 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
       <header className="flex items-center justify-between gap-2">
         <button
           type="button"
@@ -638,9 +634,6 @@ export function EntryDetail({
           }}
         />
       </div>
-      {calendarConnected && entryDate && (
-        <DayEventsInline dateKey={entryDate} className="mt-1.5" />
-      )}
 
       {/* The title is edited in place: no dialog, no separate screen. */}
       <textarea

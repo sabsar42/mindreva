@@ -5,7 +5,7 @@ import { Skeleton } from "@mindreva/ui/skeleton";
 
 export default function AccountLoading() {
   return (
-    <main className="min-h-app mx-auto px-4 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
       <Skeleton className="mb-6 h-7 w-28" />
       <div className="space-y-4">
         <Skeleton className="h-20 w-full rounded-2xl" />

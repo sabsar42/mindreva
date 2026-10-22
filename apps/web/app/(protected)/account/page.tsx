@@ -1,8 +1,8 @@
 import Link from "next/link";
 import {
   Archive,
-  CalendarDays,
   FileText,
+  Plug,
   RefreshCw,
   ShieldCheck,
   Trash2,
@@ -17,15 +17,12 @@ import {
 import { getUser } from "@mindreva/auth/server";
 import { getMyProfile, type UseCase } from "@/lib/services/profile.service";
 import { countMyEntries } from "@/lib/services/entries.service";
-import {
-  getMyCalendarStatus,
-  isCalendarConfigured,
-} from "@/lib/services/calendar.service";
 import { PrefetchLink } from "../_components/prefetch-link";
 import { PageHeader } from "../_components/page-header";
 import { ThemeSwitchRow } from "../_components/theme-switch-row";
 import {
   LanguagesCard,
+  PreferenceToggles,
   SummaryStyleCard,
 } from "./_components/account-settings";
 import { SignOutButton } from "./_components/sign-out-button";
@@ -33,19 +30,11 @@ import { DeleteAccountButton } from "./_components/delete-account-button";
 import { SupportFooterLink, SupportRow } from "../../_components/support-link";
 
 export default async function AccountPage() {
-  const calendarOn = isCalendarConfigured();
-  const [user, profile, noteCount, calendar] = await Promise.all([
+  const [user, profile, noteCount] = await Promise.all([
     getUser(),
     getMyProfile(),
     countMyEntries().catch(() => 0),
-    calendarOn ? getMyCalendarStatus().catch(() => null) : null,
   ]);
-  const calendarLabel =
-    calendar?.status === "connected"
-      ? `Connected${calendar.email ? ` as ${calendar.email}` : ""}`
-      : calendar?.status === "needs_reconnect"
-        ? "Needs reconnecting"
-        : "Optional · see your events beside entries";
 
   const email = user?.email ?? "";
   const displayName = profile?.displayName || email.split("@")[0] || "You";
@@ -56,10 +45,10 @@ export default async function AccountPage() {
 
   return (
     <>
-      <main className="min-h-app mx-auto px-4 pb-24 pt-6">
-        <PageHeader back={false} title="Account" large />
+      <main className="min-h-app mx-auto px-5 pb-24 pt-6">
+        <PageHeader back="/journal" title="Account" className="mb-4" />
 
-        <div className="mt-5 space-y-4">
+        <div className="space-y-4">
           {/* Profile */}
           <Card className="flex items-center gap-4 p-4">
             <Avatar className="size-12">
@@ -79,17 +68,14 @@ export default async function AccountPage() {
               title="Cloud sync"
               description={`${noteCount} ${noteCount === 1 ? "note" : "notes"} kept`}
             />
-            {/* Hidden entirely when this deployment can't connect it. */}
-            {calendarOn && (
-              <PrefetchLink href="/integrations">
-                <SettingsRow
-                  icon={<CalendarDays />}
-                  title="Google Calendar"
-                  description={calendarLabel}
-                  chevron
-                />
-              </PrefetchLink>
-            )}
+            <PrefetchLink href="/integrations">
+              <SettingsRow
+                icon={<Plug />}
+                title="Integrations"
+                description="Connect Google Calendar and more"
+                chevron
+              />
+            </PrefetchLink>
             <PrefetchLink href="/archive">
               <SettingsRow
                 icon={<Archive />}
@@ -131,6 +117,8 @@ export default async function AccountPage() {
           <Card className="p-4">
             <ThemeSwitchRow />
           </Card>
+
+          <PreferenceToggles />
 
           <SummaryStyleCard initial={summaryStyle} />
 

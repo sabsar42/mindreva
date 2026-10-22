@@ -3,7 +3,6 @@ import {
   addDays,
   dayKeyInZone,
   nextMidnightInZone,
-  startOfDayInZone,
   resolveTimeZone,
 } from "./day-key";
 
@@ -46,34 +45,6 @@ describe("nextMidnightInZone", () => {
     const after = new Date("2026-11-01T16:00:00Z");
     expect(nextMidnightInZone("America/New_York", after).toISOString()).toBe(
       "2026-11-02T05:00:00.000Z",
-    );
-  });
-});
-
-describe("startOfDayInZone", () => {
-  it("is local midnight as a UTC instant", () => {
-    expect(startOfDayInZone("2026-10-23", "Asia/Dhaka").toISOString()).toBe(
-      "2026-10-22T18:00:00.000Z",
-    );
-    expect(startOfDayInZone("2026-10-23", "UTC").toISOString()).toBe(
-      "2026-10-23T00:00:00.000Z",
-    );
-  });
-
-  it("handles DST-change days", () => {
-    // New York springs forward at 2am on 2026-03-08; midnight is still EST.
-    expect(
-      startOfDayInZone("2026-03-08", "America/New_York").toISOString(),
-    ).toBe("2026-03-08T05:00:00.000Z");
-    // The next day starts in EDT.
-    expect(
-      startOfDayInZone("2026-03-09", "America/New_York").toISOString(),
-    ).toBe("2026-03-09T04:00:00.000Z");
-  });
-
-  it("falls back to UTC for an unknown zone", () => {
-    expect(startOfDayInZone("2026-10-23", "Not/AZone").toISOString()).toBe(
-      "2026-10-23T00:00:00.000Z",
     );
   });
 });

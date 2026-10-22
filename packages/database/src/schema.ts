@@ -542,39 +542,3 @@ export interface TranscriptSegmentRow {
   startMs: number;
   endMs: number;
 }
-
-/**
- * Google Calendar connection, one per user (read-only access to the user's
- * calendars). The refresh token is AES-256-GCM encrypted by the app
- * (CALENDAR_TOKEN_KEY) before it gets here and is never sent to a client.
- * RLS is on with no client policies at all: only the server's database
- * connection reads or writes this table. Deleting the profile (account
- * deletion) cascades; disconnecting deletes the row after revoking with Google.
- */
-export const calendarConnections = pgTable("calendar_connections", {
-  userId: uuid("user_id")
-    .primaryKey()
-    .references(() => profiles.id, { onDelete: "cascade" }),
-  provider: text("provider").notNull().default("google"),
-  accountEmail: text("account_email"),
-  refreshTokenEnc: text("refresh_token_enc").notNull(),
-  scopes: text("scopes").notNull(),
-  /** Calendar ids whose events are shown; empty means "primary only". */
-  selectedCalendarIds: text("selected_calendar_ids")
-    .array()
-    .notNull()
-    .default(sql`'{}'::text[]`),
-  status: text("status")
-    .notNull()
-    .default("connected")
-    .$type<CalendarConnectionStatus>(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
-export type CalendarConnectionStatus = "connected" | "needs_reconnect";
-export type CalendarConnection = typeof calendarConnections.$inferSelect;

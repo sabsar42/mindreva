@@ -9,7 +9,7 @@ export default function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="motion-safe:animate-page-in min-h-app mx-auto px-4 pb-16 pt-6">
+    <main className="motion-safe:animate-page-in min-h-app mx-auto px-5 pb-16 pt-6">
       <div className="mb-6 flex items-center justify-between">
         <Link
           href="/"

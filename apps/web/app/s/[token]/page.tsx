@@ -59,7 +59,7 @@ export default async function SharedEntryPage({
         <div className="mx-auto mb-5">
           <Brand />
         </div>
-        <div className="border-border bg-card shadow-subtle flex flex-col items-center rounded-2xl border px-6 py-10">
+        <div className="border-border bg-card shadow-subtle flex flex-col items-center rounded-3xl border px-6 py-10">
           <span className="bg-secondary text-muted-foreground flex size-14 items-center justify-center rounded-[1.25rem]">
             <Lock className="size-6" />
           </span>
@@ -87,7 +87,7 @@ export default async function SharedEntryPage({
   const date = formatDate(entry.entryDate);
 
   return (
-    <main className="min-h-app mx-auto px-4 pb-16 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-16 pt-6">
       <header className="flex items-center justify-between">
         <Brand />
         <span className="text-muted-foreground text-xs">Shared journal</span>

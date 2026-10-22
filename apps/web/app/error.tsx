@@ -28,7 +28,7 @@ export default function RouteError({
     <main className="min-h-app mx-auto flex flex-col justify-center px-6 py-12 text-center">
       <div
         role="alert"
-        className="border-border bg-card shadow-subtle flex flex-col items-center rounded-2xl border px-6 py-10"
+        className="border-border bg-card shadow-subtle flex flex-col items-center rounded-3xl border px-6 py-10"
       >
         <span className="bg-secondary text-muted-foreground flex size-14 items-center justify-center rounded-xl">
           <TriangleAlert className="size-6" aria-hidden />

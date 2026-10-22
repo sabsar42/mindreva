@@ -38,10 +38,7 @@ import { useHydrated } from "@/lib/use-hydrated";
 import { ConfirmTrashDialog } from "./confirm-trash-dialog";
 import { EmptyState } from "./empty-state";
 import { HomeHeader } from "./home-header";
-import { RecordSheet } from "./record-sheet";
-import { WriteSheet } from "./write-sheet";
-import { LookbackCard, QuickActions } from "./home-sections";
-import { pickLookback } from "@/lib/on-this-day";
+import { InlineRecorder } from "./inline-recorder";
 import { SwipeNav } from "./swipe-nav";
 import type { EntryType } from "@mindreva/database";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
@@ -55,17 +52,11 @@ export function EntryListScreen({
   heading,
   entries,
   initialActivity,
-  todayKey = null,
-  calendarSlot,
 }: {
   type: EntryType;
   heading: string;
   entries: EntryListItemWithThumbnail[];
   initialActivity: InitialActivity | null;
-  /** Today in the user's own time zone ("YYYY-MM-DD"), for the look-back. */
-  todayKey?: string | null;
-  /** Today's calendar events, when Google Calendar is connected. */
-  calendarSlot?: React.ReactNode;
 }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -76,8 +67,6 @@ export function EntryListScreen({
     EntryListItemWithThumbnail[] | null
   >(null);
   const [searching, setSearching] = React.useState(false);
-  const [recordOpen, setRecordOpen] = React.useState(false);
-  const [writeOpen, setWriteOpen] = React.useState(false);
   const [confirmTrashId, setConfirmTrashId] = React.useState<string | null>(
     null,
   );
@@ -257,22 +246,11 @@ export function EntryListScreen({
   const { thumbnails: entryThumbnails, resolved: thumbnailResolved } =
     useEntryThumbnails(visibleIds);
 
-  const lookback = React.useMemo(
-    () => (todayKey ? pickLookback(entries, todayKey) : null),
-    [entries, todayKey],
-  );
-
-  // Sections settle in one after another on first paint (transform and
-  // opacity only; none under reduced motion).
-  const rise = (i: number) => ({
-    className: "motion-safe:animate-rise",
-    style: { animationDelay: `${i * 50}ms` },
-  });
-
   return (
     <SwipeNav>
-      <main className="min-h-app mx-auto px-4 pb-8 pt-6">
-        <div {...rise(0)}>
+      <main className="h-app mx-auto flex flex-col px-5 pt-6">
+        {/* Everything above the entries is fixed; only the list scrolls. */}
+        <div className="shrink-0">
           <HomeHeader
             leading={
               <MoriCompanion
@@ -282,58 +260,33 @@ export function EntryListScreen({
               />
             }
           />
-        </div>
 
-        <div {...rise(1)}>
           <ActivityStrip
-            className="mt-5"
+            className="mt-[18px]"
             getDay={activity.getDay}
             ensureYear={activity.ensureYear}
             onWeekChange={setWeek}
             onOpen={() => setSheetOpen(true)}
           />
-        </div>
-
-        {type === "journal" && (
-          <div {...rise(2)}>
-            <QuickActions
+          {type === "journal" && (
+            <InlineRecorder
               className="mt-4"
               streak={activity.streak}
-              onRecord={() => setRecordOpen(true)}
-              onWrite={() => setWriteOpen(true)}
+              onPhaseChange={setPhase}
+              onSaved={beginForming}
             />
-          </div>
-        )}
+          )}
 
-        {calendarSlot && <div {...rise(3)}>{calendarSlot}</div>}
-
-        {todayKey && lookback && !searchResults && (
-          <div {...rise(3)}>
-            <LookbackCard
-              className="mt-7"
-              lookback={lookback}
-              todayKey={todayKey}
-              thumbnailFor={(e) =>
-                entryThumbnails[e.id] ?? e.thumbnailUrl ?? null
-              }
-            />
-          </div>
-        )}
-
-        <section aria-label={heading} {...rise(4)}>
-          <div className="mt-7 flex h-11 items-center justify-between gap-3 px-1">
+          <div className="mt-3.5 flex h-10 items-center justify-between gap-3">
             {searchOpen ? (
-              <div className="border-border bg-card motion-safe:animate-fade-in flex h-11 flex-1 items-center gap-2 rounded-full border pl-4 pr-1">
-                <Search
-                  className="text-muted-foreground size-4 shrink-0"
-                  aria-hidden
-                />
+              <div className="border-border bg-card motion-safe:animate-fade-in flex h-10 flex-1 items-center gap-2 rounded-full border px-3.5">
+                <Search className="text-muted-foreground size-4 shrink-0" />
                 <Input
                   ref={searchInputRef}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Escape" && closeSearch()}
-                  placeholder={`Search ${heading.toLowerCase()}`}
+                  placeholder={`Search ${heading.toLowerCase()}…`}
                   aria-label={`Search ${heading.toLowerCase()}`}
                   inputMode="search"
                   enterKeyHint="search"
@@ -344,14 +297,17 @@ export function EntryListScreen({
                   type="button"
                   aria-label="Close search"
                   onClick={closeSearch}
-                  className={buttonVariants({ variant: "quiet", size: "icon" })}
+                  className={buttonVariants({
+                    variant: "quiet",
+                    size: "icon-sm",
+                  })}
                 >
                   <X />
                 </button>
               </div>
             ) : (
               <>
-                <h2 className="text-title-3 text-foreground font-bold">
+                <h2 className="text-foreground text-lg font-bold tracking-tight">
                   {heading}
                 </h2>
                 <button
@@ -365,110 +321,91 @@ export function EntryListScreen({
               </>
             )}
           </div>
+        </div>
 
-          <div data-entry-list className="mt-2 space-y-2">
-            {searching && (
-              <p
-                role="status"
-                className="text-subhead text-muted-foreground px-1"
+        <div
+          data-entry-list
+          className="-mx-5 mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 pb-[calc(2.5rem+var(--safe-bottom))] pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_10px)]"
+        >
+          {searching && (
+            <p role="status" className="text-muted-foreground text-sm">
+              Searching…
+            </p>
+          )}
+
+          {!searching &&
+            formingCards.map((m) => (
+              <NoteCard
+                key={m.id}
+                title=""
+                dateLabel="Just now"
+                durationLabel={formatDuration(m.durationMs)}
+                forming={{
+                  stage:
+                    m.phase === "transcribing"
+                      ? "transcribing"
+                      : m.phase === "writing"
+                        ? "writing"
+                        : "finishing",
+                  text: m.text,
+                }}
+              />
+            ))}
+
+          {!searching && visible.length === 0 && formingCards.length === 0 && (
+            <EmptyState
+              icon={searchResults ? <Search /> : <FileText />}
+              title={
+                searchResults
+                  ? "No matches"
+                  : `No ${heading.toLowerCase()} entries yet`
+              }
+              message={
+                searchResults
+                  ? "Try a different word or phrase."
+                  : "Tap record to capture your first entry."
+              }
+            />
+          )}
+
+          {!searching &&
+            visible.map((entry) => (
+              <SwipeableRow
+                key={entry.id}
+                actions={[
+                  {
+                    key: "archive",
+                    label: "Archive",
+                    icon: <Archive className="size-5" />,
+                    onClick: () => void archiveEntry(entry.id),
+                    className: "bg-secondary text-secondary-foreground",
+                  },
+                  trashSwipeAction(() => setConfirmTrashId(entry.id)),
+                ]}
               >
-                Searching…
-              </p>
-            )}
-
-            {!searching &&
-              formingCards.map((m) => (
-                <NoteCard
-                  key={m.id}
-                  title=""
-                  dateLabel="Just now"
-                  durationLabel={formatDuration(m.durationMs)}
-                  forming={{
-                    stage:
-                      m.phase === "transcribing"
-                        ? "transcribing"
-                        : m.phase === "writing"
-                          ? "writing"
-                          : "finishing",
-                    text: m.text,
-                  }}
-                />
-              ))}
-
-            {!searching &&
-              visible.length === 0 &&
-              formingCards.length === 0 && (
-                <EmptyState
-                  icon={searchResults ? <Search /> : <FileText />}
-                  title={
-                    searchResults ? "No matches" : "Your journal starts here"
-                  }
-                  message={
-                    searchResults
-                      ? "Try a different word or phrase."
-                      : "Say a few words about your day. Mindreva keeps it as a readable note, with a title and a summary."
-                  }
-                  action={
-                    searchResults ? undefined : (
-                      <button
-                        type="button"
-                        onClick={() => setRecordOpen(true)}
-                        className={buttonVariants({ size: "lg" })}
-                      >
-                        Record your first entry
-                      </button>
-                    )
-                  }
-                />
-              )}
-
-            {!searching &&
-              visible.map((entry) => (
-                <SwipeableRow
-                  key={entry.id}
-                  actions={[
-                    {
-                      key: "archive",
-                      label: "Archive",
-                      icon: <Archive className="size-5" />,
-                      onClick: () => void archiveEntry(entry.id),
-                      className: "bg-secondary text-secondary-foreground",
-                    },
-                    trashSwipeAction(() => setConfirmTrashId(entry.id)),
-                  ]}
-                >
-                  <PrefetchLink href={`/entries/${entry.id}`}>
-                    <NoteCard
-                      title={entry.title || "Untitled entry"}
-                      dateLabel={
-                        hydrated
-                          ? formatEntryDateTime(entry.createdAt)
-                          : DATE_PLACEHOLDER
-                      }
-                      durationLabel={formatDuration(entry.durationMs)}
-                      snippet={entry.snippet ?? undefined}
-                      failed={failedReason.get(entry.id)}
-                      settling={settlingIds.has(entry.id)}
-                      thumbnailPending={!thumbnailResolved(entry.id)}
-                      thumbnailUrl={
-                        entryThumbnails[entry.id] ??
-                        entry.thumbnailUrl ??
-                        getDefaultArtwork(entry.id)
-                      }
-                    />
-                  </PrefetchLink>
-                </SwipeableRow>
-              ))}
-          </div>
-        </section>
-
-        <RecordSheet
-          open={recordOpen}
-          onOpenChange={setRecordOpen}
-          onPhaseChange={setPhase}
-          onSaved={beginForming}
-        />
-        <WriteSheet open={writeOpen} onOpenChange={setWriteOpen} />
+                <PrefetchLink href={`/entries/${entry.id}`}>
+                  <NoteCard
+                    title={entry.title || "Untitled entry"}
+                    dateLabel={
+                      hydrated
+                        ? formatEntryDateTime(entry.createdAt)
+                        : DATE_PLACEHOLDER
+                    }
+                    durationLabel={formatDuration(entry.durationMs)}
+                    snippet={entry.snippet ?? undefined}
+                    failed={failedReason.get(entry.id)}
+                    settling={settlingIds.has(entry.id)}
+                    thumbnailPending={!thumbnailResolved(entry.id)}
+                    thumbnailUrl={
+                      entryThumbnails[entry.id] ??
+                      entry.thumbnailUrl ??
+                      getDefaultArtwork(entry.id)
+                    }
+                  />
+                </PrefetchLink>
+              </SwipeableRow>
+            ))}
+        </div>
 
         <ActivitySheet
           open={sheetOpen}
