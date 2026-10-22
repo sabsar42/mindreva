@@ -10,6 +10,13 @@ import {
   type PersonaHalf,
 } from "@mindreva/database";
 import { getUser } from "@mindreva/auth/server";
+import { getMyProfile } from "./profile.service";
+import {
+  DailyLimitReachedError,
+  refundDaily,
+  tryUseDaily,
+} from "./usage.service";
+import { DAILY_CHAT_LIMIT_MESSAGE } from "../usage-limits";
 import {
   halfLabel,
   rangeLabel,
@@ -289,6 +296,13 @@ export async function sendPersonaChatMessage(
     );
   }
 
+  // Checked before the question is stored, so a turn that won't be answered
+  // today doesn't leave an unanswered message in the conversation.
+  const profile = await getMyProfile();
+  if (!(await tryUseDaily(userId, profile?.timezone, "chatMessages"))) {
+    throw new DailyLimitReachedError(DAILY_CHAT_LIMIT_MESSAGE);
+  }
+
   await ChatRepository.addMessage({
     sessionId,
     userId,
@@ -340,7 +354,13 @@ export async function sendPersonaChatMessage(
   });
 
   onStage?.("generating");
-  const replyText = await provider.complete(messages);
+  let replyText: string;
+  try {
+    replyText = (await provider.complete(messages)).text;
+  } catch (err) {
+    await refundDaily(userId, "chatMessages");
+    throw err;
+  }
   const citedEntries = [
     ...new Map(excerpts.map((e) => [e.entryId, e])).values(),
   ].map((e) => ({ entryId: e.entryId, entryDate: e.entryDate }));

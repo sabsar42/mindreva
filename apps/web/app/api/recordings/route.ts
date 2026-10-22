@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import { createVoiceEntry } from "@/lib/services/entries.service";
+import { timed } from "@/lib/timing";
 import type { EntryType } from "@mindreva/database";
 
 // Hard cap matching the client-side 10-minute hard stop, so a modified client
@@ -34,12 +35,16 @@ export async function POST(request: Request) {
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const { entryId } = await createVoiceEntry({
-      audio: buffer,
-      mimeType: file.type || "audio/webm",
-      durationMs,
-      type,
-    });
+    const { entryId } = await timed(
+      "recording-upload",
+      "total",
+      createVoiceEntry({
+        audio: buffer,
+        mimeType: file.type || "audio/webm",
+        durationMs,
+        type,
+      }),
+    );
     return NextResponse.json({ entryId }, { status: 201 });
   } catch (err) {
     console.error("POST /api/recordings failed:", err);

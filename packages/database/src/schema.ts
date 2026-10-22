@@ -42,13 +42,21 @@ export const profiles = pgTable("profiles", {
   // user's existing days into the zone (once); later changes (travel) don't
   // rewrite history.
   timezoneSyncedAt: timestamp("timezone_synced_at", { withTimezone: true }),
-  // Monetization groundwork — present now, unenforced until Phase 9.
+  // Per-user DAILY usage counters for the shared free-tier AI quotas (see
+  // apps/web/lib/usage-limits.ts). These reuse the original "monetization
+  // groundwork" columns — the DB names are kept so older deployments that
+  // still select them keep working; only the TypeScript names say what they
+  // now mean. `plan` is unused (there are no plans).
   plan: text("plan").notNull().default("free"),
-  minutesUsedThisPeriod: integer("minutes_used_this_period")
+  /** DB column: minutes_used_this_period. Past-self chat messages today. */
+  chatMessagesUsedToday: integer("minutes_used_this_period")
     .notNull()
     .default(0),
-  notesUsedThisPeriod: integer("notes_used_this_period").notNull().default(0),
-  periodResetsAt: timestamp("period_resets_at", { withTimezone: true }),
+  /** DB column: notes_used_this_period. AI summaries generated today. */
+  summariesUsedToday: integer("notes_used_this_period").notNull().default(0),
+  /** DB column: period_resets_at. The user's next local midnight; both
+   * counters start again from 0 once it has passed. */
+  usageResetsAt: timestamp("period_resets_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -67,6 +75,10 @@ export const entries = pgTable(
     source: text("source").notNull().$type<EntrySource>(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // Non-null = the summary still needs writing (the AI call failed, a limit
+    // was hit, or a voice entry was never summarised). A background retry
+    // picks it up once this time has passed; cleared when a summary lands.
+    summaryRetryAt: timestamp("summary_retry_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -79,6 +91,9 @@ export const entries = pgTable(
     check("entries_source_check", sql`${t.source} in ('voice','text')`),
     index("entries_user_created_idx").on(t.userId, t.createdAt),
     index("entries_user_entry_date_idx").on(t.userId, t.entryDate),
+    index("entries_summary_retry_idx")
+      .on(t.userId, t.summaryRetryAt)
+      .where(sql`${t.summaryRetryAt} is not null`),
   ],
 );
 
@@ -179,6 +194,9 @@ export const summaries = pgTable(
     summaryText: text("summary_text"),
     promptVersion: text("prompt_version"),
     provider: text("provider"),
+    // The model that actually answered — with fallbacks it is often not the
+    // configured one (see @mindreva/llm CompletionResult).
+    model: text("model"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

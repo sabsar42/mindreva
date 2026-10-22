@@ -18,8 +18,14 @@ import {
 import { stripFormatting } from "@mindreva/types";
 import { getUser, createClient } from "@mindreva/auth/server";
 import { transcribeEntry } from "./transcription.service";
-import { summarizeEntry } from "./summarization.service";
+import {
+  retryDueSummary,
+  summarizeEntry,
+  type SummarizeOutcome,
+} from "./summarization.service";
+import { SUMMARY_GRACE_MS } from "../usage-limits";
 import { getMyToday } from "./profile.service";
+import { timed } from "../timing";
 
 /**
  * Business rules for entries (journals + notes). Route handlers call this;
@@ -70,8 +76,12 @@ export async function listMyEntries(options?: {
   dateFrom?: string;
   dateTo?: string;
 }): Promise<EntryListItemWithThumbnail[]> {
-  const userId = await requireUserId();
-  const entries = await EntriesRepository.listForUser(userId, options ?? {});
+  const userId = await timed("entry-list", "auth", requireUserId());
+  const entries = await timed(
+    "entry-list",
+    "query",
+    EntriesRepository.listForUser(userId, options ?? {}),
+  );
   return withPlainSnippets(entries);
 }
 
@@ -125,9 +135,10 @@ export async function getMyEntryThumbnails(
 ): Promise<Record<string, string>> {
   const userId = await requireUserId();
   if (entryIds.length === 0) return {};
-  const firstPhotos = await EntryPhotosRepository.getFirstPhotosForEntries(
-    entryIds,
-    userId,
+  const firstPhotos = await timed(
+    "entry-thumbnails",
+    "first-photos",
+    EntryPhotosRepository.getFirstPhotosForEntries(entryIds, userId),
   );
   if (firstPhotos.size === 0) return {};
 
@@ -140,13 +151,17 @@ export async function getMyEntryThumbnails(
   // existed have none and fall back to the full photo. Both are signed in
   // parallel so the fallback costs no extra round trip.
   const supabase = await createClient();
-  const [{ data: thumbs }, full] = await Promise.all([
-    supabase.storage.from("photos").createSignedUrls(
-      rows.map((r) => thumbnailPathFor(r.storagePath)),
-      PHOTO_SIGNED_URL_EXPIRY_SECONDS,
-    ),
-    signPhotoUrls(rows),
-  ]);
+  const [{ data: thumbs }, full] = await timed(
+    "entry-thumbnails",
+    "sign",
+    Promise.all([
+      supabase.storage.from("photos").createSignedUrls(
+        rows.map((r) => thumbnailPathFor(r.storagePath)),
+        PHOTO_SIGNED_URL_EXPIRY_SECONDS,
+      ),
+      signPhotoUrls(rows),
+    ]),
+  );
   const thumbByPath = new Map(
     (thumbs ?? [])
       .filter((t) => !t.error && t.signedUrl)
@@ -226,7 +241,7 @@ export async function getMyEntryDetail(id: string): Promise<{
   /** Whether a share link is currently active for this entry. */
   shared: boolean;
 } | null> {
-  const userId = await requireUserId();
+  const userId = await timed("entry-detail", "auth", requireUserId());
 
   // None of these five queries depend on each other's results (only on id/
   // userId, already known) — run them together instead of in three
@@ -235,14 +250,44 @@ export async function getMyEntryDetail(id: string): Promise<{
   // Promise.all, so the Storage round trip overlaps the other four queries
   // instead of starting after all of them. Photo rows are scoped by userId,
   // so a missing or foreign entry signs nothing.
-  const [entry, transcript, summary, photos, tasks, share] = await Promise.all([
-    EntriesRepository.getByIdForUser(id, userId),
-    TranscriptsRepository.getByEntry(id, userId),
-    SummariesRepository.getByEntry(id, userId),
-    EntryPhotosRepository.listByEntry(id, userId).then(signPhotoUrls),
-    EntryTasksRepository.listByEntry(id, userId),
-    EntrySharesRepository.getByEntry(id, userId),
-  ]);
+  const [entry, transcript, summary, photos, tasks, share] = await timed(
+    "entry-detail",
+    "all-queries",
+    Promise.all([
+      timed(
+        "entry-detail",
+        "entry",
+        EntriesRepository.getByIdForUser(id, userId),
+      ),
+      timed(
+        "entry-detail",
+        "transcript",
+        TranscriptsRepository.getByEntry(id, userId),
+      ),
+      timed(
+        "entry-detail",
+        "summary",
+        SummariesRepository.getByEntry(id, userId),
+      ),
+      timed(
+        "entry-detail",
+        "photos",
+        EntryPhotosRepository.listByEntry(id, userId),
+      ).then((rows) =>
+        timed("entry-detail", "photos-sign", signPhotoUrls(rows)),
+      ),
+      timed(
+        "entry-detail",
+        "tasks",
+        EntryTasksRepository.listByEntry(id, userId),
+      ),
+      timed(
+        "entry-detail",
+        "share",
+        EntrySharesRepository.getByEntry(id, userId),
+      ),
+    ]),
+  );
   if (!entry) return null;
 
   return {
@@ -316,20 +361,24 @@ export async function addPhotoToEntry(
   // The object path is a fresh UUID and is never overwritten, so the browser
   // may keep it for a year. Without this, Storage served photos with no
   // cache-control at all, leaving the browser to guess and re-check.
-  const [{ error: uploadError }, thumbResult] = await Promise.all([
-    supabase.storage.from("photos").upload(objectPath, input.image, {
-      contentType: input.mimeType,
-      cacheControl: "31536000",
-    }),
-    input.thumbnail
-      ? supabase.storage
-          .from("photos")
-          .upload(thumbnailPathFor(objectPath), input.thumbnail.image, {
-            contentType: input.thumbnail.mimeType,
-            cacheControl: "31536000",
-          })
-      : null,
-  ]);
+  const [{ error: uploadError }, thumbResult] = await timed(
+    "photo-upload",
+    "storage-upload",
+    Promise.all([
+      supabase.storage.from("photos").upload(objectPath, input.image, {
+        contentType: input.mimeType,
+        cacheControl: "31536000",
+      }),
+      input.thumbnail
+        ? supabase.storage
+            .from("photos")
+            .upload(thumbnailPathFor(objectPath), input.thumbnail.image, {
+              contentType: input.thumbnail.mimeType,
+              cacheControl: "31536000",
+            })
+        : null,
+    ]),
+  );
   if (uploadError) {
     throw new Error(`Photo upload failed: ${uploadError.message}`);
   }
@@ -338,17 +387,28 @@ export async function addPhotoToEntry(
     console.error("Thumbnail upload failed:", thumbResult.error.message);
   }
 
-  const photo = await EntryPhotosRepository.create({
-    entryId,
-    userId: user.id,
-    storagePath: objectPath,
-    kind: input.kind,
-    makeCover: input.makeCover,
-  });
-
-  const { data, error: signError } = await supabase.storage
-    .from("photos")
-    .createSignedUrl(objectPath, PHOTO_SIGNED_URL_EXPIRY_SECONDS);
+  // The row insert and the URL signing each only need the uploaded object,
+  // not each other, so they run together instead of back to back.
+  const [photo, { data, error: signError }] = await Promise.all([
+    timed(
+      "photo-upload",
+      "insert",
+      EntryPhotosRepository.create({
+        entryId,
+        userId: user.id,
+        storagePath: objectPath,
+        kind: input.kind,
+        makeCover: input.makeCover,
+      }),
+    ),
+    timed(
+      "photo-upload",
+      "sign",
+      supabase.storage
+        .from("photos")
+        .createSignedUrl(objectPath, PHOTO_SIGNED_URL_EXPIRY_SECONDS),
+    ),
+  ]);
   if (signError)
     throw new Error(`Failed to sign photo URL: ${signError.message}`);
 
@@ -410,9 +470,18 @@ export async function createVoiceEntry(input: {
   const objectPath = `${user.id}/${crypto.randomUUID()}.${extensionFromMimeType(input.mimeType)}`;
 
   const supabase = await createClient();
-  const { error: uploadError } = await supabase.storage
-    .from("recordings")
-    .upload(objectPath, input.audio, { contentType: input.mimeType });
+  // The user's "today" (a profile read) doesn't depend on the upload, so it
+  // loads alongside it instead of after it.
+  const [{ error: uploadError }, entryDate] = await Promise.all([
+    timed(
+      "recording-upload",
+      "storage-upload",
+      supabase.storage
+        .from("recordings")
+        .upload(objectPath, input.audio, { contentType: input.mimeType }),
+    ),
+    timed("recording-upload", "today", getMyToday()),
+  ]);
   if (uploadError) {
     throw new Error(`Recording upload failed: ${uploadError.message}`);
   }
@@ -423,7 +492,10 @@ export async function createVoiceEntry(input: {
     storagePath: objectPath,
     durationMs: input.durationMs,
     mimeType: input.mimeType,
-    entryDate: await getMyToday(),
+    entryDate,
+    // Picked up by the background retry if the summary never lands (the
+    // client asks for it once transcription is done, but may be closed).
+    summaryRetryAt: new Date(Date.now() + SUMMARY_GRACE_MS),
   });
 
   // Transcription is a real ASR API call and can take several seconds for a
@@ -461,6 +533,7 @@ export async function createTextEntry(input: {
     type: input.type ?? "note",
     text,
     entryDate: await getMyToday(),
+    summaryRetryAt: new Date(Date.now() + SUMMARY_GRACE_MS),
   });
 
   after(async () => {
@@ -523,6 +596,13 @@ export async function saveMyTranscriptEdit(
   // The client polls briefly afterward to pick up the fresh result (same
   // pattern already used for transcript-processing status).
   if (options?.resummarize !== false) {
+    // Marked first, so the summary still gets refreshed if the background
+    // job below never runs to completion.
+    await EntriesRepository.setSummaryRetry(
+      entryId,
+      userId,
+      new Date(Date.now() + SUMMARY_GRACE_MS),
+    );
     after(async () => {
       try {
         await summarizeEntry(entryId, userId);
@@ -547,16 +627,38 @@ export async function saveMyTranscriptEdit(
  * above.
  */
 export async function summarizeMyEntry(entryId: string): Promise<{
+  outcome: SummarizeOutcome;
   summary: Summary | null;
   tasks: EntryTask[];
 }> {
   const userId = await requireUserId();
-  await summarizeEntry(entryId, userId);
+  const outcome = await summarizeEntry(entryId, userId);
   const [summary, tasks] = await Promise.all([
     SummariesRepository.getByEntry(entryId, userId),
     EntryTasksRepository.listByEntry(entryId, userId),
   ]);
-  return { summary, tasks };
+  return { outcome, summary, tasks };
+}
+
+/**
+ * Writes at most one overdue summary for the signed-in user. Called from the
+ * protected layout's after() on each page load, so pending summaries catch
+ * up while the app is in use. Never throws.
+ */
+export async function retryMyPendingSummary(): Promise<void> {
+  try {
+    const user = await getUser();
+    if (!user) return;
+    await retryDueSummary(user.id);
+  } catch (err) {
+    // Same reasoning as recordMyVisit: during build probing there is no
+    // request, and a failed retry just waits for the next page load.
+    if (!(
+      err instanceof Error && /cookies|Dynamic server usage/.test(err.message)
+    )) {
+      console.error("Background summary retry failed:", err);
+    }
+  }
 }
 
 /** Read-only current summary + tasks, without triggering summarization —

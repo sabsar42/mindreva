@@ -431,8 +431,8 @@ async function labelCluster(sample: EmbeddedEntry[]): Promise<string> {
 
   try {
     const provider = getLLMProvider();
-    const raw = await provider.complete(buildThemeLabelMessages(excerpts));
-    return parseThemeLabel(raw);
+    const { text } = await provider.complete(buildThemeLabelMessages(excerpts));
+    return parseThemeLabel(text);
   } catch (err) {
     console.error("Theme labeling failed for a cluster:", err);
     return UNLABELED_THEME;

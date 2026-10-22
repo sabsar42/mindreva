@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import { summarizeMyEntry } from "@/lib/services/entries.service";
-import { LIMIT_MESSAGE, isLimitError } from "@/lib/limit-error";
+import {
+  DAILY_SUMMARY_LIMIT_MESSAGE,
+  SUMMARY_PENDING_MESSAGE,
+} from "@/lib/usage-limits";
 
-/** Manual "regenerate summary" trigger — also used by the transcript review
- * screen's "Skip for now" to confirm the raw transcript as-is. */
+/** Manual "regenerate summary" trigger — also what the forming memory card
+ * calls once a voice entry is transcribed. A summary that can't be written
+ * right now is not an error: the entry is saved and marked for retry, and
+ * the response says so in `pending` (HTTP 200). */
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ entryId: string }> },
@@ -16,21 +21,25 @@ export async function POST(
 
   const { entryId } = await params;
   try {
-    const { summary, tasks } = await summarizeMyEntry(entryId);
+    const { outcome, summary, tasks } = await summarizeMyEntry(entryId);
     return NextResponse.json({
       summary: summary
         ? { summaryText: summary.summaryText, provider: summary.provider }
         : null,
       tasks,
+      pending:
+        outcome.status === "pending"
+          ? {
+              reason: outcome.reason,
+              message:
+                outcome.reason === "daily-limit"
+                  ? DAILY_SUMMARY_LIMIT_MESSAGE
+                  : SUMMARY_PENDING_MESSAGE,
+            }
+          : null,
     });
   } catch (err) {
     console.error("POST /api/entries/[entryId]/summarize failed:", err);
-    if (isLimitError(err)) {
-      return NextResponse.json(
-        { error: LIMIT_MESSAGE, code: "limit" },
-        { status: 429 },
-      );
-    }
     return NextResponse.json(
       { error: "Failed to summarize entry" },
       { status: 500 },

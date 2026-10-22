@@ -3,9 +3,12 @@ export type {
   LLMProviderName,
   LLMMessage,
   CompleteOptions,
+  CompletionResult,
   SummaryStyle,
 } from "./types";
 export { getLLMProvider } from "./factory";
+export { FallbackLLMProvider } from "./providers/fallback-provider";
+export { completionModelList } from "./providers/openrouter-provider";
 export {
   resolveSummaryPrompt,
   parseTaskBlock,

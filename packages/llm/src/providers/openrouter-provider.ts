@@ -1,4 +1,9 @@
-import type { CompleteOptions, LLMMessage, LLMProvider } from "../types";
+import type {
+  CompleteOptions,
+  CompletionResult,
+  LLMMessage,
+  LLMProvider,
+} from "../types";
 
 const CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 const EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
@@ -9,8 +14,23 @@ const EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
 // rather than silently reshaping a mismatch.
 const EXPECTED_EMBEDDING_DIMENSIONS = 2048;
 
-// This model emits an internal reasoning trace by default. We suppress it
-// three ways: the OpenRouter `reasoning.exclude` param (strips reasoning
+// OpenRouter's own router over whatever free models are up right now. Always
+// the last entry in the fallback list: it can pick a model we have never
+// seen, which is why the reasoning suppression below stays on for every call.
+const LAST_RESORT_MODEL = "openrouter/free";
+
+// OpenRouter's hard cap on the `models` array of one request.
+const MAX_MODELS_PER_REQUEST = 3;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size));
+  return out;
+}
+
+// Models emit an internal reasoning trace by default, and the fallback models
+// each do it differently. We suppress it three ways: the OpenRouter `reasoning.exclude` param (strips reasoning
 // tokens server-side even if the model generates them), a system-prompt
 // instruction, and — as a last-resort safety net — stripping any <think>
 // tags that still leak into `content` before returning it.
@@ -19,11 +39,28 @@ const NO_REASONING_INSTRUCTION =
   "Respond with only your final answer. Do not include any visible reasoning, thinking steps, chain-of-thought, or <think> tags — output the finished text only.";
 
 interface OpenRouterChatResponse {
+  /** The model that actually answered (may be a fallback). */
+  model?: string;
   choices?: { message?: { content?: string } }[];
 }
 
 interface OpenRouterEmbeddingsResponse {
   data?: { embedding?: number[] }[];
+}
+
+/**
+ * OPENROUTER_MODEL, then OPENROUTER_FALLBACK_MODELS (comma-separated), then
+ * openrouter/free. OpenRouter tries them in order on any error, rate limits
+ * included. Duplicates and blanks are dropped.
+ */
+export function completionModelList(
+  primary: string,
+  fallbacks: string | undefined,
+): string[] {
+  const all = [primary, ...(fallbacks ?? "").split(","), LAST_RESORT_MODEL].map(
+    (m) => m.trim(),
+  );
+  return [...new Set(all.filter(Boolean))];
 }
 
 function stripReasoningTags(text: string): string {
@@ -63,7 +100,7 @@ export class OpenRouterLLMProvider implements LLMProvider {
   async complete(
     messages: LLMMessage[],
     options?: CompleteOptions,
-  ): Promise<string> {
+  ): Promise<CompletionResult> {
     const apiKey = this.getApiKey();
     const model = process.env.OPENROUTER_MODEL;
     if (!model) {
@@ -72,18 +109,42 @@ export class OpenRouterLLMProvider implements LLMProvider {
       );
     }
 
+    const body = {
+      messages: withNoReasoningInstruction(messages),
+      max_tokens: options?.maxTokens,
+      reasoning: { exclude: true },
+    };
+
+    // OpenRouter rejects a `models` array longer than 3 (HTTP 400), so a
+    // longer list goes out as consecutive requests of up to 3 models each.
+    // Within a request OpenRouter does the fallback itself; between requests
+    // we do, so the configured order holds either way.
+    let lastError: Error | null = null;
+    for (const batch of chunk(
+      completionModelList(model, process.env.OPENROUTER_FALLBACK_MODELS),
+      MAX_MODELS_PER_REQUEST,
+    )) {
+      try {
+        return await this.requestCompletion(apiKey, batch, body);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    throw lastError ?? new Error("OpenRouter: no models configured");
+  }
+
+  private async requestCompletion(
+    apiKey: string,
+    models: string[],
+    body: Record<string, unknown>,
+  ): Promise<CompletionResult> {
     const response = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        messages: withNoReasoningInstruction(messages),
-        max_tokens: options?.maxTokens,
-        reasoning: { exclude: true },
-      }),
+      body: JSON.stringify({ ...body, models }),
     });
 
     if (!response.ok) {
@@ -103,7 +164,11 @@ export class OpenRouterLLMProvider implements LLMProvider {
         "OpenRouter returned only a reasoning trace with no final answer",
       );
     }
-    return cleaned;
+    return {
+      text: cleaned,
+      model: data.model ?? models[0]!,
+      provider: this.name,
+    };
   }
 
   async embed(text: string): Promise<number[]> {

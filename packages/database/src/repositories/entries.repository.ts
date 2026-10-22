@@ -366,6 +366,49 @@ export const EntriesRepository = {
     return rows[0] ?? null;
   },
 
+  /** Marks the entry's summary as pending retry from `at`, or clears it
+   * (null) once a summary has been written. Doesn't touch updatedAt: this is
+   * bookkeeping, not an edit. */
+  async setSummaryRetry(
+    id: string,
+    userId: string,
+    at: Date | null,
+  ): Promise<void> {
+    await getDb()
+      .update(entries)
+      .set({ summaryRetryAt: at })
+      .where(and(eq(entries.id, id), eq(entries.userId, userId)));
+  },
+
+  /**
+   * Claims this user's oldest entry whose summary retry is due, pushing its
+   * retry time out to `leaseUntil` in the same statement so two concurrent
+   * page loads never pick the same entry (SKIP LOCKED). Returns its id, or
+   * null when nothing is due. Trashed entries are skipped.
+   */
+  async claimDueSummaryRetry(
+    userId: string,
+    leaseUntil: Date,
+  ): Promise<string | null> {
+    const rows = await getDb().execute(sql`
+      update ${entries} set summary_retry_at = ${leaseUntil.toISOString()}::timestamptz
+      where id = (
+        select id from ${entries}
+        where user_id = ${userId}
+          and summary_retry_at is not null
+          and summary_retry_at <= now()
+          and deleted_at is null
+        order by summary_retry_at
+        limit 1
+        for update skip locked
+      )
+      returning id`);
+    const list = (
+      Array.isArray(rows) ? rows : (rows as { rows: unknown[] }).rows
+    ) as { id: string }[];
+    return list[0]?.id ?? null;
+  },
+
   /** Soft delete only. Moves the entry to Trash; never removes the row. */
   async softDelete(id: string, userId: string): Promise<Entry | null> {
     const rows = await getDb()
@@ -398,6 +441,8 @@ export const EntriesRepository = {
     mimeType: string;
     /** The user's local calendar day, "YYYY-MM-DD". */
     entryDate?: string;
+    /** When to retry the summary if it hasn't landed (see summaryRetryAt). */
+    summaryRetryAt?: Date;
   }): Promise<{ entry: Entry; recording: Recording; transcript: Transcript }> {
     return getDb().transaction(async (tx) => {
       const [entry] = await tx
@@ -407,6 +452,7 @@ export const EntriesRepository = {
           type: input.type,
           source: "voice",
           entryDate: input.entryDate ?? today(),
+          summaryRetryAt: input.summaryRetryAt ?? null,
         })
         .returning();
       if (!entry) throw new Error("Failed to create entry");
@@ -446,6 +492,8 @@ export const EntriesRepository = {
     text: string;
     /** The user's local calendar day, "YYYY-MM-DD". */
     entryDate?: string;
+    /** When to retry the summary if it hasn't landed (see summaryRetryAt). */
+    summaryRetryAt?: Date;
   }): Promise<{ entry: Entry; transcript: Transcript }> {
     return getDb().transaction(async (tx) => {
       const [entry] = await tx
@@ -455,6 +503,7 @@ export const EntriesRepository = {
           type: input.type,
           source: "text",
           entryDate: input.entryDate ?? today(),
+          summaryRetryAt: input.summaryRetryAt ?? null,
         })
         .returning();
       if (!entry) throw new Error("Failed to create entry");

@@ -8,6 +8,7 @@ import {
 import { getUser } from "@mindreva/auth/server";
 import { addDays, dayKeyInZone, resolveTimeZone } from "../day-key";
 import { getMyProfile, getMyToday } from "./profile.service";
+import { timed } from "../timing";
 import {
   listMyEntries,
   type EntryListItemWithThumbnail,
@@ -201,8 +202,13 @@ export async function getMyYearHeatmap(
   type?: EntryType,
 ): Promise<YearHeatmap> {
   const userId = await requireUserId();
-  const today = await getMyToday();
-  const { days, entryCounts } = await loadYearDays(userId, year, type);
+  // "today" (a profile read) and the year's day data don't depend on each
+  // other, so they load together.
+  const [today, { days, entryCounts }] = await timed(
+    "journal-heatmap",
+    "load",
+    Promise.all([getMyToday(), loadYearDays(userId, year, type)]),
+  );
   const totalEntries = entryCounts.reduce((n, r) => n + r.count, 0);
   const totalDaysJournaled = entryCounts.length;
 

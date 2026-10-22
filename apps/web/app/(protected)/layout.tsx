@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import { getMyProfile } from "@/lib/services/profile.service";
 import { recordMyVisit } from "@/lib/services/heatmap.service";
+import { retryMyPendingSummary } from "@/lib/services/entries.service";
 import { TimezoneSync } from "./_components/timezone-sync";
 import { AppShell } from "./_components/app-shell";
 import type { AccountSummary } from "./_components/account-context";
@@ -38,6 +39,8 @@ export default function ProtectedLayout({
   // this fires once per navigation; the (user_id, day) unique constraint
   // makes repeats within the same day free no-ops.
   after(() => recordMyVisit());
+  // Catch up one overdue summary per page load (see summary_retry_at).
+  after(() => retryMyPendingSummary());
 
   return (
     <>

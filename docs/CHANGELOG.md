@@ -7,6 +7,46 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-10-22 — Perf: function region moved to Seoul, one pooled DB connection, timing logs
+
+See DECISIONS.md (2026-10-22, "Function region Seoul, max:1") for the reasoning.
+
+- `vercel.json`: `"regions": ["icn1"]` (Seoul), was `hnd1` (Tokyo). Supabase is
+  `ap-northeast-2` (Seoul, from the `aws-1-ap-northeast-2` pooler host), so
+  every DB, Auth and Storage round trip used to cross Tokyo→Seoul.
+- `packages/database/src/client.ts`: still the transaction pooler (6543) with
+  `prepare: false`; now `max: 1` (override with `DATABASE_POOL_MAX`),
+  `idle_timeout: 20`, and a warning if `DATABASE_URL` ever points at 5432.
+- New `apps/web/lib/timing.ts` (`timed()`), logging
+  `[timing] route=<r> step=<s> ms=<n>` (silence with `TIMING_LOGS=0`) on the
+  journal page, entry list, entry detail (each query + photo signing),
+  thumbnails, photo upload and recording upload.
+- Less waiting in a row: the year heatmap reads "today" alongside the year's
+  data (`heatmap.service.ts`); a photo's row insert and URL signing run
+  together (`addPhotoToEntry`); a recording's upload and the "today" lookup run
+  together (`createVoiceEntry`).
+- Measured on a production build from this machine (Bangladesh → Seoul DB,
+  ~120ms per round trip, pool 10 to isolate the code changes), medians: Journal
+  543→312-416ms, photo upload 1297→1169ms, recording upload 1513→1299ms; entry
+  detail, entry list and thumbnails unchanged (already parallel). Confirmed in
+  the logs that `prepare: false` makes every parameterised query two round
+  trips, and that with `max: 1` a request's queries queue one after another.
+- Throwaway user + seeded entries/photos deleted afterwards (cascade checked:
+  0 entries, 0 profiles, Storage objects removed). lint, test (134), build green.
+- Not verified: live Vercel logs (CLI not logged in) and the deployed timings
+  in `icn1` (needs a deploy).
+
+## 2026-10-22 — AI calls survive free-tier limits and model rotation
+
+See DECISIONS.md (2026-10-22, "Free-tier AI quotas") for the measurements behind this.
+
+- `@mindreva/llm`: `complete()` now returns `{text, model, provider}`. OpenRouter sends `OPENROUTER_MODEL` + `OPENROUTER_FALLBACK_MODELS` + `openrouter/free` (batched 3 per request). New `FallbackLLMProvider` + `LLM_FALLBACK_PROVIDER` for completions only. Groq's model is `GROQ_LLM_MODEL` (default `openai/gpt-oss-120b`; the old llama model was retired).
+- Migration 0017: `summaries.model`, `entries.summary_retry_at` (+ partial index). Usage columns on `profiles` renamed in TypeScript only (`summariesUsedToday`, `chatMessagesUsedToday`, `usageResetsAt`).
+- Per-user daily limits (15 summaries, 20 chat messages), atomic reserve/refund (`ProfilesRepository.consumeDailyUsage`), reset at the user's midnight (`nextMidnightInZone`).
+- Summaries never block a save: failure or limit marks the entry pending retry; the summarize route answers 200 with `pending` instead of an error; the memory card, entry detail and chat show a calm note.
+- Config: the previous primary model was dead (404) for this account, so `OPENROUTER_MODEL` is now `nvidia/nemotron-3-ultra-550b-a55b:free` with minimax and poolside as fallbacks.
+- Verified live: normal path, dead primary, three dead models in a row (second batch), bad key then Groq; usage counters (limit, refund, 5 concurrent requests at the limit -> 0 extra wins, midnight reset) and retry claims (3 concurrent claims over 2 due entries -> 2 distinct) on the real database with a throwaway user (deleted). 134 tests.
+
 ## 2026-10-22 — Consistency data made production-safe (timezone, New Year, archive)
 
 Audit of the contribution graph / streak storage. Saved data: `app_logins` (visits) and `entries.entry_date`; graph colours and streak are derived. Fixed:

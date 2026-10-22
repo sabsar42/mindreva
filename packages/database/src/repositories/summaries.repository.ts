@@ -14,7 +14,7 @@ async function assertEntryOwned(
   if (!rows[0]) throw new Error("Entry not found for user");
 }
 
-/** Summaries keep `provider` + `prompt_version` for every AI-generated row. */
+/** Summaries keep `provider`, `model` + `prompt_version` for every AI-generated row. */
 export const SummariesRepository = {
   async create(input: {
     entryId: string;
@@ -22,6 +22,7 @@ export const SummariesRepository = {
     summaryText: string;
     promptVersion?: string | null;
     provider?: string | null;
+    model?: string | null;
   }): Promise<Summary> {
     await assertEntryOwned(input.entryId, input.userId);
     const rows = await getDb()
@@ -31,6 +32,7 @@ export const SummariesRepository = {
         summaryText: input.summaryText,
         promptVersion: input.promptVersion ?? null,
         provider: input.provider ?? null,
+        model: input.model ?? null,
       })
       .returning();
     return rows[0]!;

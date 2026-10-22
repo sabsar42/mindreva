@@ -1,5 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
-import type { CompleteOptions, LLMMessage, LLMProvider } from "../types";
+import type {
+  CompleteOptions,
+  CompletionResult,
+  LLMMessage,
+  LLMProvider,
+} from "../types";
 
 const COMPLETION_MODEL = "gemini-2.5-flash";
 // text-embedding-004 defaults to 768 dims, matching embeddings.embedding
@@ -27,7 +32,7 @@ export class GeminiLLMProvider implements LLMProvider {
   async complete(
     messages: LLMMessage[],
     options?: CompleteOptions,
-  ): Promise<string> {
+  ): Promise<CompletionResult> {
     const client = this.getClient();
     const systemInstruction = messages
       .filter((m) => m.role === "system")
@@ -51,7 +56,7 @@ export class GeminiLLMProvider implements LLMProvider {
 
     const text = response.text;
     if (!text) throw new Error("Gemini returned an empty completion");
-    return text;
+    return { text, model: COMPLETION_MODEL, provider: this.name };
   }
 
   async embed(text: string): Promise<number[]> {

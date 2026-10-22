@@ -432,8 +432,12 @@ export function EntryDetail({
       const data = (await res.json()) as {
         summary: { summaryText: string; provider: string | null } | null;
         tasks: TaskChecklistTask[];
+        pending: { message: string } | null;
       };
-      if (data.summary) {
+      if (data.pending) {
+        // A limit or a busy AI, not a failure: the server retries it later.
+        toast(data.pending.message);
+      } else if (data.summary) {
         setSummary(data.summary.summaryText);
         setTasks(data.tasks);
         toast.success(

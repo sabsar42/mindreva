@@ -11,6 +11,50 @@ rather than resolved.
 
 ---
 
+## 2026-10-22 — Function region Seoul (icn1), max:1 pooled connection
+
+**What happened:** The app still felt slow and moving the database was raised
+again. Checked first: Supabase is in `ap-northeast-2` (Seoul); the function
+ran in `hnd1` (Tokyo, picked on 2026-08-16 although `icn1` was offered). With
+postgres-js and `prepare: false`, every parameterised query is two round trips
+(Describe, then Bind/Execute; measured: 122ms for `select 1`, 243ms for
+`select $1` from here), so each query paid the Tokyo→Seoul hop twice.
+
+**What was decided:**
+
+- `vercel.json` → `"regions": ["icn1"]`, the same region as the database.
+  The browser → function hop from Bangladesh is about the same to Seoul as to
+  Tokyo; what changes is that DB/Auth/Storage calls stay inside Seoul.
+- `max: 1` per function instance (Supabase's serverless guidance), with
+  `DATABASE_POOL_MAX` as an escape hatch. Trade-off measured: with one
+  connection, a request's `Promise.all` queries run one after another (entry
+  detail's 6 queries landed ~2 round trips apart). That's only cheap because
+  of `icn1`; if the region ever goes back to `hnd1`, raise `DATABASE_POOL_MAX`.
+- Don't move the database. Moving it doesn't shorten anything once the
+  function sits next to it.
+
+---
+
+## 2026-10-22 — Free-tier AI quotas: what they really are, and how the app copes
+
+**What was measured (2026-10-22, from the live accounts and docs, not assumed):**
+
+- **OpenRouter `:free` models:** 20 requests/minute and **50 requests/day for the whole account** (1,000/day only after buying 10 credits). The 50 is shared by every user of the app and resets at 00:00 UTC. Our key reports `free_model_daily_requests: {limit: 50}`.
+- **Free models rotate and break without notice.** Our configured primary (`nvidia/nemotron-3-super-120b-a12b:free`) now returns 404 "Function not found for account"; `google/gemma-4-*:free` returned 429 from the upstream provider the same hour. Of 7 candidates tested, 4 answered.
+- **A `models` array holds at most 3 entries** (HTTP 400 beyond that).
+- **Groq:** `llama-3.3-70b-versatile` was retired (404). Current chat models: `openai/gpt-oss-120b`, `qwen/qwen3.8-27b`; the key shows 1,000 requests/day, 8,000 tokens/minute.
+- Groq/OpenRouter docs do not publish exact free-tier numbers for every model; the figures above are from response headers and `/api/v1/key`.
+
+**Decided:**
+
+1. OpenRouter completions try `OPENROUTER_MODEL`, then `OPENROUTER_FALLBACK_MODELS`, then `openrouter/free`, in batches of 3 models per request (to respect the cap) so the order holds. Reasoning is still excluded three ways, because each fallback model behaves differently.
+2. If every OpenRouter model fails, completions go to `LLM_FALLBACK_PROVIDER` (Groq, model via `GROQ_LLM_MODEL`). **Embeddings never fall back**: another model's vectors would be a different space and dimension and would silently corrupt retrieval. A 429 from the primary pauses it for 5 minutes (per server instance) so users aren't paying a doomed round trip.
+3. The model that answered is stored on every summary (`summaries.model`, migration 0017) next to `provider`.
+4. **Per-user daily limits** (config constants in `apps/web/lib/usage-limits.ts`): 15 summaries and 20 past-self messages per user per local day. Why: with 50 free-model requests/day for everyone, the real ceiling is the shared quota, and Groq's fallback is the safety net, not extra capacity. The counters reuse the old `profiles` usage columns (DB names unchanged; renamed only in TypeScript), reset at the user's own midnight, are reserved atomically in one UPDATE (no race at the limit), and are refunded when the AI call produces nothing. Reaching a limit shows a calm "come back tomorrow" note, never an error and never an upgrade prompt.
+5. **A save never waits on AI.** If a summary can't be written (daily limit, every provider down), the entry is kept and `entries.summary_retry_at` marks it pending; each page load retries at most one overdue entry in the background. New entries are also marked on creation so one whose summary request never arrives (app closed) is still picked up.
+
+**Consequence worth knowing:** with 50 shared free requests a day, a few dozen active users will exhaust OpenRouter's free pool daily; Groq then carries completions. The cheap fix is buying 10 OpenRouter credits (one-time) to lift the cap to 1,000/day, which this design allows without code changes.
+
 ## 2026-10-22 — A day is the user's local day, stored per profile
 
 **What happened:** Visits and entry dates used the server clock (UTC on Vercel), so users outside UTC had early/late entries filed on the wrong day, breaking streaks.

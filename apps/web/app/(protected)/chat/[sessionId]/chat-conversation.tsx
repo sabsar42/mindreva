@@ -119,6 +119,8 @@ export function ChatConversation({
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [stage, setStage] = React.useState<Stage | null>(null);
+  // A calm "come back tomorrow" note when today's chat limit is reached.
+  const [notice, setNotice] = React.useState<string | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -128,6 +130,7 @@ export function ChatConversation({
     const question = input.trim();
     if (!question || sending) return;
     setSending(true);
+    setNotice(null);
     setInput("");
 
     const userMessage: Message = {
@@ -155,6 +158,7 @@ export function ChatConversation({
         reply?: { id: string; content: string };
         citedEntries?: { entryId: string; entryDate: string | null }[];
         error?: string;
+        notice?: string;
       } | null = null;
 
       for (;;) {
@@ -171,6 +175,13 @@ export function ChatConversation({
         }
       }
 
+      if (final?.notice) {
+        // Not an error: keep their question in the box for tomorrow.
+        setNotice(final.notice);
+        setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+        setInput(question);
+        return;
+      }
       if (!final || final.error || !final.reply) {
         throw new Error(final?.error ?? "Failed to send");
       }
@@ -301,6 +312,15 @@ export function ChatConversation({
               />
             </div>
           ),
+        )}
+
+        {notice && (
+          <p
+            role="status"
+            className="text-muted-foreground font-serif text-base italic leading-relaxed"
+          >
+            {notice}
+          </p>
         )}
 
         {stage && (

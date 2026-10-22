@@ -120,6 +120,13 @@
       "when": 1792613102397,
       "tag": "0016_profile_timezone_synced_at",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792613646302,
+      "tag": "0017_ai_resilience",
+      "breakpoints": true
     }
   ]
 }

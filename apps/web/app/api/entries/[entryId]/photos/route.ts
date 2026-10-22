@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import { addPhotoToEntry } from "@/lib/services/entries.service";
+import { timed } from "@/lib/timing";
 
 // Generous client-side cap for a single photo; the "recordings" route uses the
 // same pattern to guard against a modified client pushing an oversized upload.
@@ -49,13 +50,17 @@ export async function POST(
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const photo = await addPhotoToEntry(entryId, {
-      image: buffer,
-      mimeType: file.type || "image/jpeg",
-      kind,
-      makeCover,
-      thumbnail: kind === "cover" ? thumbnail : undefined,
-    });
+    const photo = await timed(
+      "photo-upload",
+      "total",
+      addPhotoToEntry(entryId, {
+        image: buffer,
+        mimeType: file.type || "image/jpeg",
+        kind,
+        makeCover,
+        thumbnail: kind === "cover" ? thumbnail : undefined,
+      }),
+    );
     return NextResponse.json({ photo }, { status: 201 });
   } catch (err) {
     console.error(`POST /api/entries/${entryId}/photos failed:`, err);

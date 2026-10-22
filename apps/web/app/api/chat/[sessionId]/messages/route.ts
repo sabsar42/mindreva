@@ -1,4 +1,5 @@
 import { LIMIT_MESSAGE, isLimitError } from "@/lib/limit-error";
+import { DailyLimitReachedError } from "@/lib/services/usage.service";
 import { NextResponse } from "next/server";
 import { getUser } from "@mindreva/auth/server";
 import {
@@ -60,6 +61,11 @@ export async function POST(
           citedEntries,
         });
       } catch (err) {
+        // Today's chat limit: a calm note in the conversation, not an error.
+        if (err instanceof DailyLimitReachedError) {
+          send({ notice: err.message });
+          return;
+        }
         const message =
           err instanceof Error ? err.message : "Something went wrong";
         // The message-cap error is meant to be shown to the user verbatim;

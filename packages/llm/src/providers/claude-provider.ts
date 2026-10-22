@@ -1,5 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { CompleteOptions, LLMMessage, LLMProvider } from "../types";
+import type {
+  CompleteOptions,
+  CompletionResult,
+  LLMMessage,
+  LLMProvider,
+} from "../types";
 
 const COMPLETION_MODEL = "claude-sonnet-5";
 const DEFAULT_MAX_TOKENS = 1024;
@@ -29,7 +34,7 @@ export class ClaudeLLMProvider implements LLMProvider {
   async complete(
     messages: LLMMessage[],
     options?: CompleteOptions,
-  ): Promise<string> {
+  ): Promise<CompletionResult> {
     const client = this.getClient();
     const system = messages
       .filter((m) => m.role === "system")
@@ -50,7 +55,11 @@ export class ClaudeLLMProvider implements LLMProvider {
     if (!textBlock || textBlock.type !== "text") {
       throw new Error("Claude returned an empty completion");
     }
-    return textBlock.text;
+    return {
+      text: textBlock.text,
+      model: COMPLETION_MODEL,
+      provider: this.name,
+    };
   }
 
   async embed(_text: string): Promise<number[]> {

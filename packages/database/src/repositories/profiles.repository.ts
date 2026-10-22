@@ -82,4 +82,59 @@ export const ProfilesRepository = {
           and day <> (created_at at time zone ${timezone})::date`);
     });
   },
+
+  /**
+   * Counts one AI use against today's per-user limit, atomically: returns
+   * false (and changes nothing) when the user is already at `limit`. When
+   * the stored reset time has passed, both counters start again from zero
+   * and the next reset becomes `nextResetAt` (the user's next midnight).
+   * One UPDATE, so two requests racing for the last unit can't both win.
+   */
+  async consumeDailyUsage(
+    userId: string,
+    kind: DailyUsageKind,
+    limit: number,
+    nextResetAt: Date,
+  ): Promise<boolean> {
+    const [used, other] =
+      kind === "summaries"
+        ? [profiles.summariesUsedToday, profiles.chatMessagesUsedToday]
+        : [profiles.chatMessagesUsedToday, profiles.summariesUsedToday];
+    const usedKey =
+      kind === "summaries" ? "summariesUsedToday" : "chatMessagesUsedToday";
+    const otherKey =
+      kind === "summaries" ? "chatMessagesUsedToday" : "summariesUsedToday";
+    const expired = sql`(${profiles.usageResetsAt} is null or ${profiles.usageResetsAt} <= now())`;
+    const rows = await getDb()
+      .update(profiles)
+      .set({
+        [usedKey]: sql`case when ${expired} then 1 else ${used} + 1 end`,
+        [otherKey]: sql`case when ${expired} then 0 else ${other} end`,
+        usageResetsAt: sql`case when ${expired} then ${nextResetAt.toISOString()}::timestamptz else ${profiles.usageResetsAt} end`,
+      })
+      .where(
+        and(eq(profiles.id, userId), sql`(${expired} or ${used} < ${limit})`),
+      )
+      .returning({ id: profiles.id });
+    return rows.length > 0;
+  },
+
+  /** Gives back a unit when the AI call it was reserved for never produced
+   * anything. No-op once the counters have reset. */
+  async releaseDailyUsage(userId: string, kind: DailyUsageKind): Promise<void> {
+    const used =
+      kind === "summaries"
+        ? profiles.summariesUsedToday
+        : profiles.chatMessagesUsedToday;
+    const usedKey =
+      kind === "summaries" ? "summariesUsedToday" : "chatMessagesUsedToday";
+    await getDb()
+      .update(profiles)
+      .set({ [usedKey]: sql`greatest(${used} - 1, 0)` })
+      .where(
+        and(eq(profiles.id, userId), sql`${profiles.usageResetsAt} > now()`),
+      );
+  },
 };
+
+export type DailyUsageKind = "summaries" | "chatMessages";

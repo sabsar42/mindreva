@@ -16,7 +16,3 @@ export function isLimitError(err: unknown): boolean {
 /** What the user is told. Friendly, specific about what is safe, no upsell. */
 export const LIMIT_MESSAGE =
   "We've reached today's limit for this. Nothing is lost, and it will work again tomorrow.";
-
-/** The same, for a memory card whose summary could not be written. */
-export const SUMMARY_LIMIT_MESSAGE =
-  "Today's summary limit is reached. Your recording is saved; try again tomorrow.";

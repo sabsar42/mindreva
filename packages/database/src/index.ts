@@ -5,7 +5,10 @@
  * ESLint no-restricted-imports rule in this package).
  */
 
-export { ProfilesRepository } from "./repositories/profiles.repository";
+export {
+  ProfilesRepository,
+  type DailyUsageKind,
+} from "./repositories/profiles.repository";
 export {
   EntriesRepository,
   type EntryListItem,

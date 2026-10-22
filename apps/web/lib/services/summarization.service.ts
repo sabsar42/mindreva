@@ -14,6 +14,14 @@ import {
 } from "@mindreva/database";
 import { stripFormatting } from "@mindreva/types";
 import { recomputeMindmapForUser } from "./mindmap.service";
+import { nextDailyReset, refundDaily, tryUseDaily } from "./usage.service";
+import { isLimitError } from "../limit-error";
+import {
+  SUMMARY_GRACE_MS,
+  SUMMARY_PROVIDER_LIMIT_DELAY_MS,
+  SUMMARY_RETRY_DELAY_MS,
+  SUMMARY_RETRY_LEASE_MS,
+} from "../usage-limits";
 
 const MAX_TITLE_LENGTH = 120;
 
@@ -33,6 +41,38 @@ function deriveTitle(text: string): string {
 }
 
 /**
+ * What happened to one summarize attempt. Summarizing never throws for an AI
+ * problem: the entry is already saved, so a failure just marks the summary
+ * as pending retry (entries.summary_retry_at) and the caller decides how to
+ * tell the user.
+ */
+export type SummarizeOutcome =
+  | { status: "done" }
+  /** Nothing to summarize yet (or ever, e.g. a failed transcription). */
+  | { status: "skipped" }
+  | {
+      status: "pending";
+      /** daily-limit: this user's own cap. provider-limit: the shared AI
+       * quota. error: any other AI failure. */
+      reason: "daily-limit" | "provider-limit" | "error";
+      retryAt: Date;
+    };
+
+async function markPending(
+  entryId: string,
+  userId: string,
+  reason: "daily-limit" | "provider-limit" | "error",
+  retryAt: Date,
+): Promise<SummarizeOutcome> {
+  try {
+    await EntriesRepository.setSummaryRetry(entryId, userId, retryAt);
+  } catch (err) {
+    console.error(`Couldn't mark entry ${entryId} for summary retry:`, err);
+  }
+  return { status: "pending", reason, retryAt };
+}
+
+/**
  * Given an entry, summarizes its confirmed text (edited transcript, or raw if
  * never edited — for typed entries these are the same value) using the
  * owner's chosen summary style, and stores the result. Always inserts a new
@@ -45,6 +85,10 @@ function deriveTitle(text: string): string {
  * trigger this as a fast follow-up and should not let it fail the primary
  * save (see docs/roadmap.md Phase 5 Common mistakes).
  *
+ * Each attempt counts against the user's daily summary limit; an attempt
+ * that produces nothing is refunded. Over the limit, or when every AI
+ * provider fails, the entry is marked for retry instead (see SummarizeOutcome).
+ *
  * editedText may contain RichTextEditor's bold/italic Markdown — stripped to
  * plain text before it reaches the model or the embedding, since neither
  * should see `**`/`*` syntax (see @mindreva/types#stripFormatting).
@@ -52,29 +96,67 @@ function deriveTitle(text: string): string {
 export async function summarizeEntry(
   entryId: string,
   userId: string,
-): Promise<void> {
+): Promise<SummarizeOutcome> {
   const transcript = await TranscriptsRepository.getByEntry(entryId, userId);
   const rawConfirmedText = (
     transcript?.editedText ?? transcript?.rawText
   )?.trim();
-  if (!rawConfirmedText) return;
+  if (!rawConfirmedText) {
+    // Still transcribing: check back later. Otherwise there is nothing to
+    // summarize, so stop retrying.
+    const transcribing =
+      transcript?.status === "pending" || transcript?.status === "processing";
+    await EntriesRepository.setSummaryRetry(
+      entryId,
+      userId,
+      transcribing ? new Date(Date.now() + SUMMARY_GRACE_MS) : null,
+    );
+    return { status: "skipped" };
+  }
   const confirmedText = stripFormatting(rawConfirmedText);
 
   const profile = await ProfilesRepository.getById(userId);
+  if (!(await tryUseDaily(userId, profile?.timezone, "summaries"))) {
+    return markPending(
+      entryId,
+      userId,
+      "daily-limit",
+      nextDailyReset(profile?.timezone),
+    );
+  }
+
   const template = resolveSummaryPrompt(profile?.summaryStyle ?? "general");
   const messages = template.buildMessages(confirmedText);
 
   const provider = getLLMProvider();
-  const rawResponse = await provider.complete(messages);
-  const { summaryText, tasks } = parseTaskBlock(rawResponse);
+  let completion;
+  try {
+    completion = await provider.complete(messages);
+  } catch (err) {
+    console.error(`Summary generation failed for entry ${entryId}:`, err);
+    await refundDaily(userId, "summaries");
+    const limited = isLimitError(err);
+    return markPending(
+      entryId,
+      userId,
+      limited ? "provider-limit" : "error",
+      new Date(
+        Date.now() +
+          (limited ? SUMMARY_PROVIDER_LIMIT_DELAY_MS : SUMMARY_RETRY_DELAY_MS),
+      ),
+    );
+  }
+  const { summaryText, tasks } = parseTaskBlock(completion.text);
 
   await SummariesRepository.create({
     entryId,
     userId,
     summaryText,
     promptVersion: template.promptVersion,
-    provider: provider.name,
+    provider: completion.provider,
+    model: completion.model,
   });
+  await EntriesRepository.setSummaryRetry(entryId, userId, null);
 
   try {
     await EntryTasksRepository.replaceForEntry(entryId, userId, tasks);
@@ -121,4 +203,23 @@ export async function summarizeEntry(
       console.error(`Mindmap recompute failed for user ${userId}:`, err);
     }
   }
+
+  return { status: "done" };
+}
+
+/**
+ * Background catch-up: claims this user's oldest entry whose summary retry is
+ * due and tries it once. One per call keeps each page load's after() short;
+ * the claim (a lease pushed SUMMARY_RETRY_LEASE_MS out) stops two concurrent
+ * loads from summarizing the same entry. Null when nothing was due.
+ */
+export async function retryDueSummary(
+  userId: string,
+): Promise<SummarizeOutcome | null> {
+  const entryId = await EntriesRepository.claimDueSummaryRetry(
+    userId,
+    new Date(Date.now() + SUMMARY_RETRY_LEASE_MS),
+  );
+  if (!entryId) return null;
+  return summarizeEntry(entryId, userId);
 }

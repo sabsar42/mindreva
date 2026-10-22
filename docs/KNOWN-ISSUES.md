@@ -6,6 +6,41 @@ things still outstanding.
 
 ---
 
+## Vercel logs not checked; icn1 + max:1 not measured live
+
+**Status:** Open.
+The Vercel CLI on this machine is logged out, so recent runtime logs (timeouts,
+"max clients reached") were not read. To do: `vercel login`, `vercel link`,
+then `vercel logs <deployment-url>` and filter for `[timing]`. Also confirm
+the Supabase region in Dashboard → Project Settings (inferred from the pooler
+host). Migrations still run over the pooler URL (6543) because there's only one
+`DATABASE_URL`; a separate direct (5432) URL for drizzle-kit would be cleaner.
+If `[timing]` shows queries queueing on the single connection, set
+`DATABASE_POOL_MAX` (e.g. 3) in Vercel.
+
+---
+
+## Free-tier AI is thin and unstable
+
+**Status:** Open (mitigated).
+OpenRouter's free pool is 50 requests/day for the whole app and its models rotate (see DECISIONS.md 2026-10-22). Fallbacks and per-user limits keep the app working, but a busy day still pushes everything onto Groq, and a run of failures leaves entries "pending" until the retry succeeds. The model list in `.env` needs a re-check every few weeks. Buying 10 OpenRouter credits lifts the cap to 1,000/day.
+
+---
+
+## Retry only runs while the app is being used
+
+**Status:** Open (minor).
+Pending summaries are retried by one background job per page load. A user who stops opening the app sees their pending summary only when they come back. A scheduled job would remove this, and needs a cron secret.
+
+---
+
+## The chat limit notice, the pending toast and the memory-card note are not browser-verified
+
+**Status:** Open.
+Their logic and the server paths are tested; nobody has looked at them rendered on a phone-width screen yet.
+
+---
+
 ## Photos uploaded before 2026-10-14 are still full-size
 
 **Status:** Open.
@@ -234,6 +269,13 @@ the branch to `main` to match the trigger.
 ## ~230ms per-request floor from the edge → Tokyo function hop
 
 **Status:** Open, accepted for now. See docs/DECISIONS.md (2026-10-12).
+
+**Update 2026-10-22:** the function now runs in `icn1` (Seoul, next to the
+database), see DECISIONS.md 2026-10-22. Not yet re-measured on the live
+deploy: after deploying, check `x-vercel-id` reads `...::icn1` and look at the
+`[timing]` lines in Vercel's runtime logs. If DB steps are then a few ms each,
+what's left is the browser → function hop, and the Mumbai idea below is the
+only thing that would shorten it.
 
 **What's wrong:** Every dynamic request from Bangladesh pays ~230ms just to
 reach the `hnd1` function, before auth (~50ms) and DB (~70ms). The
