@@ -37,7 +37,17 @@ pnpm install
 Copy-Item .env.example apps/web/.env.local
 ```
 
-Fill in `apps/web/.env.local` with your Supabase credentials and the provider keys you plan to use. See [the Supabase setup guide](docs/supabase-setup.md) for the required values and dashboard setup.
+Fill in `apps/web/.env.local` with your Supabase credentials and the provider keys you plan to use. See [the Supabase setup guide](docs/supabase-setup.md) for the required values and dashboard setup. Optional variables worth knowing (all documented in `.env.example`):
+
+| Variable                    | What it does                                                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPPORT_URL`   | A voluntary tip page (`https://` only). Shows a "Support Mindreva" row on Account and small footer links; empty hides both. Unlocks nothing. |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Where privacy requests go; shown on the Privacy and Terms pages when set.                                                                    |
+| `CRON_SECRET`               | Unlocks the daily `/api/cron/embeddings` job that catches up embedding work. Without it the route refuses every request.                     |
+| `RETRIEVAL_MIN_SIMILARITY`  | Overrides the past-self search's similarity threshold (default in `apps/web/lib/retrieval/retrieve.ts`).                                     |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only. Needed for shared-entry pictures and for account deletion.                                                                      |
+
+After migrating, backfill search data for existing entries with `pnpm --filter @mindreva/database db:backfill-embeddings` (a dry run by default; see the script header).
 
 Apply the database migrations:
 

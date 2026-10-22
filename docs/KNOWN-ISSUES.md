@@ -23,6 +23,7 @@ If `[timing]` shows queries queueing on the single connection, set
 ## Retrieval Phase 1 not applied yet; branch must not deploy before it is
 
 **Status:** Open — waiting for owner approval.
+Applying them from this session was blocked by the permission system (classified as a production deploy). Also: the schema adds `profiles.embedding_calls_today`, so on this branch every profile query fails until 0018 is applied — the Account page, timezone sync and anything reading the profile break. Do not merge or deploy before migrating.
 Migrations 0018/0019 and the embedding backfill are written but not run. Until they are, this branch's saves log a failed job write (harmless, caught) and the past-self chat finds nothing (every answer is the no-record reply). Apply order: `pnpm --filter @mindreva/database db:migrate`, then the backfill dry run, then `--apply --confirm <ref>`. The similarity threshold (0.30) is provisional until the Phase 2 eval.
 
 ---
@@ -118,11 +119,10 @@ less in landscape. If that is too tight, collapse the graph (or the header)
 while the list scrolls. Not tried on a real phone or iOS Safari (`dvh`,
 safe-area at the top).
 
-## Privacy and Terms are drafts; there is no account-deletion flow
+## Privacy and Terms are drafts
 
 **Status:** Open — needs the owner.
-
-`/privacy` and `/terms` now exist (plain-language drafts written from what the app does). They should be read and adjusted by the owner, and `NEXT_PUBLIC_CONTACT_EMAIL` set so people have a way to ask for deletion or a copy of their data. There is still no in-app "Delete account" (the old link was dead and was removed): deletion is by request only.
+Account deletion now exists (Account -> Delete account). Still open: legal review of both pages, the contact email (`NEXT_PUBLIC_CONTACT_EMAIL`), jurisdiction, and a retention statement for provider backups.
 
 ## Older photos still load full size in lists
 

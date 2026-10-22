@@ -26,6 +26,7 @@ import {
   SummaryStyleCard,
 } from "./_components/account-settings";
 import { SignOutButton } from "./_components/sign-out-button";
+import { DeleteAccountButton } from "./_components/delete-account-button";
 import { SupportFooterLink, SupportRow } from "../../_components/support-link";
 
 export default async function AccountPage() {
@@ -126,6 +127,7 @@ export default async function AccountPage() {
           {/* Sign out + legal */}
           <div className="flex flex-col items-center gap-4 py-4">
             <SignOutButton />
+            <DeleteAccountButton />
             <nav className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs">
               <Link href="/privacy" className="hit-44 hover:underline">
                 Privacy

@@ -11,10 +11,8 @@ export function supportUrl(): string | null {
   if (!raw) return null;
   try {
     const url = new URL(raw);
-    // Only ever a web page: never javascript:, data: or similar.
-    return url.protocol === "https:" || url.protocol === "http:"
-      ? url.toString()
-      : null;
+    // Only ever a secure web page: never http:, javascript:, data: or similar.
+    return url.protocol === "https:" ? url.toString() : null;
   } catch {
     return null;
   }

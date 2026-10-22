@@ -36,6 +36,14 @@ See DECISIONS.md (2026-10-22, "Function region Seoul, max:1") for the reasoning.
 - Not verified: live Vercel logs (CLI not logged in) and the deployed timings
   in `icn1` (needs a deploy).
 
+## 2026-10-22 — Account deletion, https-only support link, Privacy update (Phase 3)
+
+- **Delete account** (Account, under Sign out): a dialog that lists what is erased and needs "delete" typed. `deleteMyAccount` removes the user's Storage files first (recordings, and photos under `<user>/<entry>/` including `.thumb` copies, walked recursively) and then the auth user, whose deletion cascades through every table. The one deliberate exception to soft-delete-only. Sign-in shows "Your account and everything in it has been deleted."
+- `NEXT_PUBLIC_SUPPORT_URL` must be `https://` (http now hides the link). Documented in the README with the other optional variables; `CRON_SECRET` and `RETRIEVAL_MIN_SIMILARITY` added to `.env.example`.
+- Privacy: account deletion described (immediate, provider backups expire later), Groq named as the fallback writer, the search embedding service named.
+- No pricing/plan routes or UI remained to remove.
+- Verified: unit tests (order: files then login; refuses without session or service key; reports failure). Against the real Supabase project with a throwaway user: 5 files incl. nested photos and thumbs removed, a second run removed 0, the login deleted (lookup 404). **Not verified in a browser:** this branch's profile queries need migration 0018's new column, so the Account page can't load until it is applied (the browser run stopped there and cleaned up its test user).
+
 ## 2026-10-22 — Retrieval backend: chunks, hybrid search, embedding queue (Phase 1, NOT yet applied)
 
 Code and migrations written and tested; **migrations 0018/0019 are not applied and the backfill has not run** (owner approval pending). Do not deploy this branch until they are: saves arm embedding jobs, and chat searches `entry_chunks`.

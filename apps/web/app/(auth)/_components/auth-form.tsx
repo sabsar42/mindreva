@@ -33,6 +33,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/journal";
+  // Set by the delete-account action's redirect.
+  const accountDeleted = searchParams.get("deleted") === "1";
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -100,6 +102,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
           {c.subtitle}
         </p>
       </div>
+
+      {accountDeleted && (
+        <p
+          role="status"
+          className="bg-secondary text-foreground mt-6 rounded-xl px-4 py-3 text-center text-sm"
+        >
+          Your account and everything in it has been deleted.
+        </p>
+      )}
 
       <Button
         type="button"

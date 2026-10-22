@@ -32,3 +32,12 @@ describe("contactEmail", () => {
     expect(contactEmail()).toBeNull();
   });
 });
+
+describe("supportUrl accepts only https", () => {
+  it("hides an http link", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPPORT_URL", "http://ko-fi.com/x");
+    expect(supportUrl()).toBeNull();
+    vi.stubEnv("NEXT_PUBLIC_SUPPORT_URL", "https://ko-fi.com/x");
+    expect(supportUrl()).toBe("https://ko-fi.com/x");
+  });
+});

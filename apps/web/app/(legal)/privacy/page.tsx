@@ -77,11 +77,19 @@ export default function PrivacyPage() {
             Face as a fallback) receives your <em>audio</em> to transcribe it.
           </li>
           <li>
-            <strong>A language-model service</strong> (OpenRouter by default;
-            Google Gemini, Anthropic Claude or Groq can be used instead)
-            receives your <em>transcript text</em> to write summaries, titles
-            and tasks, to name themes, to make search possible, and to answer
-            Past Self questions.
+            <strong>Language-model services</strong> receive your <em>text</em>.
+            OpenRouter is used first: it passes the text to a free model from
+            one of several AI companies to write summaries, titles and tasks,
+            name themes, and answer Past Self questions. When OpenRouter
+            can&apos;t answer, Groq is used instead. Google Gemini or Anthropic
+            Claude can be configured instead of either.
+          </li>
+          <li>
+            <strong>A search service</strong> (an embedding model reached
+            through OpenRouter) receives your <em>entry text</em> and your Past
+            Self questions, and turns them into numbers so the app can find the
+            entries that relate to a question. Those numbers are stored with
+            your entries.
           </li>
           <li>
             <strong>Vercel</strong> hosts the app.
@@ -107,8 +115,16 @@ export default function PrivacyPage() {
         <p>
           Moving an entry to Trash hides it and keeps it recoverable; nothing is
           permanently erased from Trash yet.
+        </p>
+        <p>
+          You can delete your whole account at any time from{" "}
+          <strong>Account &rarr; Delete account</strong>. That permanently
+          erases your account and everything in it straight away: entries,
+          recordings, transcripts, summaries, pictures, conversations, share
+          links and search data. Copies can remain in our providers&apos;
+          backups for a short time before those expire.
           {email
-            ? " To have your account and everything in it deleted, or to ask for a copy of your data, email the address below."
+            ? " To ask for a copy of your data, email the address below."
             : ""}
         </p>
       </Section>
