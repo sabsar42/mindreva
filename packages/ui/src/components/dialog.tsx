@@ -17,7 +17,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out fixed inset-0 z-50 bg-black/30 backdrop-blur-sm",
+      "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out fixed inset-0 z-50 bg-black/30",
       className,
     )}
     {...props}
@@ -34,14 +34,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "border-border bg-popover text-popover-foreground data-[state=open]:animate-scale-in data-[state=closed]:animate-fade-out fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border p-6",
+        // Centered and compact like an iOS alert, always inset from the
+        // screen edges. Larger dialogs widen it with max-w-* on className.
+        "border-border bg-popover text-popover-foreground shadow-elevated data-[state=open]:animate-scale-in data-[state=closed]:animate-fade-out fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2.5rem)] max-w-xs -translate-x-1/2 -translate-y-1/2 gap-4 overscroll-contain rounded-xl border p-5",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="text-muted-foreground focus-visible:ring-ring absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2">
-        <X className="size-4" />
+      <DialogPrimitive.Close className="text-muted-foreground focus-visible:ring-ring hover:bg-secondary absolute right-2.5 top-2.5 flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2">
+        <X className="size-4" aria-hidden />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
@@ -52,10 +54,7 @@ DialogContent.displayName = DialogPrimitive.Content.displayName;
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn(
-        "flex flex-col gap-1.5 text-center sm:text-left",
-        className,
-      )}
+      className={cn("flex flex-col gap-1.5 px-6 pt-1 text-center", className)}
       {...props}
     />
   );
@@ -65,7 +64,8 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        // Two actions sit side by side at equal width (iOS alert); more stack.
+        "grid auto-cols-fr grid-flow-col gap-2 *:px-3 [&:has(>:nth-child(3))]:grid-flow-row",
         className,
       )}
       {...props}
@@ -79,7 +79,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold tracking-tight", className)}
+    className={cn("text-headline tracking-tight", className)}
     {...props}
   />
 ));
@@ -91,7 +91,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-muted-foreground text-sm", className)}
+    className={cn("text-muted-foreground text-footnote", className)}
     {...props}
   />
 ));

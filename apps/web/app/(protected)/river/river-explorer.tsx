@@ -249,7 +249,7 @@ function ThemeDetail({ theme }: { theme: RiverTheme }) {
           </div>
         )}
       </div>
-      <div className="mt-4 max-h-[50vh] space-y-2 overflow-y-auto pb-2">
+      <div className="mt-4 max-h-[50dvh] space-y-2 overflow-y-auto pb-2">
         {theme.milestones.map((m) => (
           <PrefetchLink
             key={m.entryId}

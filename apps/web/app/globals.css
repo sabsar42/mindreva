@@ -27,8 +27,8 @@
    The CSS-variable approach on <Toaster> covers the host; this covers
    the individual [data-sonner-toast] elements that inherit separately. */
 [data-sonner-toast] {
-  box-shadow: none !important;
-  border-radius: 0.75rem !important;
+  box-shadow: var(--shadow-elevated) !important;
+  border-radius: var(--radius-lg) !important;
   background: var(--color-card) !important;
   border-color: var(--color-border) !important;
   color: var(--color-card-foreground) !important;
@@ -42,7 +42,15 @@
    simply the full screen; above it, it's centred with hairline sides. */
 .app-frame {
   margin-inline: auto;
-  min-height: 100vh;
+  /* dvh: the visible height, so iOS Safari's collapsing toolbars never hide
+     the bottom of a screen (100vh is the tallest possible height). */
+  min-height: 100dvh;
+  /* Edge-to-edge: clear the notch / Dynamic Island and, in landscape, the
+     rounded sides. The home indicator is cleared by the bottom chrome
+     itself (pb-safe), so content can still scroll beneath it. */
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
   width: 100%;
   max-width: 30rem;
   background-color: var(--color-background);

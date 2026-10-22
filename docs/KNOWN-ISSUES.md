@@ -41,6 +41,16 @@ Their logic and the server paths are tested; nobody has looked at them rendered 
 
 ---
 
+## iOS polish not yet tried on a real iPhone
+
+**Status:** Open.
+
+**What's wrong:** The 2026-10-22 polish pass was verified in headless Edge (Chromium) only. Not checked on a device: safe-area padding in Safari and in standalone/PWA mode (insets are 0 in headless), San Francisco rendering (Windows shows Segoe UI), the grabber drag and row swipes with a real finger, `:active` press states in iOS Safari, and the keyboard over the chat composer (no `visualViewport` handling was added; iOS normally scrolls a focused field into view).
+
+**To revisit:** open the deploy on an iPhone (Safari and Add to Home Screen) and check the Journal, a sheet, a row swipe and a chat conversation.
+
+---
+
 ## Photos uploaded before 2026-10-14 are still full-size
 
 **Status:** Open.

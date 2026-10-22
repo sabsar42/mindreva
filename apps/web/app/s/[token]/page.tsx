@@ -55,7 +55,7 @@ export default async function SharedEntryPage({
 
   if (result.status === "forbidden") {
     return (
-      <main className="mx-auto flex min-h-screen flex-col justify-center px-6 py-12 text-center">
+      <main className="min-h-app mx-auto flex flex-col justify-center px-6 py-12 text-center">
         <div className="mx-auto mb-5">
           <Brand />
         </div>
@@ -87,7 +87,7 @@ export default async function SharedEntryPage({
   const date = formatDate(entry.entryDate);
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-16 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-16 pt-6">
       <header className="flex items-center justify-between">
         <Brand />
         <span className="text-muted-foreground text-xs">Shared journal</span>

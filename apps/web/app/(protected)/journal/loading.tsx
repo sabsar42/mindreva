@@ -1,5 +1,3 @@
-import { EntryListLoading } from "../_components/entry-list-loading";
+import { JournalLoading } from "../_components/entry-list-loading";
 
-export default function JournalLoading() {
-  return <EntryListLoading />;
-}
+export default JournalLoading;

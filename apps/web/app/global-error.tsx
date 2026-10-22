@@ -22,24 +22,27 @@ export default function GlobalError({
     <html lang="en">
       <body
         style={{
-          fontFamily: "system-ui, sans-serif",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", sans-serif',
           display: "flex",
-          minHeight: "100vh",
+          minHeight: "100dvh",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           gap: "0.75rem",
           padding: "1.5rem",
           textAlign: "center",
-          color: "#1a1712",
-          background: "#faf9f6",
+          // Inline on purpose: this replaces the root layout, so the token
+          // stylesheet may not be loaded. Values mirror tokens.css (light).
+          color: "#1d1d1f",
+          background: "#f5f5f7",
         }}
       >
         <p style={{ fontSize: "1.125rem", fontWeight: 600 }}>
           Something went wrong.
         </p>
         <p
-          style={{ fontSize: "0.875rem", color: "#635c4d", maxWidth: "24rem" }}
+          style={{ fontSize: "0.875rem", color: "#6a6a70", maxWidth: "24rem" }}
         >
           The error has been reported. Try reloading the page.
         </p>
@@ -48,12 +51,14 @@ export default function GlobalError({
           onClick={() => window.location.reload()}
           style={{
             marginTop: "0.5rem",
-            padding: "0.5rem 1.25rem",
-            borderRadius: "0.625rem",
+            minHeight: "2.75rem",
+            padding: "0 1.5rem",
+            borderRadius: "9999px",
             border: "none",
             background: "#26623f",
             color: "#ffffff",
-            fontSize: "0.875rem",
+            fontSize: "1.0625rem",
+            fontWeight: 600,
             cursor: "pointer",
           }}
         >

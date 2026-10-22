@@ -80,11 +80,11 @@ function AccountMenuInner({ className }: { className?: string }) {
           </div>
         </div>
 
-        <div className="border-border bg-card shadow-subtle mt-3 divide-y overflow-hidden rounded-2xl border">
+        <div className="border-border bg-card shadow-subtle grouped-list mt-3 overflow-hidden rounded-2xl border [--row-inset:3.625rem]">
           <PrefetchLink
             href="/integrations"
             onClick={close}
-            className="hover:bg-secondary flex items-center gap-3 p-3.5 transition-colors"
+            className="hover:bg-secondary flex min-h-11 items-center gap-3 p-3.5"
           >
             <IconTile size="sm">
               <Plug />
@@ -102,7 +102,7 @@ function AccountMenuInner({ className }: { className?: string }) {
           <PrefetchLink
             href="/account"
             onClick={close}
-            className="hover:bg-secondary flex items-center gap-3 p-3.5 transition-colors"
+            className="hover:bg-secondary flex min-h-11 items-center gap-3 p-3.5"
           >
             <IconTile size="sm" tone="neutral">
               <Settings2 />

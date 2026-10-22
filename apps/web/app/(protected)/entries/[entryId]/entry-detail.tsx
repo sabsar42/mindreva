@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
-  ArrowLeft,
+  ChevronLeft,
   Archive,
   ArchiveRestore,
   Check,
@@ -557,7 +557,7 @@ export function EntryDetail({
   const coverInputRef = React.useRef<HTMLInputElement>(null);
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
       <header className="flex items-center justify-between gap-2">
         <button
           type="button"
@@ -565,10 +565,10 @@ export function EntryDetail({
           aria-label="Back"
           className={cn(
             buttonVariants({ variant: "ghost", size: "icon" }),
-            "-ml-2",
+            "-ml-3 [&_svg]:size-7",
           )}
         >
-          <ArrowLeft />
+          <ChevronLeft />
         </button>
         <div className="flex items-center gap-1.5">
           {source === "voice" && (

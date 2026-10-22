@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button, Input, buttonVariants, cn, toast } from "@mindreva/ui";
 import { createClient } from "@mindreva/auth/client";
 import { GoogleIcon } from "./google-icon";
@@ -129,7 +129,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
           <Input
             id="email"
             type="email"
+            inputMode="email"
             autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            enterKeyHint="next"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -152,6 +156,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
               }
               required
               minLength={8}
+              autoCapitalize="none"
+              spellCheck={false}
+              enterKeyHint="go"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="At least 8 characters"
@@ -170,9 +177,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
             </button>
           </div>
         </div>
-        <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending && <Loader2 className="size-4 animate-spin" />}
-          {pending ? "Please wait…" : c.submit}
+        <Button type="submit" size="lg" className="w-full" loading={pending}>
+          {c.submit}
         </Button>
       </form>
 

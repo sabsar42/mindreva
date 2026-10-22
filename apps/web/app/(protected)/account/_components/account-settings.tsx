@@ -107,7 +107,7 @@ export function LanguagesCard({ initial }: { initial: string[] }) {
  */
 export function PreferenceToggles() {
   return (
-    <Card className="divide-border divide-y p-0">
+    <Card className="grouped-list overflow-hidden p-0">
       <SettingsRow
         title="Offline notes on this browser"
         description="Off by default. On trusted devices, notes are encrypted in this browser and erased when you sign out."

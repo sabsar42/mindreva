@@ -116,7 +116,7 @@ export function IntegrationsScreen({
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-12 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-12 pt-6">
       <PageHeader
         title="Integrations"
         back={() => {

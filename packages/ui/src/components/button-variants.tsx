@@ -17,7 +17,9 @@ import { cva } from "class-variance-authority";
  *   ghost        navigation: Back                                 ink icon/text
  *   quiet        toolbar icon actions: Search, Archive, Close     grey icon
  *
- * Sizes: text buttons are sm 36 / default 44 / lg 56. Icon-only buttons are
+ * Sizes: text buttons are sm 36 / default 44 / lg 56 with 13 / 15 / 17px
+ * labels; `loading` (Button) swaps the label for a spinner at the same
+ * width. Disabled buttons fade and ignore taps. Icon-only buttons are
  * icon-sm 32 / icon 40 / icon-lg 44 and size their icon to match (16 / 20 /
  * 24), so an icon never needs its own size class.
  */
@@ -25,7 +27,7 @@ import { cva } from "class-variance-authority";
 // Separate from button.tsx (a client component) so server components, e.g. a
 // Link styled as a button, can call it without crossing the client boundary.
 export const buttonVariants = cva(
-  "press inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "press hit-44 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -46,9 +48,10 @@ export const buttonVariants = cva(
         quiet: "text-muted-foreground hover:bg-secondary hover:text-foreground",
       },
       size: {
-        sm: "h-9 px-4 text-xs [&_svg]:size-4",
-        default: "h-11 px-6 text-sm [&_svg]:size-4",
-        lg: "h-14 px-8 text-base [&_svg]:size-5",
+        // Labels follow the iOS scale: Footnote 13 / Subhead 15 / Body 17.
+        sm: "h-9 px-4 text-footnote [&_svg]:size-4",
+        default: "h-11 px-6 text-subhead [&_svg]:size-[1.125rem]",
+        lg: "h-14 px-8 text-body [&_svg]:size-5",
         "icon-sm": "size-8 text-xs [&_svg]:size-4",
         icon: "size-10 text-sm [&_svg]:size-5",
         "icon-lg": "size-11 text-sm [&_svg]:size-6",

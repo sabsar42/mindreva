@@ -41,15 +41,19 @@ const SettingsRow = React.forwardRef<HTMLDivElement, SettingsRowProps>(
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         className={cn(
-          "flex items-center gap-3 px-4 py-3",
+          "flex min-h-11 items-center gap-3 px-4 py-3",
           interactive &&
-            "hover:bg-secondary focus-visible:ring-ring cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
+            // Rows highlight while pressed, like iOS; they don't shrink.
+            "hover:bg-secondary focus-visible:ring-ring active:bg-row-pressed cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset active:scale-100 active:shadow-none",
           className,
         )}
         {...props}
       >
         {icon && (
-          <span className="text-muted-foreground flex size-5 shrink-0 items-center justify-center [&_svg]:size-5">
+          <span
+            data-row-icon
+            className="text-muted-foreground flex size-5 shrink-0 items-center justify-center [&_svg]:size-5"
+          >
             {icon}
           </span>
         )}

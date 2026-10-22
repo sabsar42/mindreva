@@ -55,6 +55,25 @@ postgres-js and `prepare: false`, every parameterised query is two round trips
 
 **Consequence worth knowing:** with 50 shared free requests a day, a few dozen active users will exhaust OpenRouter's free pool daily; Groq then carries completions. The cheap fix is buying 10 OpenRouter credits (one-time) to lift the cap to 1,000/day, which this design allows without code changes.
 
+---
+
+## 2026-10-22 — iOS polish: what was kept from earlier owner decisions
+
+**What happened:** The owner asked for a full iOS-native refinement pass (tokens, components, navigation, motion, performance, accessibility). Several parts of that brief conflict with decisions the owner had already made, so those decisions were kept and the brief applied around them.
+
+**Decided:**
+
+- **No bottom tab bar, no collapsing large titles.** Navigation stays as header icons and the Journal's fixed top section (2026-10-16, 2026-10-17). A tab bar would be a navigation redesign, not a polish. `PageHeader` became a sticky iOS-style nav bar instead.
+- **No desktop split view.** The one phone-width column stays (2026-10-13).
+- **Compact body text kept** (15px, 2026-10-19). The iOS names were added as tokens and the scale already matches them; only fields (17px, to stop iOS focus zoom) and button labels moved up.
+- **Secondary text stays `#6a6a70`,** not iOS's `rgba(60,60,67,0.6)`, which is about 3.4:1 on white and fails AA for body text.
+- **Theme still ignores the OS setting** (light by default, dark when chosen, 2026-10-16). `theme-color` follows the app's choice rather than `prefers-color-scheme`.
+- **20px screen padding kept** (iOS uses 16 to 20).
+- **No new dependencies.** Sheet drag, swipe physics and optimistic rollback use pointer events and React state.
+- **Not done:** push/pop slide transitions (Next 15's View Transitions support is still experimental; the existing fade-and-rise stays); edge-swipe-back (it would compete with the tab swipe and row swipes); squircle corners (`corner-shape` changes perceived radius and has little browser support).
+
+---
+
 ## 2026-10-22 — A day is the user's local day, stored per profile
 
 **What happened:** Visits and entry dates used the server clock (UTC on Vercel), so users outside UTC had early/late entries filed on the wrong day, breaking streaks.

@@ -218,7 +218,7 @@ export function ShareSheet({
 
   return (
     <BottomSheet open={open} onOpenChange={onOpenChange}>
-      <BottomSheetContent className="max-h-[88vh] overflow-y-auto">
+      <BottomSheetContent className="max-h-[88dvh] overflow-y-auto">
         <div className="flex items-center gap-3">
           <IconTile>
             <Link2 />
@@ -324,7 +324,7 @@ export function ShareSheet({
                       readOnly
                       value={link}
                       onFocus={(e) => e.currentTarget.select()}
-                      className="h-11 flex-1 text-xs"
+                      className="text-callout h-11 flex-1"
                     />
                     <Button
                       type="button"
@@ -384,6 +384,9 @@ export function ShareSheet({
                           type="email"
                           inputMode="email"
                           autoComplete="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          enterKeyHint="done"
                           value={email}
                           onChange={(e) => {
                             setEmail(e.target.value);

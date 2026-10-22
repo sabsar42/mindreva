@@ -31,7 +31,7 @@ export function RiverModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[88vh] w-[calc(100%-1rem)] max-w-2xl gap-0 overflow-hidden rounded-3xl p-0">
+      <DialogContent className="max-h-[88dvh] w-[calc(100%-1rem)] max-w-2xl gap-0 overflow-hidden rounded-3xl p-0">
         <div className="px-6 pb-4 pt-6">
           <DialogTitle className="text-xl font-bold tracking-tight">
             Your river of memories

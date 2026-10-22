@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { ArchiveRestore } from "lucide-react";
 import { trashSwipeAction } from "../_components/swipe-actions";
-import { NoteCard, SwipeableRow, toast } from "@mindreva/ui";
+import { NoteCard, SwipeableRow } from "@mindreva/ui";
+import { useOptimisticRemove } from "../_components/use-optimistic-remove";
 import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service";
 import { DATE_PLACEHOLDER, formatEntryDateTime } from "@/lib/format-entry";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -20,8 +20,8 @@ export function ArchiveList({
 }: {
   entries: EntryListItemWithThumbnail[];
 }) {
-  const router = useRouter();
   const [entries, setEntries] = React.useState(initial);
+  const remove = useOptimisticRemove(entries, setEntries);
   const [confirmTrashId, setConfirmTrashId] = React.useState<string | null>(
     null,
   );
@@ -29,33 +29,34 @@ export function ArchiveList({
   const { thumbnails, resolved } = useEntryThumbnails(entryIds);
   const hydrated = useHydrated();
 
-  async function unarchive(id: string) {
-    const res = await fetch(`/api/entries/${id}/archive`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("Something went wrong.");
-      return;
-    }
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-    toast.success("Unarchived");
-    router.refresh();
+  function unarchive(id: string) {
+    return remove(
+      id,
+      { url: `/api/entries/${id}/archive`, method: "DELETE" },
+      {
+        done: "Unarchived",
+        failed: "Couldn't unarchive that entry. It's still here; try again.",
+      },
+    );
   }
 
-  async function trash(id: string) {
-    const res = await fetch(`/api/entries/${id}/trash`, { method: "POST" });
-    if (!res.ok) {
-      toast.error("Something went wrong.");
-      return;
-    }
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-    toast.success("Moved to Trash");
-    router.refresh();
+  function trash(id: string) {
+    return remove(
+      id,
+      { url: `/api/entries/${id}/trash`, method: "POST" },
+      {
+        done: "Moved to Trash",
+        failed:
+          "Couldn't move that entry to Trash. It's still here; try again.",
+      },
+    );
   }
 
   return (
-    <main className="mx-auto min-h-screen px-5 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
       <PageHeader back="/account" title="Archived" />
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-2">
         {entries.length === 0 && <EmptyState message="Nothing archived yet." />}
 
         {entries.map((entry) => (
