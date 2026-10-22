@@ -20,12 +20,10 @@ If `[timing]` shows queries queueing on the single connection, set
 
 ---
 
-## Retrieval Phase 1 not applied yet; branch must not deploy before it is
+## Retrieval eval (Phase 2) waits for the daily quota reset
 
-**Status:** Open — waiting for owner approval.
-Applying them from this session was blocked by the permission system (classified as a production deploy). Also: the schema adds `profiles.embedding_calls_today`, so on this branch every profile query fails until 0018 is applied — the Account page, timezone sync and anything reading the profile break. Do not merge or deploy before migrating.
-Migrations 0018/0019 and the embedding backfill are written but not run. Until they are, this branch's saves log a failed job write (harmless, caught) and the past-self chat finds nothing (every answer is the no-record reply). Apply order: `pnpm --filter @mindreva/database db:migrate`, then the backfill dry run, then `--apply --confirm <ref>`. The similarity threshold (0.30) is provisional until the Phase 2 eval.
-
+**Status:** Open.
+Migrations are applied and the backfill is done. The eval (`cd apps/web && node --conditions=react-server --import tsx scripts/eval-retrieval.mts`) needs ~22 OpenRouter free requests; today's 50 were used by the backfill, so it runs after 00:00 UTC. Until it does, the similarity threshold (0.30) is provisional. One undated entry is still waiting in the embedding queue for the same reset.
 ---
 
 ## Free-tier AI is thin and unstable

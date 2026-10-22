@@ -43,11 +43,26 @@ export type IndexOutcome =
   | { status: "skipped" }
   | { status: "daily-limit"; retryAt: Date };
 
+/** Refreshes the user's mindmap, which clusters on the per-entry vectors
+ * indexEntry writes. Non-fatal: a stale map still renders and the next
+ * index pass retries. */
+async function refreshMindmap(userId: string): Promise<void> {
+  try {
+    await recomputeMindmapForUser(userId);
+  } catch (err) {
+    console.error(`Mindmap recompute failed for user ${userId}:`, err);
+  }
+}
+
 /** Brings one entry's chunks up to date. Throws only for an embedding or
- * database failure, which the job runner turns into a retry. */
+ * database failure, which the job runner turns into a retry.
+ * `refreshMindmap: false` lets a batch (drainEmbeddingJobs) refresh each
+ * user's mindmap once at the end instead of after every entry — a refresh
+ * can relabel themes with LLM calls. */
 export async function indexEntry(
   entryId: string,
   userId: string,
+  options: { refreshMindmap?: boolean } = {},
 ): Promise<IndexOutcome> {
   const entry = await EntriesRepository.getByIdForUser(entryId, userId);
   if (!entry) return { status: "skipped" };
@@ -66,12 +81,17 @@ export async function indexEntry(
     return { status: "cleared" };
   }
 
-  const hash = contentHash(plain, entry.entryDate);
+  // Filed under its entry_date, else the day it was created: the same rule
+  // the Re-live Me sessions use (lib/past-self/sessions.ts entryDateKey), so
+  // an undated entry is still found inside its session's date range.
+  const filedDate =
+    entry.entryDate ?? new Date(entry.createdAt).toISOString().slice(0, 10);
+  const hash = contentHash(plain, filedDate);
   if ((await ChunksRepository.getHashForEntry(entryId, userId)) === hash) {
     return { status: "unchanged" };
   }
 
-  const chunks = prepareChunks(plain, entry.entryDate);
+  const chunks = prepareChunks(plain, filedDate);
   const profile = await ProfilesRepository.getById(userId);
   if (!(await tryUseDaily(userId, profile?.timezone, "embeddings"))) {
     return {
@@ -92,19 +112,13 @@ export async function indexEntry(
   await ChunksRepository.replaceForEntry({
     userId,
     entryId,
-    entryDate: entry.entryDate,
+    entryDate: filedDate,
     contentHash: hash,
     plainText: plain,
     chunks: chunks.map((c, i) => ({ ...c, embedding: vectors[i]! })),
   });
 
-  // The mindmap clusters on the per-entry vector refreshed above. Failure is
-  // non-fatal: a stale map still renders and the next index pass retries.
-  try {
-    await recomputeMindmapForUser(userId);
-  } catch (err) {
-    console.error(`Mindmap recompute failed for user ${userId}:`, err);
-  }
+  if (options.refreshMindmap !== false) await refreshMindmap(userId);
   return { status: "indexed", chunks: chunks.length };
 }
 
@@ -118,9 +132,10 @@ function backoffMs(attempt: number): number {
 /** Runs one claimed job and records what happened. Never throws. */
 export async function runEmbeddingJob(
   job: ClaimedEmbeddingJob,
+  options: { refreshMindmap?: boolean } = {},
 ): Promise<IndexOutcome | { status: "error"; error: string }> {
   try {
-    const outcome = await indexEntry(job.entryId, job.userId);
+    const outcome = await indexEntry(job.entryId, job.userId, options);
     if (outcome.status === "daily-limit") {
       await EmbeddingJobsRepository.markRetry(job, {
         nextAttemptAt: outcome.retryAt,
@@ -209,6 +224,7 @@ export async function drainEmbeddingJobs(input: {
 }): Promise<{ processed: number; outcomes: Record<string, number> }> {
   const started = Date.now();
   const outcomes: Record<string, number> = {};
+  const changedUsers = new Set<string>();
   let processed = 0;
   while (processed < input.max && Date.now() - started < input.budgetMs) {
     const job = await EmbeddingJobsRepository.claimDue({
@@ -216,9 +232,12 @@ export async function drainEmbeddingJobs(input: {
       leaseUntil: new Date(Date.now() + EMBEDDING_LEASE_MS),
     });
     if (!job) break;
-    const outcome = await runEmbeddingJob(job);
+    const outcome = await runEmbeddingJob(job, { refreshMindmap: false });
     outcomes[outcome.status] = (outcomes[outcome.status] ?? 0) + 1;
+    if (outcome.status === "indexed") changedUsers.add(job.userId);
     processed += 1;
   }
+  // One mindmap refresh per user whose vectors changed, not one per entry.
+  for (const userId of changedUsers) await refreshMindmap(userId);
   return { processed, outcomes };
 }

@@ -172,3 +172,41 @@ describe("runEmbeddingJob", () => {
     });
   });
 });
+
+describe("drainEmbeddingJobs", () => {
+  it("refreshes each user's mindmap once at the end, not per entry", async () => {
+    const { EmbeddingJobsRepository } = await import("@mindreva/database");
+    const claim = vi
+      .fn()
+      .mockResolvedValueOnce({ ...job, id: "a", entryId: "e1" })
+      .mockResolvedValueOnce({ ...job, id: "b", entryId: "e2" })
+      .mockResolvedValueOnce(null);
+    (
+      EmbeddingJobsRepository as unknown as { claimDue: typeof claim }
+    ).claimDue = claim;
+    const { drainEmbeddingJobs } = await import("./embedding-index.service");
+    const result = await drainEmbeddingJobs({ max: 10, budgetMs: 10_000 });
+    expect(result).toEqual({ processed: 2, outcomes: { indexed: 2 } });
+    expect(embedMany).toHaveBeenCalledTimes(2);
+    expect(recompute).toHaveBeenCalledTimes(1);
+    expect(recompute).toHaveBeenCalledWith(USER);
+  });
+});
+
+describe("undated entries", () => {
+  it("are filed under the day they were created, like Re-live Me sessions", async () => {
+    getEntry.mockResolvedValue({
+      id: ENTRY,
+      entryDate: null,
+      title: null,
+      createdAt: new Date("2025-11-02T09:30:00Z"),
+    });
+    await indexEntry(ENTRY, USER);
+    expect(embedMany.mock.calls[0]![0][0]).toMatch(
+      /^Date: 2025-11-02 \(Sunday\)\n\n/,
+    );
+    expect(replaceForEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ entryDate: "2025-11-02" }),
+    );
+  });
+});

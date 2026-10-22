@@ -36,6 +36,18 @@ See DECISIONS.md (2026-10-22, "Function region Seoul, max:1") for the reasoning.
 - Not verified: live Vercel logs (CLI not logged in) and the deployed timings
   in `icn1` (needs a deploy).
 
+## 2026-10-22 — Retrieval live: migrated, backfilled, verified
+
+Owner authorised running it. Migrations 0018/0019 applied (both new tables, RLS on with owner-only SELECT, all five chunk indexes incl. HNSW on `embedding::halfvec(2048)`).
+
+- **RLS proven** with two signed-in throwaway users: owner reads own chunk and job rows; the other user reads none; inserts denied for both (writes are server-only); client update/delete change nothing. 10/10.
+- **Backfill done:** `db:backfill-embeddings --apply` armed 21 jobs; the real worker drained 21/21 (165 s, one mindmap refresh per user). 21 chunks, per-user counter = 21 calls. Confirmed embeddings DO count against OpenRouter's shared 50/day (28 -> 48 used).
+- **Fixed:** undated entries now index under their creation day (same rule as Re-live Me sessions) instead of "Date: unknown", which the chat date filter skipped. One of the two re-indexed; the other hit the daily 429 and is waiting in the queue (attempts not spent) — the retry path working on real traffic.
+- **Fixed (found in the browser run):** the keyword search's phrase match used `ILIKE ANY(${array}::text[])`, which drizzle expands into separate parameters ("malformed array literal"), so every question with a name or quoted phrase failed retrieval. Now one ILIKE per phrase; verified on Postgres (date filter respected, Bangla terms match, `%`/`_`/`\` escaped).
+- **Fixed:** a drain refreshes each user's mindmap once at the end instead of after every entry (a refresh can relabel themes with LLM calls).
+- **Browser-verified** on a production build at 390px: chat answer grounded in the one matching entry with its citation chip, via keyword retrieval while embeddings were rate-limited (3.4 s); an unanswerable question got the honest no-record reply without a model call (0.8 s) and no chips; account deletion end to end (dialog, typed confirmation, deleted notice; auth user, profile, entries, chunks, jobs, chat messages and files all gone). No page exceptions.
+- Phase 2 eval script ready (`apps/web/scripts/eval-retrieval.mts`, writes `docs/eval/retrieval-eval.md`); it needs ~22 fresh OpenRouter requests and refuses to start without them, so it runs after the 00:00 UTC reset.
+
 ## 2026-10-22 — Account deletion, https-only support link, Privacy update (Phase 3)
 
 - **Delete account** (Account, under Sign out): a dialog that lists what is erased and needs "delete" typed. `deleteMyAccount` removes the user's Storage files first (recordings, and photos under `<user>/<entry>/` including `.thumb` copies, walked recursively) and then the auth user, whose deletion cascades through every table. The one deliberate exception to soft-delete-only. Sign-in shows "Your account and everything in it has been deleted."

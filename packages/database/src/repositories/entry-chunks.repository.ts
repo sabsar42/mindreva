@@ -230,8 +230,14 @@ export const ChunksRepository = {
     const rank = tsquery
       ? sql`ts_rank_cd(c.content_tsv, to_tsquery('simple', ${tsquery}))`
       : sql`0`;
+    // One ILIKE per phrase, OR'd. (Not `ILIKE ANY(${likes}::text[])`: drizzle
+    // expands a JS array into separate parameters, so that cast fails with
+    // "malformed array literal".)
     const phraseMatch = likes.length
-      ? sql`c.content ILIKE ANY(${likes}::text[])`
+      ? sql.join(
+          likes.map((l) => sql`c.content ILIKE ${l}`),
+          sql` OR `,
+        )
       : sql`false`;
     const phraseScore = likes.length
       ? sql.join(
