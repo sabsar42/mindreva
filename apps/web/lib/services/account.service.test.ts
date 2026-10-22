@@ -37,6 +37,8 @@ const admin = {
 let adminAvailable = true;
 
 vi.mock("@mindreva/auth/server", () => ({ getUser }));
+const disconnectCalendarForUser = vi.fn(async () => {});
+vi.mock("./calendar.service", () => ({ disconnectCalendarForUser }));
 vi.mock("../supabase-admin", () => ({
   createAdminClient: () => (adminAvailable ? admin : null),
 }));

@@ -77,3 +77,13 @@ export function nextMidnightInZone(
   t = wallClock - zoneOffsetMs(zone, new Date(t));
   return new Date(t);
 }
+
+/** The instant a given local day ("YYYY-MM-DD") begins in `tz` (DST-safe). */
+export function startOfDayInZone(dateKey: string, tz?: string | null): Date {
+  const zone = resolveTimeZone(tz);
+  const [y, m, d] = dateKey.split("-").map(Number) as [number, number, number];
+  const wallClock = Date.UTC(y, m - 1, d);
+  let t = wallClock - zoneOffsetMs(zone, new Date(wallClock));
+  t = wallClock - zoneOffsetMs(zone, new Date(t));
+  return new Date(t);
+}

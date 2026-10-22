@@ -29,6 +29,7 @@ export {
 } from "./repositories/embeddings.repository";
 export { ChatRepository } from "./repositories/chat.repository";
 export { AppLoginsRepository } from "./repositories/app-logins.repository";
+export { CalendarConnectionsRepository } from "./repositories/calendar-connections.repository";
 export {
   MindmapRepository,
   membershipKey,
@@ -48,6 +49,8 @@ export {
 } from "./lib/cluster";
 
 export type {
+  CalendarConnection,
+  CalendarConnectionStatus,
   Profile,
   NewProfile,
   Entry,

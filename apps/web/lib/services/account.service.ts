@@ -1,4 +1,5 @@
 import "server-only";
+import { disconnectCalendarForUser } from "./calendar.service";
 import { getUser } from "@mindreva/auth/server";
 import { createAdminClient } from "../supabase-admin";
 
@@ -75,6 +76,9 @@ export async function deleteMyAccount(): Promise<void> {
       "Account deletion needs SUPABASE_SERVICE_ROLE_KEY on the server.",
     );
   }
+  // Revoke Google Calendar access with Google first (best effort); the
+  // stored row itself goes with the cascade below.
+  await disconnectCalendarForUser(user.id).catch(() => {});
   await removeUserFiles(admin, user.id);
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) throw new Error(`Deleting the account failed: ${error.message}`);

@@ -28,6 +28,7 @@ import { trashSwipeAction } from "../_components/swipe-actions";
 import { ConfirmTrashDialog } from "../_components/confirm-trash-dialog";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 import { RiverPanel } from "../river/river-panel";
+import { DayEventsInline } from "../_components/calendar-events";
 import type { RiverData } from "@/lib/services/mindmap.service";
 
 // Set when a conversation is created, consumed on this screen's next mount. A
@@ -373,13 +374,13 @@ export function PastSelfScreen({
   years,
   river,
   todayKey,
-  calendarFor,
+  calendarConnected = false,
 }: {
   years: PastSelfYear[];
   river: RiverData;
   todayKey: string | null;
-  /** Events for a past day, shown on memory cards when Calendar is connected. */
-  calendarFor?: (dateKey: string) => React.ReactNode;
+  /** Show each memory's calendar events (Google Calendar connected). */
+  calendarConnected?: boolean;
 }) {
   const router = useRouter();
 
@@ -498,7 +499,13 @@ export function PastSelfScreen({
               <MemoriesCarousel
                 entries={allEntries}
                 todayKey={todayKey}
-                calendarFor={calendarFor}
+                calendarFor={
+                  calendarConnected
+                    ? (day) => (
+                        <DayEventsInline dateKey={day} className="mt-2" />
+                      )
+                    : undefined
+                }
               />
             )}
 

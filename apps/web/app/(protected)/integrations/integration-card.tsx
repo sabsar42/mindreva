@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, CircleAlert, Info, Loader2, Settings2 } from "lucide-react";
+import { Check, CircleAlert, Info, Loader2 } from "lucide-react";
 import { Badge, Button, ExpandablePanel, cn } from "@mindreva/ui";
 import type { IntegrationView } from "@/lib/integrations/types";
 import { INTEGRATION_ICONS } from "./integration-icons";
@@ -34,15 +34,19 @@ export function IntegrationCard({
   message = null,
   onConnect,
   onDisconnect,
+  settings,
 }: {
   integration: IntegrationView;
   phase?: IntegrationPhase;
   message?: IntegrationMessage | null;
   onConnect: () => void;
   onDisconnect: () => void;
+  /** Per-integration settings, shown while connected. */
+  settings?: React.ReactNode;
 }) {
   const Icon = INTEGRATION_ICONS[integration.id];
   const connected = integration.connection.status === "connected";
+  const needsReconnect = integration.connection.status === "needs_reconnect";
   const busy = phase !== "idle";
   const MessageIcon = message ? MESSAGE_STYLES[message.tone].icon : null;
 
@@ -63,6 +67,8 @@ export function IntegrationCard({
             <Check className="size-3" />
             Connected
           </Badge>
+        ) : needsReconnect ? (
+          <Badge variant="warning">Reconnect</Badge>
         ) : !integration.available ? (
           <Badge variant="neutral">Coming soon</Badge>
         ) : null}
@@ -81,6 +87,13 @@ export function IntegrationCard({
         </p>
       )}
 
+      {needsReconnect && (
+        <p className="text-subhead text-foreground mt-3">
+          Google stopped letting Mindreva read your calendar (access was removed
+          or expired). Reconnect to see events again.
+        </p>
+      )}
+
       {!connected && (
         <Button
           className="mt-4 w-full"
@@ -94,7 +107,9 @@ export function IntegrationCard({
               Connecting…
             </>
           ) : (
-            <>Connect {integration.name}</>
+            <>
+              {needsReconnect ? "Reconnect" : "Connect"} {integration.name}
+            </>
           )}
         </Button>
       )}
@@ -103,16 +118,7 @@ export function IntegrationCard({
           will live. Only meaningful once connected. */}
       {connected && (
         <div className="mt-4">
-          <div className="border-border bg-secondary/50 rounded-2xl border p-4">
-            <p className="text-foreground flex items-center gap-2 text-sm font-semibold">
-              <Settings2 className="text-muted-foreground size-4" />
-              Settings
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              Options for how {integration.name} works with your entries will
-              appear here.
-            </p>
-          </div>
+          {settings}
           <Button
             variant="outline"
             className="mt-3 w-full"
