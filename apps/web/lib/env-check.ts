@@ -13,6 +13,8 @@
  * Values are never printed, only names.
  */
 
+import { getGoogleCalendarConfig } from "./integrations/google/config";
+
 const REQUIRED = [
   "DATABASE_URL",
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -66,6 +68,29 @@ export function checkEnv(): EnvReport {
     "CRON_SECRET",
     "the daily embedding catch-up job refuses to run (page loads still catch up).",
   );
+
+  // Google Calendar is all-or-nothing: warn only when it's half set up.
+  const calendarVars = [
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_REDIRECT_URI",
+    "CALENDAR_TOKEN_KEY",
+  ];
+  const calendarSet = calendarVars.filter(has);
+  if (calendarSet.length > 0 && calendarSet.length < calendarVars.length) {
+    warnings.push(
+      `Google Calendar is partly configured (missing ${calendarVars
+        .filter((v) => !has(v))
+        .join(", ")}), so it stays off.`,
+    );
+  } else if (
+    calendarSet.length === calendarVars.length &&
+    !getGoogleCalendarConfig()
+  ) {
+    warnings.push(
+      "Google Calendar settings are invalid (CALENDAR_TOKEN_KEY must be 32 bytes base64; GOOGLE_REDIRECT_URI must be https), so it stays off.",
+    );
+  }
 
   const support = process.env.NEXT_PUBLIC_SUPPORT_URL?.trim();
   if (support && !support.startsWith("https://")) {

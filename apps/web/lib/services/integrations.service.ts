@@ -1,7 +1,11 @@
 import "server-only";
 import { getUser } from "@mindreva/auth/server";
 import { getProvider, listProviders } from "@/lib/integrations/registry";
-import type { ConnectResult, IntegrationView } from "@/lib/integrations/types";
+import {
+  IntegrationNotFoundError,
+  type ConnectResult,
+  type IntegrationView,
+} from "@/lib/integrations/types";
 
 /**
  * Business logic for the current user's integrations. Routes call this; it
@@ -30,6 +34,17 @@ export async function listMyIntegrations(): Promise<IntegrationView[]> {
 export async function connectMyIntegration(id: string): Promise<ConnectResult> {
   const userId = await requireUserId();
   return getProvider(id).connect(userId);
+}
+
+/** The provider's OAuth redirect lands here. Throws the provider's own errors. */
+export async function completeMyIntegrationConnect(
+  id: string,
+  params: URLSearchParams,
+): Promise<void> {
+  await requireUserId();
+  const provider = getProvider(id);
+  if (!provider.handleCallback) throw new IntegrationNotFoundError(id);
+  await provider.handleCallback(params);
 }
 
 export async function disconnectMyIntegration(id: string): Promise<void> {

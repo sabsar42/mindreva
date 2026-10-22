@@ -17,6 +17,10 @@ import {
 import { getUser } from "@mindreva/auth/server";
 import { getMyProfile, type UseCase } from "@/lib/services/profile.service";
 import { countMyEntries } from "@/lib/services/entries.service";
+import {
+  getMyCalendarStatus,
+  isCalendarConfigured,
+} from "@/lib/services/calendar.service";
 import { PrefetchLink } from "../_components/prefetch-link";
 import { PageHeader } from "../_components/page-header";
 import { ThemeSwitchRow } from "../_components/theme-switch-row";
@@ -30,11 +34,21 @@ import { DeleteAccountButton } from "./_components/delete-account-button";
 import { SupportFooterLink, SupportRow } from "../../_components/support-link";
 
 export default async function AccountPage() {
-  const [user, profile, noteCount] = await Promise.all([
+  const calendarOn = isCalendarConfigured();
+  const [user, profile, noteCount, calendar] = await Promise.all([
     getUser(),
     getMyProfile(),
     countMyEntries().catch(() => 0),
+    calendarOn ? getMyCalendarStatus().catch(() => null) : null,
   ]);
+  const integrationsLabel =
+    calendar?.status === "connected"
+      ? `Google Calendar connected${calendar.email ? ` as ${calendar.email}` : ""}`
+      : calendar?.status === "needs_reconnect"
+        ? "Google Calendar needs reconnecting"
+        : calendarOn
+          ? "Connect Google Calendar and more"
+          : "Connect apps";
 
   const email = user?.email ?? "";
   const displayName = profile?.displayName || email.split("@")[0] || "You";
@@ -72,7 +86,7 @@ export default async function AccountPage() {
               <SettingsRow
                 icon={<Plug />}
                 title="Integrations"
-                description="Connect Google Calendar and more"
+                description={integrationsLabel}
                 chevron
               />
             </PrefetchLink>

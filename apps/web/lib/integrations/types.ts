@@ -15,7 +15,8 @@ export interface IntegrationDefinition {
 
 /** The current user's connection to one integration. */
 export interface IntegrationConnection {
-  status: "connected" | "disconnected";
+  /** needs_reconnect: access was revoked or expired at the provider. */
+  status: "connected" | "disconnected" | "needs_reconnect";
   /** Who/what it's connected as (e.g. a Google account email). Null when disconnected. */
   accountLabel: string | null;
   /** ISO timestamp of when the connection was made. Null when disconnected. */

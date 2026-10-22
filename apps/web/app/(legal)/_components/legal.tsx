@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export const LEGAL_UPDATED = "19 October 2026";
+export const LEGAL_UPDATED = "23 October 2026";
 
 export function LegalTitle({
   title,

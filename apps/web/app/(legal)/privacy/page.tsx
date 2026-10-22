@@ -111,6 +111,40 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
+      <Section title="Google Calendar (optional)">
+        <p>
+          If you choose to connect Google Calendar, Mindreva asks Google for
+          read-only access to your calendars (the <code>calendar.readonly</code>{" "}
+          permission) and your Google account email. It reads event titles,
+          times and calendar names, only to show that day&apos;s events beside
+          your entries, on Home and in Re-live Me. It never creates, changes or
+          deletes anything in your calendar.
+        </p>
+        <p>
+          Events are fetched when you open a screen and held briefly in memory
+          (a few minutes); they are not stored in our database. We store one
+          thing: an encrypted refresh token that lets Mindreva keep reading the
+          calendars you picked, plus your Google email and which calendars are
+          on. Calendar data is never sent to an AI model and never used for ads.
+        </p>
+        <p>
+          Disconnect any time in <strong>Account &rarr; Google Calendar</strong>
+          : we revoke the access with Google and delete the stored token.
+          Deleting your account does the same. You can also remove access from
+          your Google Account&apos;s security settings. Mindreva&apos;s use of
+          information received from Google APIs adheres to the{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hit-44 underline-offset-2 hover:underline"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements.
+        </p>
+      </Section>
+
       <Section title="Deleting things">
         <p>
           Moving an entry to Trash hides it and keeps it recoverable; nothing is
