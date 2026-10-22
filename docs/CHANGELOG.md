@@ -36,6 +36,14 @@ See DECISIONS.md (2026-10-22, "Function region Seoul, max:1") for the reasoning.
 - Not verified: live Vercel logs (CLI not logged in) and the deployed timings
   in `icn1` (needs a deploy).
 
+## 2026-10-22 — Fix pass: safe defaults, atomic summary write, browser-verified limits
+
+- Missing env vars are no longer a production risk: `OPENROUTER_FALLBACK_MODELS` has built-in defaults when unset (empty = none), and Groq becomes the completion fallback automatically when `GROQ_API_KEY` is present and `LLM_FALLBACK_PROVIDER` is unset (empty = off).
+- Bug found in the browser run and fixed: writing a summary and clearing the entry's `summary_retry_at` were two statements, so a crash between them would summarise the entry again. `SummariesRepository.create` now does both in one transaction.
+- Entry detail says "Your summary is on its way" for a pending summary instead of inviting a refresh that would hit the limit again.
+- CI now runs on pushes to `master` (the trigger watched `main`, which doesn't exist).
+- Verified on a production build in headless Edge at 390px with a throwaway user (deleted): sign-in; an overdue pending summary written in the background on page load via the real OpenRouter primary with the mark cleared; Regenerate at the daily limit shows the calm toast, marks the entry pending and writes nothing; chat at its limit shows the inline note, keeps the question in the box and stores no message; no page exceptions or console errors. 140 tests, lint, typecheck, build green.
+
 ## 2026-10-22 — AI calls survive free-tier limits and model rotation
 
 See DECISIONS.md (2026-10-22, "Free-tier AI quotas") for the measurements behind this.

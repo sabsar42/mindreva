@@ -34,13 +34,6 @@ Pending summaries are retried by one background job per page load. A user who st
 
 ---
 
-## The chat limit notice, the pending toast and the memory-card note are not browser-verified
-
-**Status:** Open.
-Their logic and the server paths are tested; nobody has looked at them rendered on a phone-width screen yet.
-
----
-
 ## iOS polish not yet tried on a real iPhone
 
 **Status:** Open.
@@ -71,22 +64,22 @@ from the entry page.
 
 ## Every recording now costs an LLM summary
 
-**Status:** Open.
+**Status:** Mitigated (2026-10-22).
 
-Since 2026-10-18 each voice recording is summarised automatically (title,
-summary, tasks, embedding, mindmap). On the OpenRouter free tier (50/day) a busy
-day can hit the cap; the card then shows "Saved, but the summary didn't finish.
-Open it to try again." and the recording and transcript are safe. A server-side
-queue with a stored summary status would make this retryable without opening
-the entry.
+Each voice recording is still summarised automatically, but it now counts
+against the per-user daily limit (15), falls back across OpenRouter models and
+then Groq, and an entry whose summary can't be written is kept and marked
+`summary_retry_at` for a background retry instead of failing. Remaining cost:
+see "Free-tier AI is thin and unstable".
 
 ## A memory only forms while the tab stays open
 
-**Status:** Open.
+**Status:** Mostly fixed (2026-10-22).
 
-Transcription finishes on the server regardless, but summarising is started by
-the client. Closing the tab right after recording leaves a transcribed, untitled
-entry until it is opened and saved.
+New entries are created with `summary_retry_at` set 10 minutes out, so if the
+tab closes before the client asks for the summary, the next page load in any
+tab writes it. The forming _animation_ still only runs in the tab that
+recorded. See "Retry only runs while the app is being used".
 
 ## Mori and card effects are unreviewed guesses on two points
 
@@ -261,21 +254,6 @@ mode.
 
 ---
 
-## CI's push trigger watches `main`, but the repo's default branch is `master`
-
-**Status:** Open.
-
-**What's wrong:** `.github/workflows/ci.yml` runs on `pull_request` (any
-branch) and `push: branches: [main]`. This repo's default branch is
-`master`, so a direct push to `master` — bypassing a PR, e.g. a docs fix or
-an empty commit to re-trigger a Vercel deploy — never runs CI. PRs are
-unaffected; this only misses direct pushes.
-
-**To revisit:** change the workflow's push trigger to `master`, or rename
-the branch to `main` to match the trigger.
-
----
-
 ## ~230ms per-request floor from the edge → Tokyo function hop
 
 **Status:** Open, accepted for now. See docs/DECISIONS.md (2026-10-12).
@@ -334,16 +312,6 @@ pending refresh (see docs/DECISIONS.md, 2026-10-12).
 **To revisit:** do the mutation through a server action that calls
 `revalidatePath("/journal")`, which purges the client cache before the
 navigation, or remove the changed row from local state on arrival.
-
----
-
-## Footer links to pages that don't exist
-
-**Status:** Open.
-
-**What's wrong:** `/privacy`, `/terms` and `/support` are linked from the
-sign-in page and Account, but no such routes exist. The live sign-in page
-logs three 404s from their prefetch on every load.
 
 ---
 

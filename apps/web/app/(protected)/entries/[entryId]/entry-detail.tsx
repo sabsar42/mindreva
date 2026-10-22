@@ -127,6 +127,7 @@ export function EntryDetail({
   transcriptStatus,
   confirmedText,
   summaryText,
+  summaryPending,
   initialPhotos,
   initialTasks,
 }: {
@@ -139,6 +140,8 @@ export function EntryDetail({
   transcriptStatus: TranscriptStatus | null;
   confirmedText: string;
   summaryText: string | null;
+  /** The server will write the summary later (a limit, or the AI was busy). */
+  summaryPending: boolean;
   initialPhotos: EntryPhoto[];
   initialTasks: TaskChecklistTask[];
 }) {
@@ -151,6 +154,7 @@ export function EntryDetail({
   const [textState, setTextState] = React.useState<SaveState>("saved");
   const [titleState, setTitleState] = React.useState<SaveState>("saved");
   const [summary, setSummary] = React.useState(summaryText);
+  const [pendingSummary, setPendingSummary] = React.useState(summaryPending);
   const [regenerating, setRegenerating] = React.useState(false);
   const [isArchived, setIsArchived] = React.useState(archived);
   const [trashing, setTrashing] = React.useState(false);
@@ -436,6 +440,7 @@ export function EntryDetail({
       };
       if (data.pending) {
         // A limit or a busy AI, not a failure: the server retries it later.
+        setPendingSummary(true);
         toast(data.pending.message);
       } else if (data.summary) {
         setSummary(data.summary.summaryText);
@@ -724,7 +729,9 @@ export function EntryDetail({
           <p className="text-primary/70 mt-3 text-sm">
             {status === "pending" || status === "processing"
               ? "Waiting for the transcript to finish."
-              : "No summary yet. Tap the refresh icon to generate one."}
+              : pendingSummary
+                ? "Your summary is on its way. It will appear here once it's written."
+                : "No summary yet. Tap the refresh icon to generate one."}
           </p>
         )}
       </div>

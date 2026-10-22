@@ -7,7 +7,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [master]
 
 # A new push to the same PR cancels the previous run rather than queueing
 # behind it — the older result is already stale by then.

@@ -23,7 +23,14 @@ describe("completionModelList", () => {
     expect(
       completionModelList("a:free", " b:free, ,c:free,a:free, openrouter/free"),
     ).toEqual(["a:free", "b:free", "c:free", "openrouter/free"]);
+    // Unset -> built-in defaults; empty -> deliberately none.
     expect(completionModelList("a:free", undefined)).toEqual([
+      "a:free",
+      "minimax/minimax-m3.1-flash:free",
+      "poolside/laguna-s-2.1:free",
+      "openrouter/free",
+    ]);
+    expect(completionModelList("a:free", "")).toEqual([
       "a:free",
       "openrouter/free",
     ]);
@@ -127,6 +134,20 @@ describe("OpenRouterLLMProvider model batching", () => {
       provider: "openrouter",
     });
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("getLLMProvider fallback default", () => {
+  it("wraps with Groq when only the key is present, and respects an explicit off", async () => {
+    const { getLLMProvider } = await import("@mindreva/llm");
+    vi.stubEnv("LLM_PROVIDER", "openrouter");
+    vi.stubEnv("GROQ_API_KEY", "g");
+    vi.stubEnv("LLM_FALLBACK_PROVIDER", undefined as unknown as string);
+    delete process.env.LLM_FALLBACK_PROVIDER;
+    expect(getLLMProvider()).toBeInstanceOf(FallbackLLMProvider);
+    vi.stubEnv("LLM_FALLBACK_PROVIDER", "");
+    expect(getLLMProvider()).not.toBeInstanceOf(FallbackLLMProvider);
     vi.unstubAllEnvs();
   });
 });

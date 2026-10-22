@@ -34,12 +34,22 @@ function createProvider(name: string): LLMProvider {
 let cached: { key: string; provider: LLMProvider } | null = null;
 
 /**
- * LLM_FALLBACK_PROVIDER (optional, e.g. "groq") takes over completions when
- * the primary fails; embeddings never use it (see FallbackLLMProvider).
+ * LLM_FALLBACK_PROVIDER (e.g. "groq"; defaults to groq when GROQ_API_KEY is
+ * set) takes over completions when the primary fails; embeddings never use
+ * it (see FallbackLLMProvider).
  */
 export function getLLMProvider(): LLMProvider {
   const primary = process.env.LLM_PROVIDER ?? "gemini";
-  const fallback = process.env.LLM_FALLBACK_PROVIDER?.trim() || null;
+  // Explicit LLM_FALLBACK_PROVIDER wins (empty string turns it off). Unset:
+  // fall back to Groq whenever its key exists, so a deployment that has the
+  // key but not this variable is still protected.
+  const configured = process.env.LLM_FALLBACK_PROVIDER?.trim();
+  const fallback =
+    configured !== undefined
+      ? configured || null
+      : process.env.GROQ_API_KEY
+        ? "groq"
+        : null;
   const key = `${primary}|${fallback ?? ""}`;
   if (cached?.key === key) return cached.provider;
 

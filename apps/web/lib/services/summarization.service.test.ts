@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe("summarizeEntry", () => {
-  it("stores the model that actually answered and clears the retry mark", async () => {
+  it("stores the model that actually answered (the repository clears the retry mark)", async () => {
     complete.mockResolvedValue({
       text: "A run.",
       model: "google/gemma-4-31b-it:free",
@@ -76,7 +76,7 @@ describe("summarizeEntry", () => {
         provider: "openrouter",
       }),
     );
-    expect(setSummaryRetry).toHaveBeenCalledWith(ENTRY, USER, null);
+    expect(setSummaryRetry).not.toHaveBeenCalled();
   });
 
   it("over the daily limit: no AI call, pending until the user's midnight", async () => {

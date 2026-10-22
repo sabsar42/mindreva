@@ -24,6 +24,7 @@ export default async function EntryDetailPage({
         detail.transcript?.editedText ?? detail.transcript?.rawText ?? ""
       }
       summaryText={detail.summary?.summaryText ?? null}
+      summaryPending={Boolean(detail.entry.summaryRetryAt) && !detail.summary}
       initialPhotos={detail.photos}
       initialTasks={detail.tasks}
     />

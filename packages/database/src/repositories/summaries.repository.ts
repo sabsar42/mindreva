@@ -25,17 +25,28 @@ export const SummariesRepository = {
     model?: string | null;
   }): Promise<Summary> {
     await assertEntryOwned(input.entryId, input.userId);
-    const rows = await getDb()
-      .insert(summaries)
-      .values({
-        entryId: input.entryId,
-        summaryText: input.summaryText,
-        promptVersion: input.promptVersion ?? null,
-        provider: input.provider ?? null,
-        model: input.model ?? null,
-      })
-      .returning();
-    return rows[0]!;
+    // The new summary and clearing the entry's pending-retry mark happen
+    // together: if they were separate, a crash in between would leave the
+    // entry "pending" and the retry would summarize it (and spend quota) again.
+    return getDb().transaction(async (tx) => {
+      const rows = await tx
+        .insert(summaries)
+        .values({
+          entryId: input.entryId,
+          summaryText: input.summaryText,
+          promptVersion: input.promptVersion ?? null,
+          provider: input.provider ?? null,
+          model: input.model ?? null,
+        })
+        .returning();
+      await tx
+        .update(entries)
+        .set({ summaryRetryAt: null })
+        .where(
+          and(eq(entries.id, input.entryId), eq(entries.userId, input.userId)),
+        );
+      return rows[0]!;
+    });
   },
 
   /**

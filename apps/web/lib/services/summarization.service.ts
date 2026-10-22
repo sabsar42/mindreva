@@ -155,8 +155,7 @@ export async function summarizeEntry(
     promptVersion: template.promptVersion,
     provider: completion.provider,
     model: completion.model,
-  });
-  await EntriesRepository.setSummaryRetry(entryId, userId, null);
+  }); // also clears the entry's pending-retry mark, atomically
 
   try {
     await EntryTasksRepository.replaceForEntry(entryId, userId, tasks);

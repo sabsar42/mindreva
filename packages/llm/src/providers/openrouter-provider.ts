@@ -19,6 +19,13 @@ const EXPECTED_EMBEDDING_DIMENSIONS = 2048;
 // seen, which is why the reasoning suppression below stays on for every call.
 const LAST_RESORT_MODEL = "openrouter/free";
 
+// Used when OPENROUTER_FALLBACK_MODELS is not set at all (an empty value
+// means "no fallbacks"), so a deployment that only knows OPENROUTER_MODEL
+// still survives that model being retired. Different vendors on purpose.
+// Re-check https://openrouter.ai/models?max_price=0 when these age out.
+const DEFAULT_FALLBACK_MODELS =
+  "minimax/minimax-m3.1-flash:free,poolside/laguna-s-2.1:free";
+
 // OpenRouter's hard cap on the `models` array of one request.
 const MAX_MODELS_PER_REQUEST = 3;
 
@@ -49,17 +56,20 @@ interface OpenRouterEmbeddingsResponse {
 }
 
 /**
- * OPENROUTER_MODEL, then OPENROUTER_FALLBACK_MODELS (comma-separated), then
- * openrouter/free. OpenRouter tries them in order on any error, rate limits
- * included. Duplicates and blanks are dropped.
+ * OPENROUTER_MODEL, then OPENROUTER_FALLBACK_MODELS (comma-separated; built-in
+ * defaults when unset, none when empty), then openrouter/free. OpenRouter
+ * tries them in order on any error, rate limits included. Duplicates and
+ * blanks are dropped.
  */
 export function completionModelList(
   primary: string,
   fallbacks: string | undefined,
 ): string[] {
-  const all = [primary, ...(fallbacks ?? "").split(","), LAST_RESORT_MODEL].map(
-    (m) => m.trim(),
-  );
+  const all = [
+    primary,
+    ...(fallbacks ?? DEFAULT_FALLBACK_MODELS).split(","),
+    LAST_RESORT_MODEL,
+  ].map((m) => m.trim());
   return [...new Set(all.filter(Boolean))];
 }
 
