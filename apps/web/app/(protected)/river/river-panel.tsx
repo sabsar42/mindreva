@@ -97,7 +97,7 @@ export function RiverPanel({
     <section
       aria-label="River of memories"
       className={cn(
-        "border-border bg-card shadow-subtle overflow-hidden rounded-3xl border",
+        "border-border bg-card shadow-subtle overflow-hidden rounded-2xl border",
         className,
       )}
     >

@@ -53,8 +53,8 @@ export function ArchiveList({
   }
 
   return (
-    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
-      <PageHeader back="/account" title="Archived" />
+    <main className="min-h-app mx-auto px-4 pb-24 pt-6">
+      <PageHeader back="/account" title="Archived" large />
 
       <div className="mt-6 space-y-2">
         {entries.length === 0 && <EmptyState message="Nothing archived yet." />}

@@ -4,6 +4,8 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { prefetchFull } from "./use-full-prefetch";
 import { AccountProvider, type AccountSummary } from "./account-context";
+import { isTabRoute } from "./nav-items";
+import { TabBar } from "./tab-bar";
 
 // Flows with their own exit (Cancel/Back/Save). They don't prefetch the tabs,
 // so the work they're doing isn't competing with background requests.
@@ -19,7 +21,7 @@ const FOCUSED_ROUTES = [/^\/chat\/[^/]+/];
 // full prefetch there would show the list without that change. Those tabs'
 // mutations already invalidate the cache (account's server actions call
 // revalidatePath; chat-home refreshes after a new session).
-const PREFETCHED_TABS = ["/chat", "/integrations"];
+const PREFETCHED_TABS = ["/chat", "/account"];
 
 export function AppShell({
   account,
@@ -45,7 +47,16 @@ export function AppShell({
     }
   }, [focused, pathname, router, children]);
 
-  // The tab icons live in each tab screen header now (TabHeaderActions), so the
-  // shell only provides the account context.
-  return <AccountProvider account={account}>{children}</AccountProvider>;
+  // The bottom tab bar shows on the three section screens only; pushed screens
+  // (an entry, a conversation, Archive…) have a back button instead. Tab
+  // screens reserve room for it so the last row is never hidden beneath it.
+  const tabs = isTabRoute(pathname);
+  return (
+    <AccountProvider account={account}>
+      <div className={tabs ? "pb-[calc(49px+var(--safe-bottom))]" : undefined}>
+        {children}
+      </div>
+      {tabs && <TabBar />}
+    </AccountProvider>
+  );
 }

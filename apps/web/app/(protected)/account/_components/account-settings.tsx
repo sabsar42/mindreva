@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Card, OptionCard, SettingsRow, Switch, toast } from "@mindreva/ui";
+import { Card, OptionCard, toast } from "@mindreva/ui";
 import { Feather } from "lucide-react";
 import type { UseCase } from "@/lib/services/profile.service";
 import { LANGUAGE_OPTIONS, USE_CASE_OPTIONS } from "@/app/onboarding/_data";
@@ -96,28 +96,6 @@ export function LanguagesCard({ initial }: { initial: string[] }) {
           />
         ))}
       </div>
-    </Card>
-  );
-}
-
-/**
- * Preference toggles from the reference. Local-only for now — there are no
- * columns behind these yet; persisting them is future work (a settings table),
- * so they reset on reload by design.
- */
-export function PreferenceToggles() {
-  return (
-    <Card className="grouped-list overflow-hidden p-0">
-      <SettingsRow
-        title="Offline notes on this browser"
-        description="Off by default. On trusted devices, notes are encrypted in this browser and erased when you sign out."
-        trailing={<Switch aria-label="Offline notes" />}
-      />
-      <SettingsRow
-        title="Email notifications"
-        description="Get an email when a note finishes processing or fails."
-        trailing={<Switch aria-label="Email notifications" />}
-      />
     </Card>
   );
 }

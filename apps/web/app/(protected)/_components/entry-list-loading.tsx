@@ -26,7 +26,7 @@ export function JournalLoading() {
     <main
       aria-busy
       aria-label="Loading your journal"
-      className="h-app mx-auto flex flex-col overflow-hidden px-5 pt-6"
+      className="h-app mx-auto flex flex-col overflow-hidden px-4 pt-6"
     >
       <div className="shrink-0">
         <div className="flex items-center gap-3">
@@ -64,7 +64,7 @@ export function EntryListLoading() {
     <main
       aria-busy
       aria-label="Loading"
-      className="min-h-app mx-auto px-5 pb-24 pt-6"
+      className="min-h-app mx-auto px-4 pb-24 pt-6"
     >
       <div className="flex items-center gap-3">
         <Skeleton className="-ml-3 size-10 rounded-full" />

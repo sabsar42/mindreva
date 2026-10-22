@@ -69,6 +69,8 @@ export function useVoiceRecorder({
   const [elapsedMs, setElapsedMs] = React.useState(0);
   const [micError, setMicError] = React.useState<MicErrorKind | null>(null);
   const [uploadFailed, setUploadFailed] = React.useState(false);
+  /** The browser is showing (or about to show) its microphone prompt. */
+  const [awaitingPermission, setAwaitingPermission] = React.useState(false);
 
   const streamRef = React.useRef<MediaStream | null>(null);
   const recorderRef = React.useRef<MediaRecorder | null>(null);
@@ -200,7 +202,18 @@ export function useVoiceRecorder({
     }
     setState("preparing");
     try {
+      // Where the Permissions API knows about the microphone, say so before
+      // the browser's own prompt appears ("Allow microphone access").
+      try {
+        const status = await navigator.permissions?.query({
+          name: "microphone" as PermissionName,
+        });
+        setAwaitingPermission(status?.state === "prompt");
+      } catch {
+        // Not queryable here (older Safari, Firefox): no extra hint.
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setAwaitingPermission(false);
       streamRef.current = stream;
 
       // The microphone can disappear mid-take: a phone call, the headset
@@ -267,6 +280,7 @@ export function useVoiceRecorder({
       startTimer();
       void requestWakeLock();
     } catch (err) {
+      setAwaitingPermission(false);
       teardownMedia();
       setMicError(classifyMicError(err));
       setState("idle");
@@ -357,6 +371,7 @@ export function useVoiceRecorder({
     analyserRef,
     micError,
     uploadFailed,
+    awaitingPermission,
     start,
     pause,
     resume,

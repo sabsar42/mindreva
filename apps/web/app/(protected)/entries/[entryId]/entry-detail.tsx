@@ -562,7 +562,7 @@ export function EntryDetail({
   const coverInputRef = React.useRef<HTMLInputElement>(null);
 
   return (
-    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-4 pb-24 pt-6">
       <header className="flex items-center justify-between gap-2">
         <button
           type="button"

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "@mindreva/ui";
 import type { IntegrationView } from "@/lib/integrations/types";
 import { PageHeader } from "../_components/page-header";
-import { TabHeaderActions } from "../_components/tab-header-actions";
 import {
   IntegrationCard,
   type IntegrationMessage,
@@ -116,18 +115,17 @@ export function IntegrationsScreen({
   }
 
   return (
-    <main className="min-h-app mx-auto px-5 pb-12 pt-6">
+    <main className="min-h-app mx-auto px-4 pb-12 pt-6">
       <PageHeader
-        title="Integrations"
+        title="Connected apps"
+        large
         back={() => {
           // Same pattern as the entry screen: go back if there's in-app
-          // history, otherwise land on Home (e.g. a deep link).
+          // history, otherwise land on Account (e.g. a deep link).
           if (window.history.length > 1) router.back();
-          else router.push("/journal");
+          else router.push("/account");
         }}
-      >
-        <TabHeaderActions />
-      </PageHeader>
+      />
       <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
         Connect an app and your entries can work with it.
       </p>

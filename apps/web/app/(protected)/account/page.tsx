@@ -22,7 +22,6 @@ import { PageHeader } from "../_components/page-header";
 import { ThemeSwitchRow } from "../_components/theme-switch-row";
 import {
   LanguagesCard,
-  PreferenceToggles,
   SummaryStyleCard,
 } from "./_components/account-settings";
 import { SignOutButton } from "./_components/sign-out-button";
@@ -45,10 +44,10 @@ export default async function AccountPage() {
 
   return (
     <>
-      <main className="min-h-app mx-auto px-5 pb-24 pt-6">
-        <PageHeader back="/journal" title="Account" className="mb-4" />
+      <main className="min-h-app mx-auto px-4 pb-24 pt-6">
+        <PageHeader back={false} title="Account" large />
 
-        <div className="space-y-4">
+        <div className="mt-5 space-y-4">
           {/* Profile */}
           <Card className="flex items-center gap-4 p-4">
             <Avatar className="size-12">
@@ -117,8 +116,6 @@ export default async function AccountPage() {
           <Card className="p-4">
             <ThemeSwitchRow />
           </Card>
-
-          <PreferenceToggles />
 
           <SummaryStyleCard initial={summaryStyle} />
 

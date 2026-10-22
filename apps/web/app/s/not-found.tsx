@@ -8,7 +8,7 @@ import { buttonVariants } from "@mindreva/ui/button-variants";
 export default function SharedEntryNotFound() {
   return (
     <main className="min-h-app mx-auto flex flex-col justify-center px-6 py-12 text-center">
-      <div className="border-border bg-card shadow-subtle flex flex-col items-center rounded-3xl border px-6 py-10">
+      <div className="border-border bg-card shadow-subtle flex flex-col items-center rounded-2xl border px-6 py-10">
         <span className="bg-secondary text-muted-foreground flex size-14 items-center justify-center rounded-[1.25rem]">
           <Link2Off className="size-6" />
         </span>

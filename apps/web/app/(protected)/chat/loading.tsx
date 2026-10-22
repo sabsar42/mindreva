@@ -5,7 +5,7 @@ import { Skeleton } from "@mindreva/ui/skeleton";
 
 export default function ChatLoading() {
   return (
-    <main className="min-h-app mx-auto px-5 pb-24 pt-6">
+    <main className="min-h-app mx-auto px-4 pb-24 pt-6">
       <Skeleton className="h-9 w-64" />
       <Skeleton className="mt-3 h-4 w-full" />
       <Skeleton className="mt-1.5 h-4 w-3/4" />
