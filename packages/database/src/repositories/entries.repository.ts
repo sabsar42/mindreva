@@ -45,10 +45,6 @@ export interface EntryListItem extends Entry {
   snippet: string | null;
 }
 
-const snippetExpr = sql<
-  string | null
->`coalesce(${transcripts.editedText}, ${transcripts.rawText})`;
-
 function withListMeta<
   T extends { entry: Entry; durationMs: number | null; snippet: string | null },
 >(row: T): EntryListItem {
@@ -109,15 +105,26 @@ export const EntriesRepository = {
       conditions.push(gte(entries.entryDate, options.dateFrom));
     if (options.dateTo) conditions.push(lte(entries.entryDate, options.dateTo));
 
+    // Correlated subqueries instead of LEFT JOINs: entries can now have
+    // multiple recordings and transcripts, so a plain join would produce a
+    // Cartesian product and return the same entry ID multiple times.
     const rows = await getDb()
       .select({
         entry: entries,
-        durationMs: recordings.durationMs,
-        snippet: snippetExpr,
+        durationMs: sql<number | null>`(
+          SELECT r.duration_ms FROM recordings r
+          WHERE r.entry_id = ${entries.id}
+          ORDER BY r.created_at ASC
+          LIMIT 1
+        )`,
+        snippet: sql<string | null>`(
+          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
+          WHERE t.entry_id = ${entries.id}
+          ORDER BY t.created_at ASC
+          LIMIT 1
+        )`,
       })
       .from(entries)
-      .leftJoin(recordings, eq(recordings.entryId, entries.id))
-      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .where(and(...conditions))
       .orderBy(desc(entries.createdAt));
     return rows.map(withListMeta);
@@ -190,12 +197,20 @@ export const EntriesRepository = {
     const rows = await getDb()
       .select({
         entry: entries,
-        durationMs: recordings.durationMs,
-        snippet: snippetExpr,
+        durationMs: sql<number | null>`(
+          SELECT r.duration_ms FROM recordings r
+          WHERE r.entry_id = ${entries.id}
+          ORDER BY r.created_at ASC
+          LIMIT 1
+        )`,
+        snippet: sql<string | null>`(
+          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
+          WHERE t.entry_id = ${entries.id}
+          ORDER BY t.created_at ASC
+          LIMIT 1
+        )`,
       })
       .from(entries)
-      .leftJoin(recordings, eq(recordings.entryId, entries.id))
-      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .where(and(...conditions))
       .orderBy(desc(entries.archivedAt));
     return rows.map(withListMeta);
@@ -205,12 +220,20 @@ export const EntriesRepository = {
     const rows = await getDb()
       .select({
         entry: entries,
-        durationMs: recordings.durationMs,
-        snippet: snippetExpr,
+        durationMs: sql<number | null>`(
+          SELECT r.duration_ms FROM recordings r
+          WHERE r.entry_id = ${entries.id}
+          ORDER BY r.created_at ASC
+          LIMIT 1
+        )`,
+        snippet: sql<string | null>`(
+          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
+          WHERE t.entry_id = ${entries.id}
+          ORDER BY t.created_at ASC
+          LIMIT 1
+        )`,
       })
       .from(entries)
-      .leftJoin(recordings, eq(recordings.entryId, entries.id))
-      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .where(and(eq(entries.userId, userId), isNotNull(entries.deletedAt)))
       .orderBy(desc(entries.deletedAt));
     return rows.map(withListMeta);
@@ -241,11 +264,20 @@ export const EntriesRepository = {
     const rows = await getDb()
       .selectDistinctOn([entries.id], {
         entry: entries,
-        durationMs: recordings.durationMs,
-        snippet: snippetExpr,
+        durationMs: sql<number | null>`(
+          SELECT r.duration_ms FROM recordings r
+          WHERE r.entry_id = ${entries.id}
+          ORDER BY r.created_at ASC
+          LIMIT 1
+        )`,
+        snippet: sql<string | null>`(
+          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
+          WHERE t.entry_id = ${entries.id}
+          ORDER BY t.created_at ASC
+          LIMIT 1
+        )`,
       })
       .from(entries)
-      .leftJoin(recordings, eq(recordings.entryId, entries.id))
       .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .leftJoin(summaries, eq(summaries.entryId, entries.id))
       .where(and(...conditions))

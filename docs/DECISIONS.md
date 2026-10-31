@@ -11,6 +11,31 @@ rather than resolved.
 
 ---
 
+## 2026-11-01 — Multiple recordings per entry: append model, single editor source of truth
+
+**What happened:** The user asked to support re-recording when editing an entry,
+with the new transcript appended as a new paragraph rather than replacing the
+existing text.
+
+**Decision:** Keep the primary transcript's `edited_text` as the single source of
+truth that the editor reads and writes. Each add-on recording creates a new
+`recording` row and a new `transcript` row; once the add-on transcript is done,
+its `raw_text` is appended to the primary transcript's `edited_text`. The add-on
+transcript row is kept (status=done) so the transcript sheet can show per-recording
+detail, but the editor only ever touches the primary's `edited_text`.
+
+**Why:** The existing editor, autosave, summarize, and embed pipelines all operate
+on a single text value per entry. Appending to that value required zero changes
+to those pipelines. Alternative (assembling the body from multiple transcript rows
+on every read) would have needed changes in six call sites and made the editor
+aware of multi-transcript state.
+
+**No schema migration needed:** `recordings` and `transcripts` already have no
+UNIQUE constraint on `entry_id`. The 1:1 assumption was only in the query layer
+(`getByEntry` with `.limit(1)`, now with explicit `ORDER BY created_at ASC`).
+
+---
+
 ## 2026-10-22 — Function region Seoul (icn1), max:1 pooled connection
 
 **What happened:** The app still felt slow and moving the database was raised

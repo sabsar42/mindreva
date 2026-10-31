@@ -7,7 +7,11 @@ import {
   RecordingNotFoundError,
 } from "@/lib/services/transcription.service";
 
-/** The transcript with timed segments, for the read-only transcript panel. */
+/**
+ * Combined transcript for the transcript sheet.
+ * Returns the primary transcript's editedText, which accumulates all recording
+ * paragraphs via appendToEditedText — so the user sees everything at once.
+ */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ entryId: string }> },
@@ -19,7 +23,9 @@ export async function GET(
   const { entryId } = await params;
   const view = await getMyTranscriptView(entryId);
   if (!view) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(view);
+  return NextResponse.json({
+    recordings: [{ recordingIndex: 1, recordedAt: null, ...view }],
+  });
 }
 
 /**

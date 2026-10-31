@@ -8,6 +8,67 @@ import {
 import { createClient } from "@mindreva/auth/server";
 
 /**
+ * Transcribes one specific add-on recording and appends its recognized text
+ * to the primary transcript's edited_text as a new paragraph. The add-on
+ * transcript row stores the raw ASR output (raw_text + segments) so the
+ * transcript sheet can show per-recording detail; the primary transcript's
+ * edited_text is the single source of truth that the editor reads and writes.
+ */
+export async function transcribeAddonRecording(
+  entryId: string,
+  userId: string,
+  recordingId: string,
+  addonTranscriptId: string,
+  primaryTranscriptId: string,
+): Promise<void> {
+  const recording = await RecordingsRepository.getById(recordingId, userId);
+  if (!recording) throw new Error("Recording not found");
+
+  try {
+    await TranscriptsRepository.setResult(addonTranscriptId, userId, {
+      status: "processing",
+    });
+
+    const supabase = await createClient();
+    const { data, error } = await supabase.storage
+      .from("recordings")
+      .download(recording.storagePath);
+    if (error || !data) {
+      throw new Error(
+        `Could not download recording: ${error?.message ?? "unknown error"}`,
+      );
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const mimeType = recording.mimeType ?? "audio/webm";
+    const result = await getASRProvider().transcribe(buffer, mimeType);
+
+    // Store ASR output on the addon transcript for the transcript sheet.
+    await TranscriptsRepository.setResult(addonTranscriptId, userId, {
+      status: "done",
+      rawText: result.text,
+      language: result.language,
+      provider: result.provider,
+      segments: result.segments.length > 0 ? result.segments : null,
+    });
+
+    // Append recognized text to the primary transcript so the editor sees
+    // all recordings combined. If primaryTranscriptId === addonTranscriptId
+    // (text entry with no prior transcript), this sets edited_text = raw_text.
+    await TranscriptsRepository.appendToEditedText(
+      primaryTranscriptId,
+      userId,
+      result.text,
+    );
+  } catch (err) {
+    await TranscriptsRepository.setResult(addonTranscriptId, userId, {
+      status: "failed",
+    }).catch(() => {});
+    throw err;
+  }
+}
+
+/**
  * Runs the ASR call for an entry's recording and updates the transcript row
  * to 'done' or 'failed'. Called synchronously right after upload (Phase 4's
  * documented tradeoff — see docs/roadmap.md Common mistakes on function

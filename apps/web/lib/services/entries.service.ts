@@ -5,6 +5,7 @@ import {
   EntryPhotosRepository,
   EntrySharesRepository,
   EntryTasksRepository,
+  RecordingsRepository,
   SummariesRepository,
   TranscriptsRepository,
   type Entry,
@@ -17,7 +18,10 @@ import {
 } from "@mindreva/database";
 import { stripFormatting } from "@mindreva/types";
 import { getUser, createClient } from "@mindreva/auth/server";
-import { transcribeEntry } from "./transcription.service";
+import {
+  transcribeAddonRecording,
+  transcribeEntry,
+} from "./transcription.service";
 import {
   retryDueSummary,
   summarizeEntry,
@@ -254,17 +258,25 @@ export async function getMyEntryDetail(id: string): Promise<{
   tasks: EntryTask[];
   /** Whether a share link is currently active for this entry. */
   shared: boolean;
+  /** True if the entry has at least one recording (voice entry or text entry
+   *  that has had voice added during editing). Controls Transcript button. */
+  hasRecordings: boolean;
+  /** Number of add-on transcripts still pending/processing. Non-zero means a
+   *  new recording was uploaded and its text hasn't been appended yet. */
+  pendingAddonCount: number;
 } | null> {
   const userId = await timed("entry-detail", "auth", requireUserId());
 
-  // None of these five queries depend on each other's results (only on id/
-  // userId, already known) — run them together instead of in three
-  // sequential round-trip stages, since each one is a real network hop to
-  // Supabase. Photo signing chains onto its own query inside the same
-  // Promise.all, so the Storage round trip overlaps the other four queries
-  // instead of starting after all of them. Photo rows are scoped by userId,
-  // so a missing or foreign entry signs nothing.
-  const [entry, transcript, summary, photos, tasks, share] = await timed(
+  const [
+    entry,
+    transcript,
+    summary,
+    photos,
+    tasks,
+    share,
+    recordingCount,
+    pendingTranscriptCount,
+  ] = await timed(
     "entry-detail",
     "all-queries",
     Promise.all([
@@ -300,9 +312,28 @@ export async function getMyEntryDetail(id: string): Promise<{
         "share",
         EntrySharesRepository.getByEntry(id, userId),
       ),
+      timed(
+        "entry-detail",
+        "recording-count",
+        RecordingsRepository.countByEntry(id, userId),
+      ),
+      timed(
+        "entry-detail",
+        "pending-transcripts",
+        TranscriptsRepository.countPendingByEntry(id, userId),
+      ),
     ]),
   );
   if (!entry) return null;
+
+  // Subtract 1 from pendingTranscriptCount if the primary transcript itself
+  // is still pending/processing — that's the initial recording, not an addon.
+  const primaryIsPending =
+    transcript?.status === "pending" || transcript?.status === "processing";
+  const pendingAddonCount = Math.max(
+    0,
+    pendingTranscriptCount - (primaryIsPending ? 1 : 0),
+  );
 
   return {
     entry,
@@ -311,6 +342,8 @@ export async function getMyEntryDetail(id: string): Promise<{
     photos,
     tasks,
     shared: Boolean(share && !share.share.revokedAt),
+    hasRecordings: recordingCount > 0,
+    pendingAddonCount,
   };
 }
 
@@ -460,6 +493,81 @@ export async function archiveMyEntry(id: string): Promise<Entry | null> {
 export async function unarchiveMyEntry(id: string): Promise<Entry | null> {
   const userId = await requireUserId();
   return EntriesRepository.setArchived(id, userId, false);
+}
+
+/**
+ * Adds a voice recording to an existing entry (any source). Uploads the
+ * audio, creates a new recording + transcript row (pending), and returns
+ * immediately. Transcription runs in the background via after(); once done,
+ * it appends the recognized text to the primary transcript's edited_text as
+ * a new paragraph, so the editor picks it up on its next addon poll.
+ */
+export async function addVoiceToEntry(
+  entryId: string,
+  input: { audio: Buffer; mimeType: string; durationMs: number },
+): Promise<{ transcriptId: string }> {
+  const user = await getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const objectPath = `${user.id}/${crypto.randomUUID()}.${extensionFromMimeType(input.mimeType)}`;
+  const supabase = await createClient();
+  const { error: uploadError } = await supabase.storage
+    .from("recordings")
+    .upload(objectPath, input.audio, { contentType: input.mimeType });
+  if (uploadError)
+    throw new Error(`Recording upload failed: ${uploadError.message}`);
+
+  // Primary transcript is the oldest one (or null for text entries).
+  // Must be fetched BEFORE creating the new addon transcript so we don't
+  // accidentally pick the new row as "primary".
+  const primaryTranscript = await TranscriptsRepository.getByEntry(
+    entryId,
+    user.id,
+  );
+
+  const [recording, addonTranscript] = await Promise.all([
+    RecordingsRepository.create({
+      entryId,
+      userId: user.id,
+      storagePath: objectPath,
+      durationMs: input.durationMs,
+      mimeType: input.mimeType,
+    }),
+    TranscriptsRepository.create({
+      entryId,
+      userId: user.id,
+      status: "pending",
+    }),
+  ]);
+
+  // If there was no primary transcript (text entry), the new transcript IS
+  // the primary; appendToEditedText will write directly to it.
+  const primaryTranscriptId = primaryTranscript?.id ?? addonTranscript.id;
+
+  after(async () => {
+    try {
+      await transcribeAddonRecording(
+        entryId,
+        user.id,
+        recording.id,
+        addonTranscript.id,
+        primaryTranscriptId,
+      );
+    } catch (err) {
+      console.error(
+        `Background addon transcription failed for entry ${entryId}:`,
+        err,
+      );
+    }
+    try {
+      await enqueueEntryIndex(entryId, user.id);
+      await indexEntryNow(entryId, user.id);
+    } catch (err) {
+      console.error(`Background index failed for entry ${entryId}:`, err);
+    }
+  });
+
+  return { transcriptId: addonTranscript.id };
 }
 
 /**

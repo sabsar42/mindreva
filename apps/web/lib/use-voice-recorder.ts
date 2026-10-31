@@ -50,6 +50,13 @@ type WakeLockNavigator = Navigator & {
  * a kept copy for retry. The live level meter reads `analyserRef` directly
  * (see LiveWaveCanvas), so the audio level never goes through React state.
  *
+ * Two modes:
+ * - Default (no addonEntryId): creates a new entry via POST /api/recordings.
+ *   onDone receives the new entryId.
+ * - Addon (addonEntryId set): adds a recording to an existing entry via
+ *   POST /api/entries/[id]/recordings. onDone is called once the upload
+ *   succeeds; the transcription runs in the background on the server.
+ *
  * Reliability:
  * - the screen is kept awake while recording, where the browser allows it;
  * - if the microphone goes away mid-take (a call, a device unplugged,
@@ -60,10 +67,17 @@ type WakeLockNavigator = Navigator & {
 export function useVoiceRecorder({
   entryType,
   onDone,
+  addonEntryId,
 }: {
   entryType: EntryType;
-  /** The audio is uploaded and the entry exists. */
+  /** The audio is uploaded and the entry exists (new-entry mode). */
   onDone: (entryId: string, durationMs: number) => void;
+  /**
+   * Addon mode: when set, uploads to an existing entry instead of creating
+   * a new one. onDone is still called (with addonEntryId as the first arg)
+   * once the upload succeeds.
+   */
+  addonEntryId?: string;
 }) {
   const [state, setState] = React.useState<RecorderState>("idle");
   const [elapsedMs, setElapsedMs] = React.useState(0);
@@ -131,13 +145,18 @@ export function useVoiceRecorder({
       const form = new FormData();
       form.set("audio", blob, "recording");
       form.set("durationMs", String(Math.round(durationMs)));
-      form.set("type", entryType);
+
+      const url = addonEntryId
+        ? `/api/entries/${addonEntryId}/recordings`
+        : "/api/recordings";
+
+      if (!addonEntryId) {
+        // New-entry mode: server needs the entry type.
+        form.set("type", entryType);
+      }
 
       try {
-        const res = await fetch("/api/recordings", {
-          method: "POST",
-          body: form,
-        });
+        const res = await fetch(url, { method: "POST", body: form });
         if (res.status === 413 || res.status === 429) {
           // Today's recording limit (429) or a take too large to upload
           // (413): calm, not an error. The take stays on screen.
@@ -149,18 +168,23 @@ export function useVoiceRecorder({
           return;
         }
         if (!res.ok) throw new Error("Upload failed");
-        const data = (await res.json()) as { entryId: string };
+        const data = (await res.json()) as {
+          entryId?: string;
+          transcriptId?: string;
+        };
         setUploadFailed(false);
         finishedBlobRef.current = null;
         setState("idle");
         setElapsedMs(0);
-        onDone(data.entryId, durationMs);
+        // Addon mode resolves with the addonEntryId as a sentinel; new-entry
+        // mode resolves with the real entryId from the response.
+        onDone(addonEntryId ?? data.entryId ?? "", durationMs);
       } catch {
         setUploadFailed(true);
         toast.error("Couldn't upload your recording. You can retry below.");
       }
     },
-    [entryType, onDone],
+    [addonEntryId, entryType, onDone],
   );
 
   const finish = React.useCallback(() => {

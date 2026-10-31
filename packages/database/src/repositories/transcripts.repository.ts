@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import {
   entries,
@@ -55,8 +55,76 @@ export const TranscriptsRepository = {
       .from(transcripts)
       .innerJoin(entries, eq(entries.id, transcripts.entryId))
       .where(and(eq(transcripts.entryId, entryId), eq(entries.userId, userId)))
+      .orderBy(asc(transcripts.createdAt))
       .limit(1);
     return rows[0]?.t ?? null;
+  },
+
+  /** All transcripts for an entry, oldest first (index 0 = primary). */
+  async getAllByEntry(entryId: string, userId: string): Promise<Transcript[]> {
+    const rows = await getDb()
+      .select({ t: transcripts })
+      .from(transcripts)
+      .innerJoin(entries, eq(entries.id, transcripts.entryId))
+      .where(and(eq(transcripts.entryId, entryId), eq(entries.userId, userId)))
+      .orderBy(asc(transcripts.createdAt));
+    return rows.map((r) => r.t);
+  },
+
+  /**
+   * Count transcripts still in-flight (pending or processing) for an entry.
+   * Used to expose pendingAddonCount on the transcript API so the editor can
+   * poll until the new text has been appended.
+   */
+  async countPendingByEntry(entryId: string, userId: string): Promise<number> {
+    const rows = await getDb()
+      .select({ count: sql<number>`count(*)::int` })
+      .from(transcripts)
+      .innerJoin(entries, eq(entries.id, transcripts.entryId))
+      .where(
+        and(
+          eq(transcripts.entryId, entryId),
+          eq(entries.userId, userId),
+          or(
+            eq(transcripts.status, "pending"),
+            eq(transcripts.status, "processing"),
+          ),
+        ),
+      );
+    return rows[0]?.count ?? 0;
+  },
+
+  /**
+   * Append a new paragraph to a transcript's edited_text. Used after an
+   * add-on recording is transcribed: raw_text of the new recording is
+   * appended to the primary transcript so the editor sees combined text.
+   */
+  async appendToEditedText(
+    id: string,
+    userId: string,
+    suffix: string,
+  ): Promise<Transcript | null> {
+    const owned = await getDb()
+      .select({
+        id: transcripts.id,
+        editedText: transcripts.editedText,
+        rawText: transcripts.rawText,
+      })
+      .from(transcripts)
+      .innerJoin(entries, eq(entries.id, transcripts.entryId))
+      .where(and(eq(transcripts.id, id), eq(entries.userId, userId)))
+      .limit(1);
+    if (!owned[0]) return null;
+
+    const current = owned[0].editedText ?? owned[0].rawText ?? "";
+    const newText = current ? `${current}\n\n${suffix}` : suffix;
+
+    const rows = await getDb()
+      .update(transcripts)
+      .set({ editedText: newText })
+      .where(eq(transcripts.id, id))
+      .returning();
+    return rows[0] ?? null;
   },
 
   async setResult(
