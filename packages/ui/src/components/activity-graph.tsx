@@ -178,7 +178,7 @@ const WeekPage = React.memo(function WeekPage({
               data-dense
               aria-label={describe(day, key)}
               className={cn(
-                "h-9 w-full max-w-[34px] rounded-[10px]",
+                "aspect-square w-full max-w-[34px] rounded-full",
                 LEVEL_BG[day?.level ?? 0],
                 isToday && "outline-primary outline-2 outline-offset-1",
                 date > today && "opacity-45",
