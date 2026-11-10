@@ -20,6 +20,7 @@ import {
 import {
   Badge,
   Button,
+  LeafMark,
   TaskChecklist,
   buttonVariants,
   cn,
@@ -38,6 +39,7 @@ import {
   prepareImageForUpload,
 } from "@/lib/prepare-image-upload";
 import { rememberEntryThumbnail, stablePhotoUrl } from "@/lib/photo-url-cache";
+import { AddVoiceSheet } from "../../_components/add-voice-sheet";
 import { ConfirmTrashDialog } from "../../_components/confirm-trash-dialog";
 import { ShareSheet } from "./share-sheet";
 import { TranscriptSheet } from "./transcript-sheet";
@@ -131,6 +133,8 @@ export function EntryDetail({
   summaryPending,
   initialPhotos,
   initialTasks,
+  hasRecordings: initialHasRecordings,
+  initialPendingAddonCount = 0,
   calendarConnected = false,
 }: {
   entryId: string;
@@ -146,6 +150,10 @@ export function EntryDetail({
   summaryPending: boolean;
   initialPhotos: EntryPhoto[];
   initialTasks: TaskChecklistTask[];
+  /** True when the entry has at least one recording (controls Transcript button). */
+  hasRecordings: boolean;
+  /** Number of addon transcripts still in-flight at page load. */
+  initialPendingAddonCount?: number;
   /** Google Calendar is connected: show that day's events under the date. */
   calendarConnected?: boolean;
 }) {
@@ -177,7 +185,20 @@ export function EntryDetail({
     React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
   const [transcriptOpen, setTranscriptOpen] = React.useState(false);
+  const [addVoiceOpen, setAddVoiceOpen] = React.useState(false);
+  // Incremented each time an addon transcription finishes so TranscriptSheet
+  // can reload its data while open instead of showing a stale "transcribing" state.
+  const [transcriptRefreshToken, setTranscriptRefreshToken] = React.useState(0);
   const [isShared, setIsShared] = React.useState(shared);
+  // True when a new recording has been uploaded and its transcript is still
+  // being processed in the background. Starts from the server-provided count
+  // so the banner also shows if the user reloads mid-transcription.
+  const [addonPending, setAddonPending] = React.useState(
+    initialPendingAddonCount > 0,
+  );
+  // Grows to include entries that had voice added during this session.
+  const [hasRecordings, setHasRecordings] =
+    React.useState(initialHasRecordings);
 
   // Pictures already in the body, id -> signed URL. New ones are tracked inside
   // the editor itself.
@@ -206,7 +227,7 @@ export function EntryDetail({
   summaryRef.current = summary;
 
   const dateLabel = entryDate
-    ? new Date(`${entryDate}T00:00:00`).toLocaleDateString(undefined, {
+    ? new Date(`${entryDate}T00:00:00`).toLocaleDateString("en-US", {
         weekday: "short",
         day: "numeric",
         month: "short",
@@ -426,6 +447,40 @@ export function EntryDetail({
     return () => clearInterval(interval);
   }, [entryId, status]);
 
+  // Poll while an add-on recording is being transcribed in the background.
+  // When pendingAddonCount drops to 0, fetch the updated primary transcript
+  // text (which now includes the appended new paragraph) and refresh the editor.
+  React.useEffect(() => {
+    if (!addonPending) return;
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/entries/${entryId}/transcript`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        status: TranscriptStatus;
+        rawText: string | null;
+        editedText: string | null;
+        pendingAddonCount: number;
+      };
+      if (data.pendingAddonCount === 0) {
+        setAddonPending(false);
+        setTranscriptRefreshToken((n) => n + 1);
+        // Update the editor with the new combined text, but only if the user
+        // hasn't been typing (their unsaved edits take priority).
+        const incoming = data.editedText ?? data.rawText ?? "";
+        if (
+          incoming &&
+          incoming !== latestTextRef.current &&
+          latestTextRef.current === lastSavedTextRef.current
+        ) {
+          latestTextRef.current = incoming;
+          lastSavedTextRef.current = incoming;
+          setText(incoming);
+        }
+      }
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [addonPending, entryId]);
+
   async function regenerateSummary() {
     setRegenerating(true);
     const hadSummaryBefore = Boolean(summary);
@@ -580,7 +635,7 @@ export function EntryDetail({
           <ChevronLeft />
         </button>
         <div className="flex items-center gap-1.5">
-          {source === "voice" && (
+          {hasRecordings && (
             <Button
               variant="secondary"
               size="sm"
@@ -591,6 +646,23 @@ export function EntryDetail({
               Transcript
             </Button>
           )}
+          <button
+            type="button"
+            aria-label="Add a voice recording"
+            onClick={() => {
+              haptic("tap");
+              setAddVoiceOpen(true);
+            }}
+            className="group relative flex size-10 items-center justify-center focus-visible:outline-none"
+          >
+            <span
+              aria-hidden
+              className="bg-primary/20 motion-safe:animate-mic-pulse absolute inset-0 rounded-full"
+            />
+            <span className="bg-gradient-primary text-primary-foreground shadow-subtle relative flex size-10 items-center justify-center rounded-full transition-transform duration-150 group-active:scale-95">
+              <LeafMark className="size-6 motion-safe:animate-pulse" />
+            </span>
+          </button>
           <Button
             size="sm"
             onClick={() => setShareOpen(true)}
@@ -640,6 +712,12 @@ export function EntryDetail({
       </div>
       {calendarConnected && entryDate && (
         <DayEventsInline dateKey={entryDate} className="mt-1.5" />
+      )}
+      {addonPending && (
+        <p className="text-muted-foreground mt-2 flex items-center gap-1.5 text-sm">
+          <Loader2 className="size-3.5 animate-spin" />
+          Transcribing new recording…
+        </p>
       )}
 
       {/* The title is edited in place: no dialog, no separate screen. */}
@@ -782,13 +860,23 @@ export function EntryDetail({
         onOpenChange={setShareOpen}
         onStatusChange={setIsShared}
       />
-      {source === "voice" && (
+      {hasRecordings && (
         <TranscriptSheet
           entryId={entryId}
           open={transcriptOpen}
           onOpenChange={setTranscriptOpen}
+          refreshToken={transcriptRefreshToken}
         />
       )}
+      <AddVoiceSheet
+        entryId={entryId}
+        open={addVoiceOpen}
+        onOpenChange={setAddVoiceOpen}
+        onUploaded={() => {
+          setAddonPending(true);
+          setHasRecordings(true);
+        }}
+      />
       {/* Same confirmation as the list's swipe-to-trash: the header icon
           used to trash the entry on a single tap. */}
       <ConfirmTrashDialog

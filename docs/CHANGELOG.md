@@ -7,6 +7,53 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-01 — Feature: add voice recording when editing any entry (Phase 7 partial)
+
+Multiple recordings per entry are now supported. The existing schema already
+allowed it (no UNIQUE constraint on `recordings.entry_id` or
+`transcripts.entry_id`); only the service layer assumed 1:1.
+
+**New capability:**
+
+- An "Add voice" button appears in the entry detail header for every entry
+  (voice or text). Tapping it opens a bottom sheet with the same recorder bar.
+- After stopping, the audio uploads to `POST /api/entries/[entryId]/recordings`.
+  The server creates a new `recording` row and a new `transcript` row (pending),
+  then transcribes the recording in the background.
+- Once transcription completes, the recognized text is appended as a new
+  paragraph (`\n\n`) to the primary transcript's `edited_text` — the existing
+  editor's single source of truth.
+- A "Transcribing new recording…" banner shows while the addon is pending.
+  The entry detail polls `GET /api/entries/[entryId]/transcript` (which now
+  includes `pendingAddonCount`) and refreshes the editor text when it drops to 0.
+- If the user reloads while a transcription is still in progress, the banner
+  reappears from `initialPendingAddonCount` passed by the server on page load.
+
+**Transcript sheet upgraded:**
+
+- `GET /api/entries/[entryId]/transcript/segments` now returns
+  `{ recordings: RecordingTranscriptView[] }` instead of a single object.
+- Each recording has its own labelled section ("Recording 1 — Nov 1, 2026")
+  with its own timestamp blocks and jump-to-time control.
+- The "Add timestamps" backfill button remains for the primary recording only.
+- For text entries that gain their first recording, the Transcript button now
+  appears (previously it was gated on `source === "voice"`; now it shows when
+  `hasRecordings` is true, tracked both server-side and in session state).
+
+**Service layer additions:**
+
+- `TranscriptsRepository`: `getAllByEntry`, `countPendingByEntry`,
+  `appendToEditedText`; `getByEntry` now has explicit `ORDER BY created_at ASC`.
+- `RecordingsRepository`: `getById`, `getAllByEntry`, `countByEntry`.
+- `transcribeAddonRecording` in `transcription.service.ts`.
+- `addVoiceToEntry` in `entries.service.ts`; `getMyEntryDetail` gains
+  `hasRecordings` and `pendingAddonCount`.
+- `getAllMyTranscriptViews` in `transcript-view.service.ts`.
+- `useVoiceRecorder` gains optional `addonEntryId` — when set, uploads to the
+  entry-specific endpoint instead of creating a new entry.
+
+pnpm lint and pnpm build verified green.
+
 ## 2026-10-22 — Perf: function region moved to Seoul, one pooled DB connection, timing logs
 
 See DECISIONS.md (2026-10-22, "Function region Seoul, max:1") for the reasoning.

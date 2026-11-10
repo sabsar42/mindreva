@@ -32,6 +32,8 @@ export default async function EntryDetailPage({
       summaryPending={Boolean(detail.entry.summaryRetryAt) && !detail.summary}
       initialPhotos={detail.photos}
       initialTasks={detail.tasks}
+      hasRecordings={detail.hasRecordings}
+      initialPendingAddonCount={detail.pendingAddonCount}
       calendarConnected={calendar?.status === "connected"}
     />
   );

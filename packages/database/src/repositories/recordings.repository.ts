@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import { entries, recordings, type Recording } from "../schema";
 
@@ -42,7 +42,41 @@ export const RecordingsRepository = {
       .from(recordings)
       .innerJoin(entries, eq(entries.id, recordings.entryId))
       .where(and(eq(recordings.entryId, entryId), eq(entries.userId, userId)))
+      .orderBy(asc(recordings.createdAt))
       .limit(1);
     return rows[0]?.r ?? null;
+  },
+
+  /** Fetch a specific recording by its own id, scoped to the user. */
+  async getById(id: string, userId: string): Promise<Recording | null> {
+    const rows = await getDb()
+      .select({ r: recordings })
+      .from(recordings)
+      .innerJoin(entries, eq(entries.id, recordings.entryId))
+      .where(and(eq(recordings.id, id), eq(entries.userId, userId)))
+      .limit(1);
+    return rows[0]?.r ?? null;
+  },
+
+  /** All recordings for an entry, oldest first. */
+  async getAllByEntry(entryId: string, userId: string): Promise<Recording[]> {
+    const rows = await getDb()
+      .select({ r: recordings })
+      .from(recordings)
+      .innerJoin(entries, eq(entries.id, recordings.entryId))
+      .where(and(eq(recordings.entryId, entryId), eq(entries.userId, userId)))
+      .orderBy(asc(recordings.createdAt));
+    return rows.map((r) => r.r);
+  },
+
+  /** How many recordings exist for an entry (any status). Used to derive
+   *  hasRecordings for the entry detail without fetching full rows. */
+  async countByEntry(entryId: string, userId: string): Promise<number> {
+    const rows = await getDb()
+      .select({ count: sql<number>`count(*)::int` })
+      .from(recordings)
+      .innerJoin(entries, eq(entries.id, recordings.entryId))
+      .where(and(eq(recordings.entryId, entryId), eq(entries.userId, userId)));
+    return rows[0]?.count ?? 0;
   },
 };

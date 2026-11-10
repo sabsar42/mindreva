@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@mindreva/auth/server";
+import { TranscriptsRepository } from "@mindreva/database";
 import {
   getMyEntryTranscript,
   saveMyTranscriptEdit,
@@ -15,10 +16,22 @@ export async function GET(
   }
 
   const { entryId } = await params;
-  const transcript = await getMyEntryTranscript(entryId);
+  const [transcript, pendingCount] = await Promise.all([
+    getMyEntryTranscript(entryId),
+    TranscriptsRepository.countPendingByEntry(entryId, user.id),
+  ]);
   if (!transcript) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  // Subtract 1 if the primary transcript itself is still in-flight so
+  // pendingAddonCount only counts actual add-on recordings.
+  const primaryIsPending =
+    transcript.status === "pending" || transcript.status === "processing";
+  const pendingAddonCount = Math.max(
+    0,
+    pendingCount - (primaryIsPending ? 1 : 0),
+  );
 
   return NextResponse.json({
     id: transcript.id,
@@ -27,6 +40,7 @@ export async function GET(
     editedText: transcript.editedText,
     language: transcript.language,
     provider: transcript.provider,
+    pendingAddonCount,
   });
 }
 
