@@ -7,6 +7,11 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-10 — README with screenshots; entry header fits at 390px
+
+- New README: overview image, feature table, a screen gallery in light and dark, how the voice-to-search pipeline works, setup, commands, layout and privacy. Screenshots live in `docs/screenshots/` and were captured from the production build at 390px with a throwaway demo account of made-up entries (deleted afterwards).
+- **Bug fixed (found while taking them):** on an entry that has a recording, the header row (back, Transcript, voice, Share, Archive, Trash) was wider than 390px and clipped the Trash button, a side effect of PR #8 adding the voice button. The Transcript button is now icon-only (same accessible label, plus a tooltip). Verified: the row ends at 370px at 390px wide and 355px at 375px, with no horizontal overflow.
+
 ## 2026-11-10 — PR #8 audited and merged (voice recordings on existing entries)
 
 PR #8 (NaifH5) adds a recorder sheet to an entry (an add-on recording is transcribed and appended as a new paragraph), a multi-recording Transcript sheet, and entry lists that tolerate several recordings/transcripts per entry. Merged into master with a merge commit authored by the owner (so Vercel deploys it); the fixes below are separate commits on top. The branch was not touched.

@@ -672,14 +672,16 @@ export function EntryDetail({
         </button>
         <div className="flex items-center gap-1.5">
           {hasRecordings && (
+            // Icon-only: with the voice button, Share, Archive and Trash, a
+            // labelled pill pushed the row past 390px and clipped Trash.
             <Button
               variant="secondary"
-              size="sm"
+              size="icon"
               onClick={() => setTranscriptOpen(true)}
               aria-label="View transcript"
+              title="Transcript"
             >
               <FileText />
-              Transcript
             </Button>
           )}
           <button
