@@ -119,7 +119,7 @@ function CalendarSettings() {
         <ul
           aria-label="Calendars to show"
           aria-busy={!calendars || undefined}
-          className="bg-background border-border grouped-list overflow-hidden rounded-2xl border"
+          className="bg-card/92 border-card-edge shadow-card grouped-list overflow-hidden rounded-2xl border-[0.5px]"
         >
           {(calendars ?? [null, null]).map((c, i) => (
             <li

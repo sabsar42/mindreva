@@ -7,6 +7,15 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-10 — iOS-style cards and a soft background wash
+
+Owner feedback on the Journal: make the cards nicer, more iOS/Apple, and put a light design behind the app instead of flat off-white.
+
+- **Cards.** One shared look for the Journal cards, week strip, record bar, summary and other `Card`s, task rows and the Integrations lists: a 22px corner, a hairline edge (`--card-edge`) instead of a visible outline, a slightly translucent fill (`bg-card/92`) and a layered soft shadow (`--shadow-card`, flat in dark mode as before). Journal cards are the same 108px, with a 17px semibold title, a 13px date, a neutral duration capsule (was outlined) and a thumbnail with an inset hairline. Hover no longer adds a green edge; it deepens the shadow, and presses sink slightly.
+- **Background.** The flat `#f5f5f7` is now the page colour with four pale glows at the screen corners (mint, warm sand, sky, mint; `--backdrop-wash`), drawn by `.app-frame::before`, fixed to the screen and limited to the phone-width column so it doesn't scroll or stretch with a long list. Dark mode keeps true black with a faint green, amber and blue tint at the corners. Off under `prefers-contrast: more`. Peak strength was chosen so muted text stays at about 4.6:1 at the strongest corner.
+- **Fixed on the way:** the editor toolbar had a flat grey fill that showed as a bar over the wash; it is now blur-only. The Integrations list used a flat `bg-background` and now uses the card surface.
+- Verified on a production build at 390px (light and dark) and 1280px: no horizontal overflow, cards stay 108px, the wash stays inside the column on wide screens. README screenshots regenerated.
+
 ## 2026-11-10 — README with screenshots; entry header fits at 390px
 
 - New README: overview image, feature table, a screen gallery in light and dark, how the voice-to-search pipeline works, setup, commands, layout and privacy. Screenshots live in `docs/screenshots/` and were captured from the production build at 390px with a throwaway demo account of made-up entries (deleted afterwards).

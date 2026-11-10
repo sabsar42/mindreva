@@ -23,7 +23,7 @@ import { LiveWaveCanvas } from "./live-wave-canvas";
 /** Every state shares this exact box (76px), so nothing around it moves when
  * recording starts, stops or saves. */
 const BAR =
-  "bg-card shadow-subtle flex h-19 w-full items-center gap-2.5 rounded-full border pl-2.5 pr-2.5";
+  "bg-card/92 shadow-card flex h-19 w-full items-center gap-2.5 rounded-full border-[0.5px] pl-2.5 pr-2.5";
 
 /** iOS-style press: a small, quick scale-down, nothing more. */
 const PRESS =
@@ -185,7 +185,7 @@ export function InlineRecorder({
           className={cn(
             BAR,
             PRESS,
-            "border-border focus-visible:ring-ring group text-left focus-visible:outline-none focus-visible:ring-2",
+            "border-card-edge focus-visible:ring-ring group text-left focus-visible:outline-none focus-visible:ring-2",
           )}
         >
           <span className="bg-accent text-accent-foreground flex size-14 shrink-0 items-center justify-center rounded-full">

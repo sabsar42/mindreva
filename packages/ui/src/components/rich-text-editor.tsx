@@ -565,7 +565,10 @@ function RichTextEditor({
     <div className={cn("w-full", className)}>
       <JournalImageUrlsContext.Provider value={allUrls}>
         <LexicalComposer initialConfig={initialConfig}>
-          <div className="bg-background/85 sticky top-0 z-10 -mx-1 px-1 pt-1 backdrop-blur">
+          <div // No fill: a flat colour here would show as a grey bar over the app's
+            // background wash; the blur alone separates it from the text beneath.
+            className="sticky top-0 z-10 -mx-1 px-1 pt-1 backdrop-blur-xl"
+          >
             <Toolbar
               canAddPicture={Boolean(onUploadImage)}
               uploading={uploading}

@@ -40,7 +40,7 @@ function TaskChecklist({ tasks, onToggle, className }: TaskChecklistProps) {
               type="button"
               onClick={() => onToggle(task.id, !task.isDone)}
               aria-pressed={task.isDone}
-              className="bg-card border-border hover:border-primary/40 group flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors"
+              className="bg-card/92 border-card-edge hover:border-primary/40 group flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors"
             >
               <span
                 className={cn(

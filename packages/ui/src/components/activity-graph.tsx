@@ -141,7 +141,7 @@ function dayLines(day: HeatmapDay | undefined, key: string): [string, string] {
 const HOLD_MS = 650;
 const MOVE_SLOP = 8;
 const STRIP_BOX =
-  "border-border bg-card shadow-subtle h-20 rounded-[18px] border";
+  "border-card-edge bg-card/92 shadow-card h-20 rounded-[18px] border-[0.5px]";
 
 const WeekPage = React.memo(function WeekPage({
   monday,

@@ -62,6 +62,11 @@
   --shadow-subtle:
     0 0 0 0.5px rgb(0 0 0 / 0.03), 0 1px 2px rgb(0 0 0 / 0.04),
     0 6px 16px -8px rgb(0 0 0 / 0.1);
+  /* A card in the iOS-style lists: a contact shadow plus a soft, wide one
+     (no hard outline; the edge comes from --card-edge). */
+  --shadow-card:
+    0 0.5px 1px rgb(0 0 0 / 0.04), 0 2px 6px -1px rgb(0 0 0 / 0.05),
+    0 14px 30px -16px rgb(0 0 0 / 0.16);
   --shadow-elevated:
     0 2px 4px rgb(0 0 0 / 0.04), 0 20px 40px -18px rgb(0 0 0 / 0.22);
   /* Filled buttons get a hairline of light along the top edge, like the
@@ -185,6 +190,33 @@
 :root {
   --canvas: #ffffff;
   --background: #f5f5f7;
+  /* A hairline edge for cards (instead of a visible outline). */
+  --card-edge: rgb(0 0 0 / 0.06);
+  /* The soft wash behind the app, instead of flat off-white: four pale,
+     very low-contrast glows (mint, warm sand, sky, mint) fixed to the screen
+     corners. Peak strength is kept low enough that secondary text stays at
+     4.5:1 even on the strongest corner. Drawn by .app-frame::before. */
+  --backdrop-wash:
+    radial-gradient(
+      36rem 24rem at 0% -4%,
+      rgb(178 239 206 / 0.4),
+      transparent 65%
+    ),
+    radial-gradient(
+      30rem 22rem at 104% 9%,
+      rgb(255 224 186 / 0.34),
+      transparent 62%
+    ),
+    radial-gradient(
+      34rem 26rem at -6% 58%,
+      rgb(196 224 255 / 0.3),
+      transparent 64%
+    ),
+    radial-gradient(
+      32rem 24rem at 106% 100%,
+      rgb(178 239 206 / 0.36),
+      transparent 62%
+    );
   --foreground: #1d1d1f;
 
   --card: #ffffff;
@@ -257,6 +289,29 @@
   --canvas: #000000;
   --background: #000000;
   --foreground: #f5f5f7;
+  --card-edge: rgb(255 255 255 / 0.09);
+  /* Dark keeps true black; the glows are only a faint tint at the corners. */
+  --backdrop-wash:
+    radial-gradient(
+      36rem 24rem at 0% -4%,
+      rgb(38 98 63 / 0.42),
+      transparent 65%
+    ),
+    radial-gradient(
+      30rem 22rem at 104% 9%,
+      rgb(110 72 26 / 0.2),
+      transparent 62%
+    ),
+    radial-gradient(
+      34rem 26rem at -6% 58%,
+      rgb(32 58 104 / 0.24),
+      transparent 64%
+    ),
+    radial-gradient(
+      32rem 24rem at 106% 100%,
+      rgb(38 98 63 / 0.3),
+      transparent 62%
+    );
 
   --card: #1c1c1e;
   --card-foreground: #f5f5f7;
@@ -313,6 +368,8 @@
 
   /* Cards sit flat on black: no shadow, the surface step is the depth. */
   --shadow-subtle: 0 0 0 0 transparent;
+  /* Dark cards stay flat: depth comes from the surface, not shadow. */
+  --shadow-card: 0 0 0 0.5px rgb(255 255 255 / 0.04);
   --shadow-elevated: 0 24px 48px -20px rgb(0 0 0 / 0.8);
   --shadow-button:
     inset 0 1px 0 rgb(255 255 255 / 0.35), 0 1px 2px rgb(0 0 0 / 0.4);
@@ -351,6 +408,7 @@
  */
 @theme inline {
   --color-canvas: var(--canvas);
+  --color-card-edge: var(--card-edge);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -1032,6 +1090,10 @@
 
 /* "Increase contrast": firmer hairlines and secondary text. */
 @media (prefers-contrast: more) {
+  :root,
+  .dark {
+    --backdrop-wash: none;
+  }
   :root {
     --border: #b8b8bd;
     --input: #8e8e93;

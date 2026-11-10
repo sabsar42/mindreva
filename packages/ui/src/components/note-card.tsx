@@ -117,13 +117,16 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
         className={cn(
           // Every ready card is exactly the same size (the cover is 80px, the
           // padding 14px); a card still forming may be taller until it settles.
-          "bg-card border-border shadow-subtle group/card relative flex items-center gap-3 overflow-hidden rounded-2xl border p-3.5",
+          // iOS-style surface: a hairline edge and a soft layered shadow (flat
+          // in dark mode), slightly translucent so the app's background wash
+          // shows through faintly.
+          "bg-card/92 border-card-edge shadow-card group/card relative flex items-center gap-3.5 overflow-hidden rounded-2xl border-[0.5px] p-3.5",
           forming ? "min-h-[108px]" : "h-[108px]",
-          // Ready cards respond to a hover or a tap: a small lift, a green
-          // edge, and the thumbnail leaning in. Cards still forming don't
-          // (there is nothing to open yet).
+          // Ready cards respond to a hover or a tap: a slightly deeper
+          // shadow, a press that sinks a little, and the thumbnail leaning
+          // in. Cards still forming don't (there is nothing to open yet).
           !forming &&
-            "hover:border-primary/40 hover:shadow-elevated transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.985]",
+            "hover:shadow-elevated transition-[transform,box-shadow] duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.985]",
           interactive &&
             "focus-visible:ring-ring cursor-pointer focus-visible:outline-none focus-visible:ring-2",
           forming && "border-primary/60 from-primary/10 to-card bg-linear-to-b",
@@ -137,12 +140,12 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
           {(dateLabel || durationLabel) && (
             <div className="flex items-center gap-1.5">
               {dateLabel && (
-                <p className="text-muted-foreground truncate text-xs">
+                <p className="text-muted-foreground text-footnote truncate">
                   {dateLabel}
                 </p>
               )}
               {durationLabel && (
-                <span className="border-border text-muted-foreground inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                <span className="bg-secondary text-muted-foreground inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
                   {durationLabel}
                 </span>
               )}
@@ -182,11 +185,11 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
             </>
           ) : (
             <>
-              <h3 className="text-foreground mt-1 line-clamp-1 text-lg font-bold leading-snug">
+              <h3 className="text-foreground text-headline mt-0.5 line-clamp-1 tracking-tight">
                 {title}
               </h3>
               {snippet && (
-                <p className="text-muted-foreground mt-1 line-clamp-2 text-sm leading-snug">
+                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-sm leading-[1.3]">
                   {snippet}
                 </p>
               )}
@@ -225,7 +228,7 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
               height={80}
               loading="lazy"
               decoding="async"
-              className="bg-secondary size-20 shrink-0 rounded-lg object-cover transition-transform duration-300 group-hover/card:scale-105"
+              className="bg-secondary ring-card-edge size-20 shrink-0 rounded-lg object-cover ring-1 ring-inset transition-transform duration-300 group-hover/card:scale-105"
             />
           )
         )}

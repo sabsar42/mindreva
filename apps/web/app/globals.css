@@ -53,8 +53,26 @@
   padding-right: var(--safe-right);
   width: 100%;
   max-width: 30rem;
-  background-color: var(--color-background);
+  /* The background is drawn by ::before (below), so the wash sits behind the
+     content and stays put while it scrolls. */
+  background-color: transparent;
   color: var(--color-foreground);
+}
+
+/* The soft wash behind the app instead of flat off-white: the page colour
+   with pale glows at the screen corners (tokens.css, --backdrop-wash; none in
+   high-contrast mode). Fixed to the screen and centred to the column's width,
+   so it neither scrolls nor stretches with a long list. */
+.app-frame::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  max-width: 30rem;
+  margin-inline: auto;
+  pointer-events: none;
+  background: var(--backdrop-wash, none), var(--color-background);
 }
 
 @media (min-width: 30.0625rem) {
