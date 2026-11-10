@@ -185,11 +185,11 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
             </>
           ) : (
             <>
-              <h3 className="text-foreground mt-1 line-clamp-1 font-serif text-[1.1875rem] font-semibold leading-tight tracking-[-0.01em]">
+              <h3 className="text-foreground mt-1 line-clamp-1 text-[1.125rem] font-semibold leading-tight tracking-[-0.02em]">
                 {title}
               </h3>
               {snippet && (
-                <p className="text-muted-foreground mt-1 line-clamp-2 font-serif text-[0.9375rem] leading-[1.32]">
+                <p className="text-muted-foreground mt-1 line-clamp-2 text-[0.9375rem] leading-[1.35]">
                   {snippet}
                 </p>
               )}

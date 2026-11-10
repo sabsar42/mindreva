@@ -7,12 +7,12 @@ import "./globals.css";
 
 // Sans and mono are the system stacks (San Francisco on Apple devices, see
 // tokens.css), so nothing is downloaded for them and text never swaps fonts.
-// The serif is the logotype, the past self's voice, and the Journal cards'
-// titles and snippets (Fraunces 400 / 600 / 700). Everything else is sans.
+// The serif is the logotype and the past self's voice only. Everything else
+// is sans.
 const serifLogotype = Fraunces({
   variable: "--font-serif-logotype",
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
+  weight: ["600", "700"],
   style: ["normal"],
   display: "swap",
 });
