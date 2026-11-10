@@ -7,6 +7,22 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-10 — PR #8 audited and merged (voice recordings on existing entries)
+
+PR #8 (NaifH5) adds a recorder sheet to an entry (an add-on recording is transcribed and appended as a new paragraph), a multi-recording Transcript sheet, and entry lists that tolerate several recordings/transcripts per entry. Merged into master with a merge commit authored by the owner (so Vercel deploys it); the fixes below are separate commits on top. The branch was not touched.
+
+Found and fixed in the audit:
+
+- **The PR failed typecheck and CI** (`snippetExpr` was deleted but `getEarliestInRange`, the chat's opening line, still used it).
+- **Journal, Archive, Trash and search would have shown no snippet and no duration for any entry.** The PR's replacement subqueries interpolated the Drizzle column `entries.id`, which renders as a bare `"id"` when the outer query reads one table; inside the subquery that means the subquery's own id, so it never matched. Now one shared helper (`primary-transcript.ts`) references `"entries"."id"` explicitly, with a note why. Verified on the real database.
+- **The River and theme sheets would list an entry once per transcript** (and take an add-on's text as its snippet): `mindmap.repository` still LEFT JOINed `transcripts`. Now the same helper. Verified.
+- **Lost updates:** appending an add-on's text read the row, then wrote it back, so an autosave or a second add-on finishing at the same moment overwrote the other. It is now one atomic `UPDATE`; 6 simultaneous appends all survive. Blank (silent) transcriptions append nothing, and an entry whose add-on is its own primary no longer appends to itself.
+- **Fragile "pending add-ons" count:** the route and the page each subtracted 1 when the primary was pending, which miscounts when the primary has been stuck for a while, and a transcript left pending by a dead server function made the editor poll and show "Transcribing…" forever. One SQL query now excludes the primary directly and ignores anything pending over 10 minutes. It also reports whether the newest add-on failed, so the editor says so instead of silently showing nothing.
+- **Route safety:** the upload ran before the entry was checked, so a wrong, foreign or trashed id left an orphan audio file (and a bad uuid was a 500). It now checks ownership first (404 for all of those) and applies the same ceilings as a new recording: 50 uploads per rolling 24 h and 20 recordings per entry, with a calm 429.
+- **Stale summary and tasks:** after an add-on's text arrives, the entry is re-indexed for chat search and re-summarised (respecting the daily limit); the editor pulls the new summary in.
+- The editor's poll no longer throws on a failed request; the dead `getAllMyTranscriptViews` (which paired recordings to transcripts by position) and two unused repository methods were removed; the transcript route goes through a service instead of a repository.
+- Verified on a production build with throwaway users: malformed id, foreign, trashed and nonexistent entries all 404 with no orphan file or row; non-audio 400; 5 MB 413; then the real flow in headless Edge at 390px (add-voice sheet, recording, upload, "Transcribing new recording", the note clearing, one add-on transcript row, text appended once after the typed text, a Transcript button appearing, the Journal listing the entry once, no page errors). 21/21, plus 33 database checks. 204 tests, typecheck, lint, build green.
+
 ## 2026-11-01 — Feature: add voice recording when editing any entry (Phase 7 partial)
 
 Multiple recordings per entry are now supported. The existing schema already

@@ -448,24 +448,31 @@ export function EntryDetail({
   }, [entryId, status]);
 
   // Poll while an add-on recording is being transcribed in the background.
-  // When pendingAddonCount drops to 0, fetch the updated primary transcript
-  // text (which now includes the appended new paragraph) and refresh the editor.
+  // When it finishes, fetch the primary transcript (which now has the new
+  // paragraph appended) and show it, unless the user has unsaved typing,
+  // whose edits win. A failed poll (offline, a blip) just tries again.
   React.useEffect(() => {
     if (!addonPending) return;
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/entries/${entryId}/transcript`);
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        status: TranscriptStatus;
-        rawText: string | null;
-        editedText: string | null;
-        pendingAddonCount: number;
-      };
-      if (data.pendingAddonCount === 0) {
+      try {
+        const res = await fetch(`/api/entries/${entryId}/transcript`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          status: TranscriptStatus;
+          rawText: string | null;
+          editedText: string | null;
+          pendingAddonCount: number;
+          latestAddonFailed?: boolean;
+        };
+        if (data.pendingAddonCount !== 0) return;
         setAddonPending(false);
         setTranscriptRefreshToken((n) => n + 1);
-        // Update the editor with the new combined text, but only if the user
-        // hasn't been typing (their unsaved edits take priority).
+        if (data.latestAddonFailed) {
+          toast.error(
+            "Couldn't transcribe the new recording. The audio is saved.",
+          );
+          return;
+        }
         const incoming = data.editedText ?? data.rawText ?? "";
         if (
           incoming &&
@@ -475,11 +482,40 @@ export function EntryDetail({
           latestTextRef.current = incoming;
           lastSavedTextRef.current = incoming;
           setText(incoming);
+          // The summary and tasks are refreshed on the server; pick them up.
+          summaryStaleRef.current = false;
+          void refreshSummaryAfterAddon();
         }
+      } catch {
+        // Try again on the next tick.
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addonPending, entryId]);
+
+  /** The server re-summarises after an add-on; pull the result in (read-only,
+   * no new AI call from here). */
+  async function refreshSummaryAfterAddon() {
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      try {
+        const res = await fetch(`/api/entries/${entryId}/summary`);
+        if (!res.ok) continue;
+        const data = (await res.json()) as {
+          summary: { summaryText: string } | null;
+          tasks?: TaskChecklistTask[];
+        };
+        if (data.summary && data.summary.summaryText !== summaryRef.current) {
+          setSummary(data.summary.summaryText);
+          if (data.tasks) setTasks(data.tasks);
+          return;
+        }
+      } catch {
+        /* keep trying */
+      }
+    }
+  }
 
   async function regenerateSummary() {
     setRegenerating(true);

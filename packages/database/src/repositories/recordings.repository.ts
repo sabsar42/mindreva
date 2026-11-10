@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import { entries, recordings, type Recording } from "../schema";
 
@@ -58,15 +58,15 @@ export const RecordingsRepository = {
     return rows[0]?.r ?? null;
   },
 
-  /** All recordings for an entry, oldest first. */
-  async getAllByEntry(entryId: string, userId: string): Promise<Recording[]> {
+  /** How many recordings the user has uploaded since `since` (any entry,
+   * trashed ones included): the cap on uploads is about what was uploaded. */
+  async countByUserSince(userId: string, since: Date): Promise<number> {
     const rows = await getDb()
-      .select({ r: recordings })
+      .select({ count: sql<number>`count(*)::int` })
       .from(recordings)
       .innerJoin(entries, eq(entries.id, recordings.entryId))
-      .where(and(eq(recordings.entryId, entryId), eq(entries.userId, userId)))
-      .orderBy(asc(recordings.createdAt));
-    return rows.map((r) => r.r);
+      .where(and(eq(entries.userId, userId), gte(recordings.createdAt, since)));
+    return rows[0]?.count ?? 0;
   },
 
   /** How many recordings exist for an entry (any status). Used to derive

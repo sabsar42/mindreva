@@ -11,6 +11,12 @@ rather than resolved.
 
 ---
 
+## 2026-11-10 — Merging a teammate's PR: merge commit plus fixes on master, not edits to their branch
+
+PR #8 failed CI and had data-layer bugs. Rather than push fixes into the author's branch, the branch was merged into master with a merge commit authored by the owner and the fixes added as their own commits. This also sidesteps the Vercel Hobby author block (the production deploy follows the owner-authored head commit). The PR closes itself as merged because its commits are on master.
+
+**Convention adopted:** anything that wants one row per entry selects `primaryTranscriptText` / `firstRecordingDurationMs` (repositories/primary-transcript.ts), never LEFT JOINs `transcripts` or `recordings`. The oldest transcript is "primary" and holds the combined edited text; later ones are add-ons.
+
 ## 2026-11-01 — Multiple recordings per entry: append model, single editor source of truth
 
 **What happened:** The user asked to support re-recording when editing an entry,

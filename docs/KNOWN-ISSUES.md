@@ -4,6 +4,11 @@ Open, unresolved items. Not decisions already made (see
 [docs/DECISIONS.md](./DECISIONS.md) for those) — this is specifically for
 things still outstanding.
 
+## Add-on recordings: order, partial failure, timestamps
+
+**Status:** Open (minor).
+Paragraphs are appended in the order transcriptions finish, not the order the takes were recorded, so two quick add-ons can land swapped. If a take can't be transcribed the editor says so, but the audio is not reachable from the UI (the Transcript sheet shows the combined text of the primary transcript only; per-recording timestamps for add-ons are stored but not shown). The server also can't tell the editor which paragraph came from which take.
+
 ---
 
 ## Vercel logs not checked; icn1 + max:1 not measured live

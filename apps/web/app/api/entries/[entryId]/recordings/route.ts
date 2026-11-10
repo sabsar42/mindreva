@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@mindreva/auth/server";
-import { addVoiceToEntry } from "@/lib/services/entries.service";
+import {
+  EntryNotFoundError,
+  addVoiceToEntry,
+} from "@/lib/services/entries.service";
+import { DailyLimitReachedError } from "@/lib/services/usage.service";
 
 const MAX_DURATION_MS = 10 * 60 * 1000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_AUDIO_BYTES = 4.5 * 1024 * 1024;
 const TOO_LARGE_MESSAGE =
   "This recording is too large to upload. Your audio is kept; try a shorter one.";
@@ -19,6 +24,10 @@ export async function POST(
   }
 
   const { entryId } = await params;
+  // A malformed id is a 404, not a database error surfacing as a 500.
+  if (!UUID.test(entryId)) {
+    return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+  }
 
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_AUDIO_BYTES + 64 * 1024) {
@@ -64,6 +73,15 @@ export async function POST(
     });
     return NextResponse.json({ transcriptId }, { status: 201 });
   } catch (err) {
+    if (err instanceof EntryNotFoundError) {
+      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    }
+    if (err instanceof DailyLimitReachedError) {
+      return NextResponse.json(
+        { error: err.message, code: "limit" },
+        { status: 429 },
+      );
+    }
     console.error(`POST /api/entries/${entryId}/recordings failed:`, err);
     return NextResponse.json(
       { error: "Failed to add recording" },

@@ -59,3 +59,7 @@ export const DAILY_RECORDING_LIMIT = 50;
 
 export const DAILY_RECORDING_LIMIT_MESSAGE =
   "That's a lot of recording for one day. You can record again tomorrow; nothing you already saved is affected.";
+
+/** Per-entry cap on voice add-ons, and the rolling-24h upload cap that also
+ * covers them (createVoiceEntry's per-day count only sees new entries). */
+export const MAX_RECORDINGS_PER_ENTRY = 20;

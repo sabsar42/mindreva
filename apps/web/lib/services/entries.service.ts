@@ -30,6 +30,7 @@ import {
 import {
   DAILY_RECORDING_LIMIT,
   DAILY_RECORDING_LIMIT_MESSAGE,
+  MAX_RECORDINGS_PER_ENTRY,
   SUMMARY_GRACE_MS,
 } from "../usage-limits";
 import { DailyLimitReachedError } from "./usage.service";
@@ -275,7 +276,7 @@ export async function getMyEntryDetail(id: string): Promise<{
     tasks,
     share,
     recordingCount,
-    pendingTranscriptCount,
+    addonStatus,
   ] = await timed(
     "entry-detail",
     "all-queries",
@@ -319,21 +320,12 @@ export async function getMyEntryDetail(id: string): Promise<{
       ),
       timed(
         "entry-detail",
-        "pending-transcripts",
-        TranscriptsRepository.countPendingByEntry(id, userId),
+        "addon-status",
+        TranscriptsRepository.addonStatusByEntry(id, userId),
       ),
     ]),
   );
   if (!entry) return null;
-
-  // Subtract 1 from pendingTranscriptCount if the primary transcript itself
-  // is still pending/processing — that's the initial recording, not an addon.
-  const primaryIsPending =
-    transcript?.status === "pending" || transcript?.status === "processing";
-  const pendingAddonCount = Math.max(
-    0,
-    pendingTranscriptCount - (primaryIsPending ? 1 : 0),
-  );
 
   return {
     entry,
@@ -343,7 +335,7 @@ export async function getMyEntryDetail(id: string): Promise<{
     tasks,
     shared: Boolean(share && !share.share.revokedAt),
     hasRecordings: recordingCount > 0,
-    pendingAddonCount,
+    pendingAddonCount: addonStatus.pending,
   };
 }
 
@@ -495,6 +487,31 @@ export async function unarchiveMyEntry(id: string): Promise<Entry | null> {
   return EntriesRepository.setArchived(id, userId, false);
 }
 
+/** Add-on recording state for the editor's poll (see
+ * TranscriptsRepository.addonStatusByEntry). */
+export async function getMyAddonStatus(
+  entryId: string,
+): Promise<{ pendingAddonCount: number; latestAddonFailed: boolean }> {
+  const userId = await requireUserId();
+  const status = await TranscriptsRepository.addonStatusByEntry(
+    entryId,
+    userId,
+  );
+  return {
+    pendingAddonCount: status.pending,
+    latestAddonFailed: status.latestFailed,
+  };
+}
+
+/** Thrown for an add-on to an entry that doesn't exist, isn't the caller's,
+ * or is in the trash. The route turns it into a 404. */
+export class EntryNotFoundError extends Error {
+  constructor() {
+    super("Entry not found");
+    this.name = "EntryNotFoundError";
+  }
+}
+
 /**
  * Adds a voice recording to an existing entry (any source). Uploads the
  * audio, creates a new recording + transcript row (pending), and returns
@@ -509,6 +526,29 @@ export async function addVoiceToEntry(
   const user = await getUser();
   if (!user) throw new Error("Not authenticated");
 
+  // Checked BEFORE the upload: a bad id, someone else's entry or a trashed
+  // one must not leave an orphan audio file in Storage.
+  const entry = await EntriesRepository.getByIdForUser(entryId, user.id);
+  if (!entry) throw new EntryNotFoundError();
+
+  // The same ceilings as a new voice entry, which this route would otherwise
+  // sidestep: uploads in the last 24 hours, and recordings on one entry.
+  const [recentUploads, onThisEntry] = await Promise.all([
+    RecordingsRepository.countByUserSince(
+      user.id,
+      new Date(Date.now() - 24 * 60 * 60 * 1000),
+    ),
+    RecordingsRepository.countByEntry(entryId, user.id),
+  ]);
+  if (recentUploads >= DAILY_RECORDING_LIMIT) {
+    throw new DailyLimitReachedError(DAILY_RECORDING_LIMIT_MESSAGE);
+  }
+  if (onThisEntry >= MAX_RECORDINGS_PER_ENTRY) {
+    throw new DailyLimitReachedError(
+      "This entry already has a lot of recordings. Start a new entry for the next one.",
+    );
+  }
+
   const objectPath = `${user.id}/${crypto.randomUUID()}.${extensionFromMimeType(input.mimeType)}`;
   const supabase = await createClient();
   const { error: uploadError } = await supabase.storage
@@ -517,9 +557,8 @@ export async function addVoiceToEntry(
   if (uploadError)
     throw new Error(`Recording upload failed: ${uploadError.message}`);
 
-  // Primary transcript is the oldest one (or null for text entries).
-  // Must be fetched BEFORE creating the new addon transcript so we don't
-  // accidentally pick the new row as "primary".
+  // Primary transcript = the oldest one. Fetched BEFORE the new add-on
+  // transcript exists so the new row can't be mistaken for it.
   const primaryTranscript = await TranscriptsRepository.getByEntry(
     entryId,
     user.id,
@@ -540,13 +579,14 @@ export async function addVoiceToEntry(
     }),
   ]);
 
-  // If there was no primary transcript (text entry), the new transcript IS
-  // the primary; appendToEditedText will write directly to it.
+  // An entry with no transcript yet: the new one becomes its primary, and
+  // transcribeAddonRecording knows not to append it to itself.
   const primaryTranscriptId = primaryTranscript?.id ?? addonTranscript.id;
 
   after(async () => {
+    let added = false;
     try {
-      await transcribeAddonRecording(
+      added = await transcribeAddonRecording(
         entryId,
         user.id,
         recording.id,
@@ -559,11 +599,26 @@ export async function addVoiceToEntry(
         err,
       );
     }
+    if (!added) return;
+    // New text was added: re-index it for search, and refresh the summary
+    // (which would otherwise keep describing only the earlier recordings).
+    // Both respect their daily limits; a failure leaves the entry marked
+    // for the background retry, never lost.
     try {
       await enqueueEntryIndex(entryId, user.id);
       await indexEntryNow(entryId, user.id);
     } catch (err) {
       console.error(`Background index failed for entry ${entryId}:`, err);
+    }
+    try {
+      await EntriesRepository.setSummaryRetry(
+        entryId,
+        user.id,
+        new Date(Date.now() + SUMMARY_GRACE_MS),
+      );
+      await summarizeEntry(entryId, user.id);
+    } catch (err) {
+      console.error(`Background summarize failed for entry ${entryId}:`, err);
     }
   });
 

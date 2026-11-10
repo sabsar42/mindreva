@@ -13,6 +13,7 @@ import { createClient } from "@mindreva/auth/server";
  * transcript row stores the raw ASR output (raw_text + segments) so the
  * transcript sheet can show per-recording detail; the primary transcript's
  * edited_text is the single source of truth that the editor reads and writes.
+ * Resolves to whether any text was added to the entry.
  */
 export async function transcribeAddonRecording(
   entryId: string,
@@ -20,7 +21,7 @@ export async function transcribeAddonRecording(
   recordingId: string,
   addonTranscriptId: string,
   primaryTranscriptId: string,
-): Promise<void> {
+): Promise<boolean> {
   const recording = await RecordingsRepository.getById(recordingId, userId);
   if (!recording) throw new Error("Recording not found");
 
@@ -53,9 +54,13 @@ export async function transcribeAddonRecording(
     });
 
     // Append recognized text to the primary transcript so the editor sees
-    // all recordings combined. If primaryTranscriptId === addonTranscriptId
-    // (text entry with no prior transcript), this sets edited_text = raw_text.
-    await TranscriptsRepository.appendToEditedText(
+    // all recordings combined (atomically, so a simultaneous edit or a
+    // second add-on isn't overwritten). When the add-on IS the primary (an
+    // entry that had no transcript), its raw text already is the entry text;
+    // appending it to itself would duplicate it. Silence appends nothing.
+    if (primaryTranscriptId === addonTranscriptId)
+      return Boolean(result.text.trim());
+    return TranscriptsRepository.appendToEditedText(
       primaryTranscriptId,
       userId,
       result.text,

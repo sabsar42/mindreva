@@ -13,6 +13,10 @@ import {
 } from "drizzle-orm";
 import { getDb } from "../client";
 import {
+  firstRecordingDurationMs,
+  primaryTranscriptText,
+} from "./primary-transcript";
+import {
   entries,
   recordings,
   summaries,
@@ -105,24 +109,14 @@ export const EntriesRepository = {
       conditions.push(gte(entries.entryDate, options.dateFrom));
     if (options.dateTo) conditions.push(lte(entries.entryDate, options.dateTo));
 
-    // Correlated subqueries instead of LEFT JOINs: entries can now have
-    // multiple recordings and transcripts, so a plain join would produce a
-    // Cartesian product and return the same entry ID multiple times.
+    // Correlated subqueries (primary-transcript.ts) instead of LEFT
+    // JOINs: an entry can have several recordings and transcripts, and a
+    // join would repeat it once per transcript.
     const rows = await getDb()
       .select({
         entry: entries,
-        durationMs: sql<number | null>`(
-          SELECT r.duration_ms FROM recordings r
-          WHERE r.entry_id = ${entries.id}
-          ORDER BY r.created_at ASC
-          LIMIT 1
-        )`,
-        snippet: sql<string | null>`(
-          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
-          WHERE t.entry_id = ${entries.id}
-          ORDER BY t.created_at ASC
-          LIMIT 1
-        )`,
+        durationMs: firstRecordingDurationMs,
+        snippet: primaryTranscriptText,
       })
       .from(entries)
       .where(and(...conditions))
@@ -197,18 +191,8 @@ export const EntriesRepository = {
     const rows = await getDb()
       .select({
         entry: entries,
-        durationMs: sql<number | null>`(
-          SELECT r.duration_ms FROM recordings r
-          WHERE r.entry_id = ${entries.id}
-          ORDER BY r.created_at ASC
-          LIMIT 1
-        )`,
-        snippet: sql<string | null>`(
-          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
-          WHERE t.entry_id = ${entries.id}
-          ORDER BY t.created_at ASC
-          LIMIT 1
-        )`,
+        durationMs: firstRecordingDurationMs,
+        snippet: primaryTranscriptText,
       })
       .from(entries)
       .where(and(...conditions))
@@ -220,18 +204,8 @@ export const EntriesRepository = {
     const rows = await getDb()
       .select({
         entry: entries,
-        durationMs: sql<number | null>`(
-          SELECT r.duration_ms FROM recordings r
-          WHERE r.entry_id = ${entries.id}
-          ORDER BY r.created_at ASC
-          LIMIT 1
-        )`,
-        snippet: sql<string | null>`(
-          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
-          WHERE t.entry_id = ${entries.id}
-          ORDER BY t.created_at ASC
-          LIMIT 1
-        )`,
+        durationMs: firstRecordingDurationMs,
+        snippet: primaryTranscriptText,
       })
       .from(entries)
       .where(and(eq(entries.userId, userId), isNotNull(entries.deletedAt)))
@@ -264,18 +238,8 @@ export const EntriesRepository = {
     const rows = await getDb()
       .selectDistinctOn([entries.id], {
         entry: entries,
-        durationMs: sql<number | null>`(
-          SELECT r.duration_ms FROM recordings r
-          WHERE r.entry_id = ${entries.id}
-          ORDER BY r.created_at ASC
-          LIMIT 1
-        )`,
-        snippet: sql<string | null>`(
-          SELECT coalesce(t.edited_text, t.raw_text) FROM transcripts t
-          WHERE t.entry_id = ${entries.id}
-          ORDER BY t.created_at ASC
-          LIMIT 1
-        )`,
+        durationMs: firstRecordingDurationMs,
+        snippet: primaryTranscriptText,
       })
       .from(entries)
       .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
@@ -372,10 +336,9 @@ export const EntriesRepository = {
         id: entries.id,
         entryDate: entries.entryDate,
         title: entries.title,
-        text: snippetExpr,
+        text: primaryTranscriptText,
       })
       .from(entries)
-      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .where(
         and(
           eq(entries.userId, userId),

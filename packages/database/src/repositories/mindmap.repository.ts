@@ -1,11 +1,11 @@
 import { and, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { getDb } from "../client";
+import { primaryTranscriptText } from "./primary-transcript";
 import {
   embeddings,
   entries,
   mindmapClusterEntries,
   mindmapClusters,
-  transcripts,
   type MindmapCluster,
 } from "../schema";
 
@@ -220,9 +220,7 @@ export const MindmapRepository = {
         entryId: entries.id,
         entryDate: entries.entryDate,
         title: entries.title,
-        snippet: sql<
-          string | null
-        >`coalesce(${transcripts.editedText}, ${transcripts.rawText})`,
+        snippet: primaryTranscriptText,
       })
       .from(mindmapClusterEntries)
       .innerJoin(
@@ -230,7 +228,6 @@ export const MindmapRepository = {
         eq(mindmapClusters.id, mindmapClusterEntries.clusterId),
       )
       .innerJoin(entries, eq(entries.id, mindmapClusterEntries.entryId))
-      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .where(and(eq(mindmapClusters.userId, userId), isNull(entries.deletedAt)))
       .orderBy(entries.entryDate);
   },
@@ -258,13 +255,10 @@ export const MindmapRepository = {
         entryId: entries.id,
         entryDate: entries.entryDate,
         title: entries.title,
-        snippet: sql<
-          string | null
-        >`coalesce(${transcripts.editedText}, ${transcripts.rawText})`,
+        snippet: primaryTranscriptText,
       })
       .from(mindmapClusterEntries)
       .innerJoin(entries, eq(entries.id, mindmapClusterEntries.entryId))
-      .leftJoin(transcripts, eq(transcripts.entryId, entries.id))
       .where(
         and(
           eq(mindmapClusterEntries.clusterId, clusterId),
