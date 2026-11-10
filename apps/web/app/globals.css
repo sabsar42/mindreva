@@ -7,6 +7,16 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    /* Slim, quiet scrollbars (a soft thumb on no track) instead of the
+       browser's chunky grey bar with arrow buttons. The colour follows the
+       text colour, so it works in light and dark. */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--color-foreground) 24%,
+        transparent
+      )
+      transparent;
   }
 
   body {
