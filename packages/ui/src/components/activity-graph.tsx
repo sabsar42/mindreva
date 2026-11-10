@@ -606,7 +606,7 @@ function YearGrid({
                     data-dense
                     aria-label={describe(getDay(key), key)}
                     className={cn(
-                      "rounded-[3px]",
+                      "rounded-full",
                       LEVEL_BG[getDay(key)?.level ?? 0],
                     )}
                     style={{ width: CELL, height: CELL }}
@@ -673,7 +673,7 @@ function MonthGrid({
               aria-label={describe(day, key)}
               onMouseOver={() => onStatus(describe(day, key))}
               className={cn(
-                "h-[38px] rounded-[10px] text-[13px] font-semibold tabular-nums",
+                "mx-auto aspect-square w-full max-w-[38px] rounded-full text-[13px] font-semibold tabular-nums",
                 LEVEL_BG[day?.level ?? 0],
                 LEVEL_TEXT[day?.level ?? 0],
                 key === todayKey &&
@@ -840,7 +840,7 @@ function ActivitySheet({
             <span
               key={level}
               aria-hidden
-              className={cn("size-3 rounded-[3px]", LEVEL_BG[level])}
+              className={cn("size-3 rounded-full", LEVEL_BG[level])}
             />
           ))}
           <span>More</span>
