@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { contactEmail, supportUrl } from "@/lib/support";
+import { contactEmail, supportUrl, supportWidget } from "@/lib/support";
 import { Bullets, LegalTitle, Section } from "../_components/legal";
 
 export const metadata: Metadata = { title: "Terms" };
 
 export default function TermsPage() {
   const email = contactEmail();
-  const hasSupport = supportUrl() !== null;
+  const hasSupport = supportUrl() !== null || supportWidget() !== null;
 
   return (
     <>
@@ -54,7 +54,7 @@ export default function TermsPage() {
         <p>
           Mindreva has no paid plans.
           {hasSupport
-            ? " The “Support Mindreva” link is a voluntary gift. It doesn't unlock features, raise any limit or buy priority, and the app works exactly the same whether or not you use it."
+            ? " The “Support Mindreva” link and tip button are a voluntary gift. It doesn't unlock features, raise any limit or buy priority, and the app works exactly the same whether or not you use it."
             : " Nothing in the app depends on payment."}{" "}
           Services behind the app can run into their own daily limits; when that
           happens we tell you, nothing is lost, and it works again later.

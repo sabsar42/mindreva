@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { contactEmail, supportUrl } from "@/lib/support";
+import { contactEmail, supportUrl, supportWidget } from "@/lib/support";
 import { Bullets, LegalTitle, Section } from "../_components/legal";
 
 export const metadata: Metadata = { title: "Privacy" };
@@ -7,6 +7,7 @@ export const metadata: Metadata = { title: "Privacy" };
 export default function PrivacyPage() {
   const email = contactEmail();
   const hasSupport = supportUrl() !== null;
+  const widget = supportWidget() !== null;
 
   return (
     <>
@@ -163,11 +164,13 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      {hasSupport && (
+      {(hasSupport || widget) && (
         <Section title="The support link">
           <p>
-            The optional “Support Mindreva” link opens another website in a new
-            tab. That site has its own rules and its own privacy policy.
+            The optional “Support Mindreva” link and tip button open another
+            website, SupportKori, which has its own rules and its own privacy
+            policy. On the Account screen the tip button loads a small script
+            and panel from that site; it is not loaded anywhere else in the app.
             Mindreva doesn&apos;t see what you do there, and supporting changes
             nothing about what you can do in the app.
           </p>

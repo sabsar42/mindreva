@@ -23,3 +23,27 @@ export function contactEmail(): string | null {
   const raw = (process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "").trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw) ? raw : null;
 }
+
+/** Where the optional SupportKori tip widget is served from (see SupportWidget). */
+export const SUPPORT_WIDGET_SCRIPT = "https://www.supportkori.com/widget.js";
+
+export interface SupportWidgetConfig {
+  id: string;
+  message: string;
+  color: string;
+}
+
+/**
+ * The SupportKori "tip jar" widget: a small floating button on the Account
+ * screen that opens a payment panel. Like the support link it is voluntary and
+ * unlocks nothing. NEXT_PUBLIC_SUPPORT_WIDGET_ID picks the creator handle
+ * (default: the project's own); set it to "off" to hide the widget entirely.
+ */
+export function supportWidget(): SupportWidgetConfig | null {
+  const raw = (process.env.NEXT_PUBLIC_SUPPORT_WIDGET_ID ?? "").trim();
+  if (raw.toLowerCase() === "off") return null;
+  const id = raw || "shakibabsar";
+  // A handle only: letters, digits, dashes and underscores.
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return null;
+  return { id, message: "Support Mindreva", color: "#10B981" };
+}

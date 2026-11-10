@@ -11,6 +11,14 @@ rather than resolved.
 
 ---
 
+## 2026-11-11 — SupportKori tip widget: Account screen only, loaded and removed on demand
+
+**What happened.** The owner asked for the SupportKori tip widget (a Buy Me a Coffee alternative) as a stand-in until real payments exist. Its script appends a fixed floating button and a 350x550 payment iframe to `<body>` and never removes them, and it loads a panel from supportkori.com that runs its own third-party scripts (the browser showed it pulling Facebook tracking inside its own frame).
+
+**Decision.** It is mounted only on the Account screen, next to the existing voluntary support link, by a client component that adds the script on mount and removes the script, button, panel and style on unmount (otherwise the button would follow the user to every screen). The CSP gains exactly two things: `https://www.supportkori.com` in `script-src`, and `https://supportkori.com` plus `https://www.supportkori.com` in `frame-src` (the panel redirects to www). Everything else stays locked, so the rest of the app never loads third-party code. The handle defaults to the project's own and is set with `NEXT_PUBLIC_SUPPORT_WIDGET_ID` (`off` hides it). It stays voluntary and gates nothing, per the non-negotiable rules; the Privacy and Terms copy now mention it.
+
+**Why Account only.** A site-wide floating button would sit over the record bar and nav on a phone-width app, and every page would then load third-party code. Moving it to every screen later is a one-line change, but it is a product call for the owner.
+
 ## 2026-11-10 — Merging a teammate's PR: merge commit plus fixes on master, not edits to their branch
 
 PR #8 failed CI and had data-layer bugs. Rather than push fixes into the author's branch, the branch was merged into master with a merge commit authored by the owner and the fixes added as their own commits. This also sidesteps the Vercel Hobby author block (the production deploy follows the owner-authored head commit). The PR closes itself as merged because its commits are on master.

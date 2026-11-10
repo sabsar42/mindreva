@@ -7,6 +7,15 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-11 — Voluntary SupportKori tip widget
+
+Owner asked for a Buy-Me-a-Coffee-style way to support the app until payments exist. See docs/DECISIONS.md 2026-11-11.
+
+- A floating "Support Mindreva" button (SupportKori, green #10B981, bottom right) on the Account screen only; it opens SupportKori's payment panel in a frame. Loaded on mount and fully removed on leaving the screen. Never gates anything.
+- CSP: SupportKori allowed in `script-src` and `frame-src` only.
+- `NEXT_PUBLIC_SUPPORT_WIDGET_ID` (default: the project's handle; `off` hides it). Privacy and Terms copy updated.
+- Verified in headless Edge with a throwaway account (deleted): button on Account only, panel opens, no CSP violation, gone after navigating away.
+
 ## 2026-11-11 — Title-only cards, generated titles, twelve default pictures
 
 Owner feedback: variety in the automatic pictures, and cards should show only a title.

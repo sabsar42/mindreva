@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { contactEmail, supportUrl } from "./support";
+import { contactEmail, supportUrl, supportWidget } from "./support";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -39,5 +39,20 @@ describe("supportUrl accepts only https", () => {
     expect(supportUrl()).toBeNull();
     vi.stubEnv("NEXT_PUBLIC_SUPPORT_URL", "https://ko-fi.com/x");
     expect(supportUrl()).toBe("https://ko-fi.com/x");
+  });
+});
+
+describe("supportWidget", () => {
+  it("defaults to the project handle and can be turned off or changed", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPPORT_WIDGET_ID", "");
+    expect(supportWidget()?.id).toBe("shakibabsar");
+    vi.stubEnv("NEXT_PUBLIC_SUPPORT_WIDGET_ID", "someone-else");
+    expect(supportWidget()?.id).toBe("someone-else");
+    vi.stubEnv("NEXT_PUBLIC_SUPPORT_WIDGET_ID", "off");
+    expect(supportWidget()).toBeNull();
+  });
+  it("rejects a handle that isn't plain characters", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPPORT_WIDGET_ID", '"><script>');
+    expect(supportWidget()).toBeNull();
   });
 });

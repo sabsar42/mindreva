@@ -32,6 +32,8 @@ import {
 import { SignOutButton } from "./_components/sign-out-button";
 import { DeleteAccountButton } from "./_components/delete-account-button";
 import { SupportFooterLink, SupportRow } from "../../_components/support-link";
+import { SupportWidget } from "../../_components/support-widget";
+import { supportWidget } from "@/lib/support";
 
 export default async function AccountPage() {
   const calendarOn = isCalendarConfigured();
@@ -57,6 +59,7 @@ export default async function AccountPage() {
     : ["en"];
   const summaryStyle = (profile?.summaryStyle as UseCase) ?? "general";
 
+  const widget = supportWidget();
   return (
     <>
       <main className="min-h-app mx-auto px-5 pb-24 pt-6">
@@ -154,6 +157,7 @@ export default async function AccountPage() {
             </nav>
           </div>
         </div>
+        {widget && <SupportWidget {...widget} />}
       </main>
     </>
   );

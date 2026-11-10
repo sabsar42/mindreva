@@ -4,7 +4,8 @@ import { withSentryConfig } from "@sentry/nextjs";
 /**
  * Security headers for every response. The CSP allows exactly what the app
  * loads: its own origin, and the Supabase project (sign-in calls, signed
- * photo/audio URLs, realtime). 'unsafe-inline' scripts are needed for Next's
+ * photo/audio URLs, realtime), plus SupportKori for the optional tip widget on
+ * the Account screen (its script, and the panel it opens in a frame). 'unsafe-inline' scripts are needed for Next's
  * inline bootstrap and the pre-paint theme script (no nonce plumbing yet);
  * everything else is locked: no framing (clickjacking), no plugins, no
  * foreign forms, no other origins. 'unsafe-eval' only in development (React
@@ -18,7 +19,7 @@ function securityHeaders() {
   const dev = process.env.NODE_ENV !== "production";
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline' https://www.supportkori.com${dev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${supabase}`,
     `media-src 'self' blob: ${supabase}`,
@@ -27,7 +28,7 @@ function securityHeaders() {
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "frame-ancestors 'none'",
-    "frame-src 'none'",
+    "frame-src https://supportkori.com https://www.supportkori.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
