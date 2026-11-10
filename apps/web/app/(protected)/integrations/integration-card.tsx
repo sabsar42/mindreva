@@ -53,7 +53,7 @@ export function IntegrationCard({
   return (
     <article
       aria-label={integration.name}
-      className="border-card-edge bg-card/92 shadow-card rounded-2xl border-[0.5px] p-5"
+      className="border-card-edge bg-card/92 shadow-card rounded-card border-[0.5px] p-5"
     >
       <div className="flex items-center gap-3.5">
         <span className="border-border bg-background flex size-12 shrink-0 items-center justify-center rounded-2xl border">

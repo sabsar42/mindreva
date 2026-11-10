@@ -7,11 +7,12 @@ import "./globals.css";
 
 // Sans and mono are the system stacks (San Francisco on Apple devices, see
 // tokens.css), so nothing is downloaded for them and text never swaps fonts.
-// Serif logotype only — everything else is sans. See docs/design-reference.
+// The serif is the logotype, the past self's voice, and the Journal cards'
+// titles and snippets (Fraunces 400 / 600 / 700). Everything else is sans.
 const serifLogotype = Fraunces({
   variable: "--font-serif-logotype",
   subsets: ["latin"],
-  weight: ["600", "700"],
+  weight: ["400", "600", "700"],
   style: ["normal"],
   display: "swap",
 });
@@ -61,7 +62,9 @@ export default function RootLayout({
     // suppressHydrationWarning: the init script adds the `dark` class to
     // <html> before React hydrates, which would otherwise be reported as a
     // mismatch. It only affects this one element's attributes.
-    <html lang="en" suppressHydrationWarning>
+    // The font variable lives on <html>, not <body>: tokens.css resolves
+    // --font-serif at :root, where a body-scoped variable doesn't exist.
+    <html lang="en" className={serifLogotype.variable} suppressHydrationWarning>
       <head>
         {/* Before the theme script, which retints it for dark mode. */}
         <meta
@@ -71,7 +74,7 @@ export default function RootLayout({
         />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className={`${serifLogotype.variable} antialiased`}>
+      <body className="antialiased">
         {/* The whole app is one phone-width column. On a wide screen it sits
             centred on a white canvas with hairline sides, so the web version
             looks and behaves exactly like the phone version. */}

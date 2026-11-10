@@ -115,18 +115,18 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
             : style
         }
         className={cn(
-          // Every ready card is exactly the same size (the cover is 80px, the
-          // padding 14px); a card still forming may be taller until it settles.
+          // Every ready card is exactly the same size (the cover is 84px, the
+          // padding 12px); a card still forming may be taller until it settles.
           // iOS-style surface: a hairline edge and a soft layered shadow (flat
           // in dark mode), slightly translucent so the app's background wash
           // shows through faintly.
-          "bg-card/92 border-card-edge shadow-card group/card relative flex items-center gap-3.5 overflow-hidden rounded-2xl border-[0.5px] p-3.5",
+          "bg-card/92 border-card-edge shadow-card group/card rounded-card relative flex items-center gap-3.5 overflow-hidden border-[0.5px] p-3",
           forming ? "min-h-[108px]" : "h-[108px]",
-          // Ready cards respond to a hover or a tap: a slightly deeper
-          // shadow, a press that sinks a little, and the thumbnail leaning
-          // in. Cards still forming don't (there is nothing to open yet).
+          // Ready cards respond to a hover or a tap: a hair of lift, a press
+          // that sinks a little, and the thumbnail leaning in. Cards still
+          // forming don't (there is nothing to open yet).
           !forming &&
-            "hover:shadow-elevated transition-[transform,box-shadow] duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.985]",
+            "transition-transform duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.985]",
           interactive &&
             "focus-visible:ring-ring cursor-pointer focus-visible:outline-none focus-visible:ring-2",
           forming && "border-primary/60 from-primary/10 to-card bg-linear-to-b",
@@ -140,12 +140,12 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
           {(dateLabel || durationLabel) && (
             <div className="flex items-center gap-1.5">
               {dateLabel && (
-                <p className="text-muted-foreground text-footnote truncate">
+                <p className="text-muted-foreground truncate text-[0.6875rem] font-medium uppercase tracking-[0.06em]">
                   {dateLabel}
                 </p>
               )}
               {durationLabel && (
-                <span className="bg-secondary text-muted-foreground inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                <span className="bg-secondary text-muted-foreground inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.06em]">
                   {durationLabel}
                 </span>
               )}
@@ -185,11 +185,11 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
             </>
           ) : (
             <>
-              <h3 className="text-foreground text-headline mt-0.5 line-clamp-1 tracking-tight">
+              <h3 className="text-foreground mt-1 line-clamp-1 font-serif text-[1.1875rem] font-semibold leading-tight tracking-[-0.01em]">
                 {title}
               </h3>
               {snippet && (
-                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-sm leading-[1.3]">
+                <p className="text-muted-foreground mt-1 line-clamp-2 font-serif text-[0.9375rem] leading-[1.32]">
                   {snippet}
                 </p>
               )}
@@ -210,25 +210,25 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
           // memory has a real cover.
           <div
             aria-hidden
-            className="bg-gradient-primary flex size-20 shrink-0 items-center justify-center rounded-lg"
+            className="bg-gradient-primary flex size-[5.25rem] shrink-0 items-center justify-center rounded-md"
           >
             <LeafMark className="text-primary-foreground size-9 animate-pulse" />
           </div>
         ) : thumbnailPending ? (
           <div
             aria-hidden
-            className="bg-secondary size-20 shrink-0 rounded-lg"
+            className="bg-secondary size-[5.25rem] shrink-0 rounded-md"
           />
         ) : (
           thumbnailUrl && (
             <img
               src={thumbnailUrl}
               alt=""
-              width={80}
-              height={80}
+              width={84}
+              height={84}
               loading="lazy"
               decoding="async"
-              className="bg-secondary ring-card-edge size-20 shrink-0 rounded-lg object-cover ring-1 ring-inset transition-transform duration-300 group-hover/card:scale-105"
+              className="bg-secondary ring-card-edge size-[5.25rem] shrink-0 rounded-md object-cover ring-1 ring-inset transition-transform duration-300 group-hover/card:scale-105"
             />
           )
         )}

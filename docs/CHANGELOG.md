@@ -7,6 +7,16 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-11 — Card type, shape, shadow and default artwork
+
+Owner feedback: dislike the card fonts, fix the card shape, add a very light shadow, and make the automatic pictures artistic on white/off-white grounds matching the theme.
+
+- **Serif never rendered (root cause).** `next/font` put the `--font-serif-logotype` variable on `<body>`, but `--font-serif` is declared at `:root` and resolves it there, where it didn't exist. `font-family` became invalid and fell back to the sans stack, so every `font-serif` element (cards, chat replies, logotype) was silently sans. The variable class now sits on `<html>`. Verified in headless Edge: computed family is `Fraunces, …` and `document.fonts.check` is true.
+- Journal cards: serif title (Fraunces 600) and snippet (Fraunces 400), small uppercase tracked date line; Fraunces now loads weights 400/600/700.
+- Cards: 24px radius (`--radius-card`), thumbnail 84px with a concentric 12px radius, shadow reduced to a hairline plus a faint 1px/4px blur. Card, integrations cards and lists share the radius.
+- Default pictures: replaced the scenic set with six abstract pieces (arches, sprig, ripple, bloom, contours, petals) on off-white grounds in the mint/green/sand palette; square and wide versions.
+- README screenshots and overview montage regenerated.
+
 ## 2026-11-10 — iOS-style cards and a soft background wash
 
 Owner feedback on the Journal: make the cards nicer, more iOS/Apple, and put a light design behind the app instead of flat off-white.
