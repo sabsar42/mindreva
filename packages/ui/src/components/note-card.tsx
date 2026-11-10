@@ -10,7 +10,6 @@ export interface NoteCardProps extends React.ComponentProps<"div"> {
   dateLabel?: string;
   /** e.g. "37 s" or "3 min". Shown in small bold uppercase below date. */
   durationLabel?: string;
-  snippet?: string;
   /** First photo (by position) on the entry, if any. Omit rather than pass
    * a broken/empty src — the trailing thumbnail simply doesn't render. */
   thumbnailUrl?: string;
@@ -82,7 +81,6 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
       title,
       dateLabel,
       durationLabel,
-      snippet,
       thumbnailUrl,
       thumbnailPending,
       forming,
@@ -185,14 +183,9 @@ const NoteCard = React.forwardRef<HTMLDivElement, NoteCardProps>(
             </>
           ) : (
             <>
-              <h3 className="text-foreground mt-1 line-clamp-1 text-[1.125rem] font-semibold leading-tight tracking-[-0.02em]">
+              <h3 className="text-foreground mt-1 line-clamp-2 text-[1.1875rem] font-semibold leading-snug tracking-[-0.02em]">
                 {title}
               </h3>
-              {snippet && (
-                <p className="text-muted-foreground mt-1 line-clamp-2 text-[0.9375rem] leading-[1.35]">
-                  {snippet}
-                </p>
-              )}
               {failed && (
                 <p
                   role="status"

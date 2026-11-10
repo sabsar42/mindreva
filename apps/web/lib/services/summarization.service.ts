@@ -3,6 +3,7 @@ import {
   getLLMProvider,
   resolveSummaryPrompt,
   parseTaskBlock,
+  parseTitleLine,
 } from "@mindreva/llm";
 import {
   EntriesRepository,
@@ -11,7 +12,7 @@ import {
   SummariesRepository,
   TranscriptsRepository,
 } from "@mindreva/database";
-import { stripFormatting } from "@mindreva/types";
+import { stripFormatting, titleFromWords } from "@mindreva/types";
 import { nextDailyReset, refundDaily, tryUseDaily } from "./usage.service";
 import { isLimitError } from "../limit-error";
 import {
@@ -20,23 +21,6 @@ import {
   SUMMARY_RETRY_DELAY_MS,
   SUMMARY_RETRY_LEASE_MS,
 } from "../usage-limits";
-
-const MAX_TITLE_LENGTH = 120;
-
-/** First sentence if short enough, else the first non-empty line, hard-capped. */
-function deriveTitle(text: string): string {
-  const firstLine = text
-    .split("\n")
-    .find((l) => l.trim().length > 0)
-    ?.trim();
-  if (!firstLine) return "Untitled entry";
-
-  const sentenceMatch = firstLine.match(/^.*?[.!?](?:\s|$)/);
-  const candidate = (sentenceMatch?.[0] ?? firstLine).trim();
-
-  if (candidate.length <= MAX_TITLE_LENGTH) return candidate;
-  return candidate.slice(0, MAX_TITLE_LENGTH - 1).trimEnd() + "…";
-}
 
 /**
  * What happened to one summarize attempt. Summarizing never throws for an AI
@@ -144,7 +128,8 @@ export async function summarizeEntry(
       ),
     );
   }
-  const { summaryText, tasks } = parseTaskBlock(completion.text);
+  const { title: modelTitle, rest } = parseTitleLine(completion.text);
+  const { summaryText, tasks } = parseTaskBlock(rest);
 
   await SummariesRepository.create({
     entryId,
@@ -164,7 +149,8 @@ export async function summarizeEntry(
   const entry = await EntriesRepository.getByIdForUser(entryId, userId);
   if (entry && !entry.title) {
     await EntriesRepository.update(entryId, userId, {
-      title: deriveTitle(confirmedText),
+      // The model's short title; if it gave none, the first few words said.
+      title: modelTitle ?? titleFromWords(confirmedText) ?? "Untitled entry",
     });
   }
 

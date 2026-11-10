@@ -252,7 +252,7 @@ export function ComponentsGallery() {
             title="And so I was wondering what happened when I sleep and wake up in the morning."
             dateLabel="Sep 22, 10:30 AM"
             durationLabel="37 s"
-            snippet="when I sleep and wake up Do you understand what I'm saying about the mornings…"
+
             thumbnailUrl="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&h=200&fit=crop"
             onClick={() => {}}
           />
@@ -260,7 +260,7 @@ export function ComponentsGallery() {
             title="Um, hey, what's up?"
             dateLabel="Sep 21, 3:45 PM"
             durationLabel="3 s"
-            snippet="Um, hey, what's up?"
+
             onClick={() => {}}
           />
         </div>
@@ -402,14 +402,14 @@ export function ComponentsGallery() {
             title="Morning walk and a long think"
             dateLabel="Oct 18, 8:42 AM"
             durationLabel="12 s"
-            snippet="Walked to the river before work. Thought about the move."
+
             settling
           />
           <NoteCard
             title="Untitled entry"
             dateLabel="Oct 18, 8:42 AM"
             durationLabel="12 s"
-            snippet="Walked to the river before work."
+
             failed="Saved, but the summary didn't finish. Open it to try again."
           />
         </div>

@@ -25,3 +25,21 @@ export function stripFormatting(markdown: string): string {
 }
 
 export * from "./journal-markdown";
+
+/**
+ * A fallback title from the first few words of what was said, for when no
+ * model title exists (the model is down, or the entry is still waiting for its
+ * summary). Cuts at the first sentence end, drops trailing punctuation, and
+ * adds an ellipsis only when words were left out. Empty text gives null.
+ */
+export function titleFromWords(text: string, maxWords = 4): string | null {
+  const plain = stripFormatting(text).replace(/\s+/g, " ").trim();
+  if (!plain) return null;
+  const sentence = plain.match(/^.*?[.!?](?:\s|$)/)?.[0] ?? plain;
+  const words = sentence.trim().split(" ");
+  const taken = words.slice(0, maxWords).join(" ");
+  const clipped = words.length > maxWords || sentence.length < plain.length;
+  const base = taken.replace(/[\s,;:.!?\-–—]+$/, "");
+  if (!base) return null;
+  return clipped && words.length > maxWords ? base + "…" : base;
+}

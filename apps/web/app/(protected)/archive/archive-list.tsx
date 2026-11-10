@@ -13,6 +13,7 @@ import { PrefetchLink } from "../_components/prefetch-link";
 import { PageHeader } from "../_components/page-header";
 import { ConfirmTrashDialog } from "../_components/confirm-trash-dialog";
 import { EmptyState } from "../_components/empty-state";
+import { titleFromWords } from "@mindreva/types";
 import { getDefaultArtwork } from "@/lib/default-artwork";
 
 export function ArchiveList({
@@ -75,13 +76,16 @@ export function ArchiveList({
           >
             <PrefetchLink href={`/entries/${entry.id}`}>
               <NoteCard
-                title={entry.title || "Untitled entry"}
+                title={
+                  entry.title ||
+                  titleFromWords(entry.snippet ?? "") ||
+                  "Untitled entry"
+                }
                 dateLabel={
                   hydrated
                     ? formatEntryDateTime(entry.createdAt)
                     : DATE_PLACEHOLDER
                 }
-                snippet={entry.snippet ?? undefined}
                 thumbnailPending={!resolved(entry.id)}
                 thumbnailUrl={
                   thumbnails[entry.id] ??

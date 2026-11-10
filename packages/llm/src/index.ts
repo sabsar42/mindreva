@@ -13,6 +13,7 @@ export { completionModelList } from "./providers/openrouter-provider";
 export {
   resolveSummaryPrompt,
   parseTaskBlock,
+  parseTitleLine,
   type SummaryPromptTemplate,
 } from "./prompts/summarize";
 export {

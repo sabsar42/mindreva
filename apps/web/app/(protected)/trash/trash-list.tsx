@@ -10,6 +10,7 @@ import { useHydrated } from "@/lib/use-hydrated";
 import { useEntryThumbnails } from "../_components/use-entry-thumbnails";
 import { PageHeader } from "../_components/page-header";
 import { EmptyState } from "../_components/empty-state";
+import { titleFromWords } from "@mindreva/types";
 import { getDefaultArtwork } from "@/lib/default-artwork";
 
 // Note: trashed entries are intentionally NOT links to /entries/[id] — the
@@ -62,13 +63,16 @@ export function TrashList({
             ]}
           >
             <NoteCard
-              title={entry.title || "Untitled entry"}
+              title={
+                entry.title ||
+                titleFromWords(entry.snippet ?? "") ||
+                "Untitled entry"
+              }
               dateLabel={
                 hydrated
                   ? formatEntryDateTime(entry.createdAt)
                   : DATE_PLACEHOLDER
               }
-              snippet={entry.snippet ?? undefined}
               thumbnailPending={!resolved(entry.id)}
               thumbnailUrl={
                 thumbnails[entry.id] ??

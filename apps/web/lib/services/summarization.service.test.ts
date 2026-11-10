@@ -35,6 +35,7 @@ vi.mock("@mindreva/llm", () => ({
     buildMessages: (t: string) => [{ role: "user", content: t }],
   }),
   parseTaskBlock: (raw: string) => ({ summaryText: raw, tasks: [] }),
+  parseTitleLine: (raw: string) => ({ title: null, rest: raw }),
 }));
 vi.mock("./mindmap.service", () => ({ recomputeMindmapForUser: vi.fn() }));
 vi.mock("./usage.service", () => ({

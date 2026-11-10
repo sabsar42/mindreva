@@ -1,6 +1,6 @@
 /**
  * The pictures an entry gets until it has a photo of its own: airy, abstract
- * pieces on off-white grounds in the app's mint, deep green and sand. Square
+ * pieces (twelve of them, for variety) on off-white grounds in the app's mint, deep green and sand. Square
  * for card thumbnails and day cells, wide (400×200) for the entry hero.
  * Entries without a photo pick one by a hash of their id, so each keeps its
  * picture. (Renaming a file here also busts browser caches of the old art.)
@@ -12,18 +12,29 @@ const NAMES = [
   "bloom",
   "contours",
   "petals",
+  "dunes",
+  "stems",
+  "moons",
+  "tiles",
+  "sunrise",
+  "orbit",
 ] as const;
 
 const ARTWORKS = NAMES.map((n) => `/defaults/${n}.svg`);
 const ARTWORKS_WIDE = NAMES.map((n) => `/defaults/${n}-wide.svg`);
 
 function hashSeed(seed: string): number {
-  let h = 0;
+  // FNV-1a plus a final avalanche, so ids that differ in a few characters
+  // still spread across every picture instead of clustering on a few.
+  let h = 0x811c9dc5;
   for (let i = 0; i < seed.length; i++) {
-    h = Math.imul(31, h) + seed.charCodeAt(i);
-    h |= 0;
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
   }
-  return Math.abs(h);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  return h >>> 0;
 }
 
 /** Square artwork for NoteCard thumbnails and calendar day cells. */

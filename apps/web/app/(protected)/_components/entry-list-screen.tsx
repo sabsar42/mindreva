@@ -45,6 +45,7 @@ import type { EntryListItemWithThumbnail } from "@/lib/services/entries.service"
 import { useEntryThumbnails } from "./use-entry-thumbnails";
 import { useOptimisticRemove } from "./use-optimistic-remove";
 import { PrefetchLink } from "./prefetch-link";
+import { titleFromWords } from "@mindreva/types";
 import { getDefaultArtwork } from "@/lib/default-artwork";
 
 export function EntryListScreen({
@@ -390,14 +391,17 @@ export function EntryListScreen({
               >
                 <PrefetchLink href={`/entries/${entry.id}`}>
                   <NoteCard
-                    title={entry.title || "Untitled entry"}
+                    title={
+                      entry.title ||
+                      titleFromWords(entry.snippet ?? "") ||
+                      "Untitled entry"
+                    }
                     dateLabel={
                       hydrated
                         ? formatEntryDateTime(entry.createdAt)
                         : DATE_PLACEHOLDER
                     }
                     durationLabel={formatDuration(entry.durationMs)}
-                    snippet={entry.snippet ?? undefined}
                     failed={failedReason.get(entry.id)}
                     settling={settlingIds.has(entry.id)}
                     thumbnailPending={!thumbnailResolved(entry.id)}

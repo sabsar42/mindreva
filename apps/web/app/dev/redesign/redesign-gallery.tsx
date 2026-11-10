@@ -269,7 +269,6 @@ export function RedesignGallery() {
           title="Morning run and the Q3 pitch"
           dateLabel="Oct 13, 9:42 AM"
           durationLabel="2 min"
-          snippet="Ran the lake loop before work. Somewhere around the second kilometre the pitch clicked."
           onClick={noop}
         />
       </Section>

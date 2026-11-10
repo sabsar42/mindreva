@@ -7,6 +7,15 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-11 — Title-only cards, generated titles, twelve default pictures
+
+Owner feedback: variety in the automatic pictures, and cards should show only a title.
+
+- Cards show the title only (no snippet). The title may take two lines.
+- Titles: the summary prompt (now `*-v3`) asks the model for a `TITLE:` first line in the same completion, no extra LLM call; `parseTitleLine` splits it off. If the model gives none, or is down, the title is the first four words said (`titleFromWords` in `@mindreva/types`). Lists also derive that fallback from the entry text while the summary is still pending, so a card is never just "Untitled entry" when there is text. A title the user typed is never overwritten.
+- Default pictures: twelve instead of six (added dunes, stems, moons, tiles, sunrise, orbit), picked with an FNV-1a hash plus avalanche so similar ids no longer cluster on a few pictures.
+- README screenshots regenerated.
+
 ## 2026-11-11 — Card type, shape, shadow and default artwork
 
 Owner feedback: dislike the card fonts, fix the card shape, add a very light shadow, and make the automatic pictures artistic on white/off-white grounds matching the theme.
