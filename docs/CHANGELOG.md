@@ -7,6 +7,13 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-11 — Google Calendar credentials wired in, logo saved
+
+- The Google OAuth client is configured through `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` and `CALENDAR_TOKEN_KEY`. The values live only in git-ignored files (`.secrets/google-calendar.env`, `apps/web/.env.local`); production needs the same four set in Vercel.
+- The OAuth client's registered redirect is `/api/google-calendar/callback`, so a route at that path now hands off to the shared callback handler (the old `/api/integrations/google-calendar/callback` still works). `.env.example` updated.
+- Verified locally: connect returns a Google sign-in URL with the right client and redirect; the Integrations screen offers Connect Google Calendar.
+- Logo files saved in `docs/brand/` (original SVG/PNG, green and white SVGs, 1000px green PNG).
+
 ## 2026-11-11 — Voluntary SupportKori tip widget
 
 Owner asked for a Buy-Me-a-Coffee-style way to support the app until payments exist. See docs/DECISIONS.md 2026-11-11.
