@@ -4,15 +4,19 @@ import {
   resolveSummaryPrompt,
   parseTaskBlock,
   parseTitleLine,
+  parseEventBlock,
+  type ParsedEvent,
 } from "@mindreva/llm";
 import {
   EntriesRepository,
+  EntryEventsRepository,
   EntryTasksRepository,
   ProfilesRepository,
   SummariesRepository,
   TranscriptsRepository,
 } from "@mindreva/database";
 import { stripFormatting, titleFromWords } from "@mindreva/types";
+import { addDays } from "../day-key";
 import { nextDailyReset, refundDaily, tryUseDaily } from "./usage.service";
 import { isLimitError } from "../limit-error";
 import {
@@ -21,6 +25,30 @@ import {
   SUMMARY_RETRY_DELAY_MS,
   SUMMARY_RETRY_LEASE_MS,
 } from "../usage-limits";
+
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+/** "2026-11-11 (Wednesday)": lets the model turn "Thursday" or "tomorrow" into a real date. */
+function describeDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number) as [number, number, number];
+  return `${dateKey} (${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]})`;
+}
+
+/** Events worth suggesting: not before the entry's own day, within two years. */
+function usableEvents(events: ParsedEvent[], entryDate: string): ParsedEvent[] {
+  const last = addDays(entryDate, 730);
+  return events
+    .filter((e) => e.date >= entryDate && e.date <= last)
+    .slice(0, 5);
+}
 
 /**
  * What happened to one summarize attempt. Summarizing never throws for an AI
@@ -107,8 +135,21 @@ export async function summarizeEntry(
     );
   }
 
+  const entryRow = await EntriesRepository.getByIdForUser(entryId, userId);
+  const entryDate =
+    entryRow?.entryDate ??
+    (entryRow?.createdAt ?? new Date()).toISOString().slice(0, 10);
+
   const template = resolveSummaryPrompt(profile?.summaryStyle ?? "general");
   const messages = template.buildMessages(confirmedText);
+  // The entry's date, so relative dates in the entry ("Thursday") resolve.
+  const last = messages[messages.length - 1];
+  if (last && last.role === "user") {
+    messages[messages.length - 1] = {
+      ...last,
+      content: `${last.content}\n\nEntry date (for resolving relative dates): ${describeDate(entryDate)}.`,
+    };
+  }
 
   const provider = getLLMProvider();
   let completion;
@@ -128,7 +169,10 @@ export async function summarizeEntry(
       ),
     );
   }
-  const { title: modelTitle, rest } = parseTitleLine(completion.text);
+  const { title: modelTitle, rest: afterTitle } = parseTitleLine(
+    completion.text,
+  );
+  const { rest, events } = parseEventBlock(afterTitle);
   const { summaryText, tasks } = parseTaskBlock(rest);
 
   await SummariesRepository.create({
@@ -144,6 +188,20 @@ export async function summarizeEntry(
     await EntryTasksRepository.replaceForEntry(entryId, userId, tasks);
   } catch (err) {
     console.error(`Task extraction failed for entry ${entryId}:`, err);
+  }
+
+  try {
+    await EntryEventsRepository.replaceSuggestions(
+      entryId,
+      userId,
+      usableEvents(events, entryDate).map((e) => ({
+        title: e.title,
+        startDate: e.date,
+        startTime: e.time,
+      })),
+    );
+  } catch (err) {
+    console.error(`Event extraction failed for entry ${entryId}:`, err);
   }
 
   const entry = await EntriesRepository.getByIdForUser(entryId, userId);

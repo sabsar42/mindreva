@@ -156,6 +156,40 @@ export const entryTasks = pgTable(
   (t) => [index("entry_tasks_entry_idx").on(t.entryId)],
 );
 
+/**
+ * Dated events the summary found in an entry ("dentist Thursday at 3"),
+ * offered to the user as one-tap "Add to calendar" suggestions. Nothing is
+ * written to the user's calendar until they tap. `start_time` is "HH:MM" in the
+ * user's own time zone (null = all-day).
+ */
+export const entryEvents = pgTable(
+  "entry_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => entries.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startDate: date("start_date").notNull(),
+    startTime: text("start_time"),
+    status: text("status")
+      .notNull()
+      .default("suggested")
+      .$type<EntryEventStatus>(),
+    googleEventId: text("google_event_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("entry_events_entry_idx").on(t.entryId),
+    check(
+      "entry_events_status_check",
+      sql`${t.status} in ('suggested','added','dismissed')`,
+    ),
+  ],
+);
+
 export const transcripts = pgTable(
   "transcripts",
   {
@@ -505,6 +539,8 @@ export type Recording = typeof recordings.$inferSelect;
 export type NewRecording = typeof recordings.$inferInsert;
 export type EntryPhoto = typeof entryPhotos.$inferSelect;
 export type NewEntryPhoto = typeof entryPhotos.$inferInsert;
+export type EntryEvent = typeof entryEvents.$inferSelect;
+export type EntryEventStatus = "suggested" | "added" | "dismissed";
 export type EntryTask = typeof entryTasks.$inferSelect;
 export type NewEntryTask = typeof entryTasks.$inferInsert;
 export type Transcript = typeof transcripts.$inferSelect;

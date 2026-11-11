@@ -14,6 +14,8 @@ export {
   resolveSummaryPrompt,
   parseTaskBlock,
   parseTitleLine,
+  parseEventBlock,
+  type ParsedEvent,
   type SummaryPromptTemplate,
 } from "./prompts/summarize";
 export {

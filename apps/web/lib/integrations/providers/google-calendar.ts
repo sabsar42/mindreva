@@ -10,9 +10,10 @@ import {
 } from "@/lib/services/calendar.service";
 
 /**
- * Google Calendar, read-only: shows your events beside your entries (on an
- * entry's day, on Home and on Re-live Me). Nothing is written to your
- * calendar and nothing is sent to an AI model. Off unless GOOGLE_CLIENT_ID,
+ * Google Calendar: shows your events beside your entries (on an entry's day,
+ * on Home and on Re-live Me), and adds an event from an entry only when you tap
+ * "Add to calendar". Existing events are never changed and no calendar data is
+ * sent to an AI model. Off unless GOOGLE_CLIENT_ID,
  * GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI and CALENDAR_TOKEN_KEY are set.
  */
 export const googleCalendarProvider: IntegrationProvider = {
@@ -20,7 +21,7 @@ export const googleCalendarProvider: IntegrationProvider = {
     id: "google-calendar",
     name: "Google Calendar",
     description:
-      "See the day's events beside your entries and memories. Read-only: Mindreva never changes your calendar.",
+      "See the day's events beside your entries and memories, and add events from your recordings with one tap.",
   },
 
   isConfigured: () => isCalendarConfigured(),

@@ -26,7 +26,7 @@ Talk, and it becomes a readable note with a title, a summary and a checklist. Mo
 | **Yours**                          | Row Level Security on every table, soft delete with Archive and Trash, share an entry by link or with specific people, and delete your whole account and its files from the Account screen.                                                                             |
 | **Free, and honest about limits**  | Nothing is behind a paywall. The optional "Support Mindreva" link is voluntary and unlocks nothing. Daily AI limits are explained calmly and never lose an entry.                                                                                                       |
 
-Also: light and dark mode, an iOS-style interface built for phones (installable as a home-screen app), and an optional read-only Google Calendar view of the day an entry belongs to.
+Also: light and dark mode, an iOS-style interface built for phones (installable as a home-screen app), and an optional Google Calendar connection that shows the day an entry belongs to and adds events from your recordings with one tap.
 
 ## Screens
 

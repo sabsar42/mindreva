@@ -23,6 +23,15 @@ export const TITLE_PREFIX = "TITLE:";
  * second LLM call). Parsed and stripped by parseTitleLine(). */
 export const TITLE_RULE = `Begin your reply with one line "${TITLE_PREFIX} " followed by a title of 2 to 6 words naming what the entry is about (plain words, no quotes, no trailing punctuation), then a blank line, then the rest as described.`;
 
+/** Marks an optional, separately-parsed block of dated events at the very end
+ * of a reply — see EVENT_RULE and parseEventBlock(). */
+export const EVENT_BLOCK_MARKER = "===EVENTS===";
+
+/** Asks for upcoming dated events in the same completion (no extra call). The
+ * entry's own date is appended to the user message by the caller so words like
+ * "tomorrow" or "Thursday" resolve correctly. */
+export const EVENT_RULE = `Last of all, if the person mentions a specific upcoming appointment, meeting or plan with a clear date (a day name, "tomorrow", "next week", or a date), add a final line "${EVENT_BLOCK_MARKER}" and then one event per line as "- YYYY-MM-DD HH:MM | Short title" (24-hour time; if no time was said, write "- YYYY-MM-DD | Short title"). Work out relative dates from the entry date given below the entry. The title is at most 6 words. Include only things that are still to happen, never past events, vague intentions with no date, or tasks with no set time. If none qualify, omit the ${EVENT_BLOCK_MARKER} block entirely. Never invent a date.`;
+
 /**
  * Appended to every style's system prompt. Keeps task extraction a single
  * additional instruction on the existing summarize call, rather than a
@@ -30,7 +39,7 @@ export const TITLE_RULE = `Begin your reply with one line "${TITLE_PREFIX} " fol
  * styles (not just meetings) that every style gets the option, but the
  * model is told explicitly to skip the block when nothing qualifies.
  */
-export const TASK_EXTRACTION_RULE = `${TITLE_RULE} After the summary, if the content clearly implies one or more concrete action items, follow-ups, or to-dos the person should do (most common in meeting notes, but not limited to them), add a line "${TASK_BLOCK_MARKER}" and then one task per line starting with "- ". Each task should be a short, self-contained action (e.g. "- Email Priya the budget draft"), not a restatement of the whole entry. If nothing in the content is genuinely an action item, omit the ${TASK_BLOCK_MARKER} block entirely — do not invent tasks to fill it.`;
+export const TASK_EXTRACTION_RULE = `${TITLE_RULE} After the summary, if the content clearly implies one or more concrete action items, follow-ups, or to-dos the person should do (most common in meeting notes, but not limited to them), add a line "${TASK_BLOCK_MARKER}" and then one task per line starting with "- ". Each task should be a short, self-contained action (e.g. "- Email Priya the budget draft"), not a restatement of the whole entry. If nothing in the content is genuinely an action item, omit the ${TASK_BLOCK_MARKER} block entirely — do not invent tasks to fill it. ${EVENT_RULE}`;
 
 /**
  * Splits a raw LLM response into the visible summary and the optional task
@@ -80,4 +89,72 @@ export function parseTitleLine(rawResponse: string): {
     .trim();
   const rest = newline === -1 ? "" : trimmed.slice(newline + 1);
   return { title: title && title.length <= 80 ? title : null, rest };
+}
+
+export interface ParsedEvent {
+  /** "YYYY-MM-DD" */
+  date: string;
+  /** "HH:MM" (24-hour), or null for an all-day event. */
+  time: string | null;
+  title: string;
+}
+
+const EVENT_LINE =
+  /^-\s*(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?\s*[|–—-]\s*(.+)$/;
+
+function isRealDate(key: string): boolean {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === m! - 1 &&
+    dt.getUTCDate() === d
+  );
+}
+
+/**
+ * Splits the optional EVENTS block off a raw response. Returns the text with
+ * the block removed (so the summary and task parsing never see it) and the
+ * valid events. Malformed lines are skipped; a missing block is the common
+ * case. If the model put the TASKS block after the events, that block is kept.
+ */
+export function parseEventBlock(rawResponse: string): {
+  rest: string;
+  events: ParsedEvent[];
+} {
+  const at = rawResponse.indexOf(EVENT_BLOCK_MARKER);
+  if (at === -1) return { rest: rawResponse, events: [] };
+
+  const before = rawResponse.slice(0, at);
+  let section = rawResponse.slice(at + EVENT_BLOCK_MARKER.length);
+  let tail = "";
+  const tasksAt = section.indexOf(TASK_BLOCK_MARKER);
+  if (tasksAt !== -1) {
+    tail = section.slice(tasksAt);
+    section = section.slice(0, tasksAt);
+  }
+
+  const events: ParsedEvent[] = [];
+  for (const raw of section.split("\n")) {
+    const m = raw.trim().match(EVENT_LINE);
+    if (!m) continue;
+    const date = m[1]!;
+    if (!isRealDate(date)) continue;
+    let time: string | null = null;
+    if (m[2]) {
+      const [h, min] = m[2].split(":").map(Number);
+      if (h! > 23 || min! > 59) continue;
+      time = `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+    }
+    const title = m[3]!
+      .trim()
+      .replace(/^["'“]+|["'”.]+$/g, "")
+      .trim();
+    if (!title || title.length > 80) continue;
+    events.push({ date, time, title });
+  }
+  return {
+    rest: (before.trimEnd() + (tail ? "\n" + tail : "")).trimEnd(),
+    events,
+  };
 }

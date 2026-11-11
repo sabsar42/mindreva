@@ -18,6 +18,10 @@ export { RecordingsRepository } from "./repositories/recordings.repository";
 export { EntryPhotosRepository } from "./repositories/entry-photos.repository";
 export { EntryTasksRepository } from "./repositories/entry-tasks.repository";
 export {
+  EntryEventsRepository,
+  type EventSuggestion,
+} from "./repositories/entry-events.repository";
+export {
   EntrySharesRepository,
   type ShareWithRecipients,
 } from "./repositories/entry-shares.repository";
@@ -60,6 +64,8 @@ export type {
   EntryPhoto,
   NewEntryPhoto,
   EntryTask,
+  EntryEvent,
+  EntryEventStatus,
   NewEntryTask,
   Transcript,
   NewTranscript,

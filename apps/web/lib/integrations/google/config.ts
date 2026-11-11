@@ -7,11 +7,20 @@ export interface GoogleCalendarConfig {
   tokenKey: Buffer;
 }
 
-/** Read-only access to calendars, plus the account email for the label. */
+/** Reading calendars, plus the account email for the label. */
+export const CALENDAR_READ_SCOPE =
+  "https://www.googleapis.com/auth/calendar.readonly";
+
+/** Creating events the user taps "Add to calendar" on. Narrower than full
+ * calendar access: it can't change calendar settings or sharing. */
+export const CALENDAR_EVENTS_SCOPE =
+  "https://www.googleapis.com/auth/calendar.events";
+
 export const GOOGLE_CALENDAR_SCOPES = [
   "openid",
   "email",
-  "https://www.googleapis.com/auth/calendar.readonly",
+  CALENDAR_READ_SCOPE,
+  CALENDAR_EVENTS_SCOPE,
 ] as const;
 
 /**

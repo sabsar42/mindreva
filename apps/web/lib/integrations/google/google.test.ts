@@ -89,12 +89,12 @@ describe("oauth", () => {
     );
   });
 
-  it("asks for read-only calendar access, offline, with state and PKCE", () => {
+  it("asks for calendar read and event access, offline, with state and PKCE", () => {
     const url = new URL(buildAuthUrl(config, "st4te", "verifier"));
     const p = url.searchParams;
     expect(url.origin).toBe("https://accounts.google.com");
     expect(p.get("scope")).toBe(
-      "openid email https://www.googleapis.com/auth/calendar.readonly",
+      "openid email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events",
     );
     expect(p.get("access_type")).toBe("offline");
     expect(p.get("include_granted_scopes")).toBe("true");

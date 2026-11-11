@@ -9,6 +9,7 @@ const claimDueSummaryRetry = vi.fn();
 const createSummary = vi.fn();
 const getEntry = vi.fn();
 const replaceTasks = vi.fn();
+const replaceEvents = vi.fn();
 const upsertEmbedding = vi.fn();
 const complete = vi.fn();
 const embed = vi.fn();
@@ -26,6 +27,7 @@ vi.mock("@mindreva/database", () => ({
   },
   SummariesRepository: { create: createSummary },
   EntryTasksRepository: { replaceForEntry: replaceTasks },
+  EntryEventsRepository: { replaceSuggestions: replaceEvents },
   EmbeddingsRepository: { upsertForEntry: upsertEmbedding },
 }));
 vi.mock("@mindreva/llm", () => ({
@@ -36,6 +38,7 @@ vi.mock("@mindreva/llm", () => ({
   }),
   parseTaskBlock: (raw: string) => ({ summaryText: raw, tasks: [] }),
   parseTitleLine: (raw: string) => ({ title: null, rest: raw }),
+  parseEventBlock: (raw: string) => ({ rest: raw, events: [] }),
 }));
 vi.mock("./mindmap.service", () => ({ recomputeMindmapForUser: vi.fn() }));
 vi.mock("./usage.service", () => ({

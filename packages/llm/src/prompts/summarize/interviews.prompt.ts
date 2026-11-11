@@ -4,7 +4,7 @@ import {
   type SummaryPromptTemplate,
 } from "./types";
 
-export const PROMPT_VERSION = "interviews-v3";
+export const PROMPT_VERSION = "interviews-v4";
 
 export const interviewsSummaryPrompt: SummaryPromptTemplate = {
   promptVersion: PROMPT_VERSION,

@@ -7,6 +7,19 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-11 — Add events from a recording to Google Calendar
+
+Owner asked: if a recording mentions an event, can it end up on the calendar, with a smooth, simple flow.
+
+- The summary call now also reports upcoming dated events (`===EVENTS===` block, prompts bumped to `*-v4`, no extra model call). The entry's own date is appended to the prompt so "Friday" and "tomorrow" resolve. Events before the entry's day, or more than two years out, are dropped; at most five per entry.
+- New `entry_events` table (migrations 0021/0022, RLS through the owning entry, same as `entry_tasks`), `EntryEventsRepository`. A regenerate refreshes the open suggestions but never re-offers one that was added or dismissed.
+- Entry screen: an Events card under the tasks, one **Add to calendar** button per event, a dismiss X. Nothing is added until the user taps.
+- The tap is the whole flow. Already connected with the events permission: it adds the event. Not connected, or connected read-only before this change: the same tap goes through Google's consent screen once, returns to the entry (`mindreva_after_connect` cookie, validated to an entry URL only) and adds the event without another tap.
+- Google scope `calendar.events` added next to `calendar.readonly`. The event id is the row's uuid as hex, so a double tap or retry can't create two events. Timed events last an hour in the user's own time zone; all-day events end the next day.
+- Fix found while building: the OAuth handshake cookie path is `/api` (see the entry below).
+- Privacy page, Integrations screen, README and the provider description no longer say "read-only"; they say events are added only on tap and existing events are never changed.
+- Verified live: the real model turned "dentist appointment this Friday at 3pm" and "Mum's birthday dinner on November 20th" into Fri 13 Nov 15:00 and Sat 20 Nov all-day (and none for a quiet entry); add without permission answers `needs_permission`; dismiss persists; tapping Add with no permission lands on Google's consent URL with the return cookie set; throwaway user deleted, cascade confirmed. Not verified: a real event created in a real Google Calendar (needs an interactive Google sign-in).
+
 ## 2026-11-11 — Google Calendar credentials wired in, logo saved
 
 - The Google OAuth client is configured through `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` and `CALENDAR_TOKEN_KEY`. The values live only in git-ignored files (`.secrets/google-calendar.env`, `apps/web/.env.local`); production needs the same four set in Vercel.

@@ -1,8 +1,15 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { getUser } from "@mindreva/auth/server";
-import { CalendarConnectionsRepository } from "@mindreva/database";
-import { getGoogleCalendarConfig } from "@/lib/integrations/google/config";
+import {
+  CalendarConnectionsRepository,
+  EntryEventsRepository,
+  type EntryEvent,
+} from "@mindreva/database";
+import {
+  CALENDAR_EVENTS_SCOPE,
+  getGoogleCalendarConfig,
+} from "@/lib/integrations/google/config";
 import { decryptToken, encryptToken } from "@/lib/integrations/google/crypto";
 import {
   GoogleReauthRequiredError,
@@ -13,7 +20,10 @@ import {
   revokeToken,
 } from "@/lib/integrations/google/oauth";
 import {
+  GoogleForbiddenError,
   GoogleUnauthorizedError,
+  buildEventBody,
+  insertEvent,
   listCalendars,
   listEvents,
   sortEvents,
@@ -24,7 +34,8 @@ import { addDays, resolveTimeZone, startOfDayInZone } from "@/lib/day-key";
 import { getMyProfile } from "./profile.service";
 
 /**
- * Google Calendar, read-only. Everything here runs on the server: tokens
+ * Google Calendar: reads events to show beside entries, and creates an event
+ * only when the user taps "Add to calendar" on a suggestion. Everything here runs on the server: tokens
  * are decrypted only in memory, never logged, never sent to a client.
  * Nothing in the app depends on it: when it isn't configured or connected,
  * callers get "disconnected" and hide calendar UI.
@@ -169,16 +180,25 @@ export async function getCalendarStatusForUser(userId: string): Promise<{
   status: CalendarStatus;
   email: string | null;
   connectedAt: string | null;
+  /** Connected AND allowed to create events (an older, read-only connection
+   * isn't: it needs one more tap through Google's consent screen). */
+  canAddEvents: boolean;
 }> {
-  if (!isCalendarConfigured()) {
-    return { status: "disconnected", email: null, connectedAt: null };
-  }
+  const none = {
+    status: "disconnected" as const,
+    email: null,
+    connectedAt: null,
+    canAddEvents: false,
+  };
+  if (!isCalendarConfigured()) return none;
   const row = await CalendarConnectionsRepository.getForUser(userId);
-  if (!row) return { status: "disconnected", email: null, connectedAt: null };
+  if (!row) return none;
   return {
     status: row.status,
     email: row.accountEmail,
     connectedAt: row.createdAt.toISOString(),
+    canAddEvents:
+      row.status === "connected" && row.scopes.includes(CALENDAR_EVENTS_SCOPE),
   };
 }
 
@@ -309,4 +329,112 @@ export async function getMyCalendarEvents(
     // Google down or rate-limited past our retries: the app carries on.
     return { status, events: hit?.events ?? [] };
   }
+}
+
+/* ---------------------------------------------------------------- */
+/* Adding a suggested event                                           */
+/* ---------------------------------------------------------------- */
+
+export type AddEventResult =
+  | { result: "added"; event: EntryEvent }
+  /** Not connected, or connected without the events permission: the caller
+   * sends the user through Google's consent and then retries. */
+  | { result: "needs_permission" }
+  | { result: "failed" }
+  | { result: "not_found" };
+
+/** A stable Google event id for one suggestion: the row's uuid as lowercase
+ * hex, which is valid for Google, so a double tap can't make two events. */
+function googleEventIdFor(eventRowId: string): string {
+  return eventRowId.replace(/-/g, "").toLowerCase();
+}
+
+/**
+ * Adds one suggested event to the user's primary calendar. The user's own tap
+ * is the only trigger. Idempotent: adding an already-added event just reports
+ * it as added.
+ */
+export async function addMyEventToCalendar(
+  eventId: string,
+): Promise<AddEventResult> {
+  const userId = await requireUserId();
+  const event = await EntryEventsRepository.getOwned(eventId, userId);
+  if (!event) return { result: "not_found" };
+  if (event.status === "added") return { result: "added", event };
+
+  const { canAddEvents } = await getCalendarStatusForUser(userId);
+  if (!canAddEvents) return { result: "needs_permission" };
+
+  const profile = await getMyProfile();
+  const zone = resolveTimeZone(profile?.timezone);
+  const googleId = googleEventIdFor(event.id);
+  try {
+    const outcome = await withToken(userId, (token) =>
+      insertEvent(
+        token,
+        "primary",
+        googleId,
+        buildEventBody(
+          {
+            title: event.title,
+            startDate: event.startDate,
+            startTime: event.startTime,
+          },
+          zone,
+        ),
+      ),
+    );
+    if (!outcome) return { result: "needs_permission" };
+  } catch (err) {
+    if (err instanceof GoogleForbiddenError)
+      return { result: "needs_permission" };
+    console.error("Adding a calendar event failed:", (err as Error).name);
+    return { result: "failed" };
+  }
+  forgetUser(userId);
+  const updated = await EntryEventsRepository.setStatus(
+    event.id,
+    userId,
+    "added",
+    googleId,
+  );
+  return updated ? { result: "added", event: updated } : { result: "failed" };
+}
+
+/** The entry's event suggestions (dismissed ones hidden) and what the calendar
+ * can do right now, so the entry screen knows which button to show. */
+export async function listMyEntryEvents(entryId: string): Promise<{
+  configured: boolean;
+  status: CalendarStatus;
+  canAddEvents: boolean;
+  events: EntryEvent[];
+}> {
+  const userId = await requireUserId();
+  const configured = isCalendarConfigured();
+  if (!configured) {
+    return {
+      configured,
+      status: "disconnected",
+      canAddEvents: false,
+      events: [],
+    };
+  }
+  const [{ status, canAddEvents }, all] = await Promise.all([
+    getCalendarStatusForUser(userId),
+    EntryEventsRepository.listByEntry(entryId, userId),
+  ]);
+  return {
+    configured,
+    status,
+    canAddEvents,
+    events: all.filter((e) => e.status !== "dismissed"),
+  };
+}
+
+export async function dismissMyEvent(eventId: string): Promise<boolean> {
+  const userId = await requireUserId();
+  return (
+    (await EntryEventsRepository.setStatus(eventId, userId, "dismissed")) !==
+    null
+  );
 }

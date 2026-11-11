@@ -107,9 +107,11 @@ function CalendarSettings() {
   return (
     <div className="space-y-3">
       <p className="text-footnote text-muted-foreground px-1">
-        Mindreva reads event titles and times from the calendars you choose,
-        only to show them beside your entries. It never changes your calendar
-        and never sends calendar data to an AI model.
+        Mindreva reads event titles and times from the calendars you choose, to
+        show them beside your entries. It adds an event only when you tap
+        &quot;Add to calendar&quot; on a date found in one of your entries,
+        never changes or deletes existing events, and never sends calendar data
+        to an AI model.
       </p>
       {failed ? (
         <p className="text-footnote text-destructive px-1" role="alert">

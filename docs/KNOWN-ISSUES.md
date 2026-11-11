@@ -4,6 +4,11 @@ Open, unresolved items. Not decisions already made (see
 [docs/DECISIONS.md](./DECISIONS.md) for those) — this is specifically for
 things still outstanding.
 
+## Calendar events: real Google add not verified; dates are the model's reading
+
+**Status:** Open.
+Everything up to the Google call was verified live (see docs/CHANGELOG.md 2026-11-11), but creating an event in a real Google Calendar needs an interactive Google sign-in and hasn't been exercised. First real test: open an entry with an event in production, tap Add to calendar, allow access, check the event. If the Google consent screen is still in "Testing" mode, only listed test users can connect. Also: event dates and times come from the model's reading of what was said ("next Friday" can be ambiguous), which is why nothing is added without a tap. Entries summarised before this change have no event suggestions until their summary is regenerated.
+
 ## Add-on recordings: order, partial failure, timestamps
 
 **Status:** Open (minor).

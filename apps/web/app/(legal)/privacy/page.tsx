@@ -114,12 +114,14 @@ export default function PrivacyPage() {
 
       <Section title="Google Calendar (optional)">
         <p>
-          If you choose to connect Google Calendar, Mindreva asks Google for
-          read-only access to your calendars (the <code>calendar.readonly</code>{" "}
-          permission) and your Google account email. It reads event titles,
-          times and calendar names, only to show that day&apos;s events beside
-          your entries, on Home and in Re-live Me. It never creates, changes or
-          deletes anything in your calendar.
+          If you choose to connect Google Calendar, Mindreva asks Google to read
+          your calendars (the <code>calendar.readonly</code> permission), to
+          create events (the <code>calendar.events</code> permission) and for
+          your Google account email. It reads event titles, times and calendar
+          names to show that day&apos;s events beside your entries, on Home and
+          in Re-live Me. It creates an event only when you tap &quot;Add to
+          calendar&quot; on a date it found in one of your entries, and it never
+          changes or deletes events that are already there.
         </p>
         <p>
           Events are fetched when you open a screen and held briefly in memory

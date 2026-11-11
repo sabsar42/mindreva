@@ -1,8 +1,10 @@
 /**
- * Google Calendar API v3, read-only. Small and dependency-free: a fetch
- * wrapper with retry + backoff for rate limits and server errors, and pure
- * mappers to Mindreva's own event shape (tested without the network).
+ * Google Calendar API v3. Small and dependency-free: a fetch wrapper with
+ * retry + backoff for rate limits and server errors, pure mappers to
+ * Mindreva's own event shape, and one write (creating an event the user chose
+ * to add). Tested without the network.
  */
+import { addDays } from "../../day-key";
 
 const API = "https://www.googleapis.com/calendar/v3";
 
@@ -21,6 +23,14 @@ export interface CalendarEvent {
   start: string;
   end: string;
   allDay: boolean;
+}
+
+/** Thrown for 403 on a write: the connection lacks the events permission. */
+export class GoogleForbiddenError extends Error {
+  constructor() {
+    super("Google says this connection can't create events");
+    this.name = "GoogleForbiddenError";
+  }
 }
 
 /** Thrown for 401: the access token is no good (refresh, then reconnect). */
@@ -174,4 +184,76 @@ export async function listEvents(
     fetchImpl,
   );
   return mapEvents(calendarId, data.items);
+}
+
+export interface NewCalendarEvent {
+  title: string;
+  /** "YYYY-MM-DD" */
+  startDate: string;
+  /** "HH:MM" in `zone`, or null for an all-day event. */
+  startTime: string | null;
+}
+
+/**
+ * The Google event body for a suggestion. Timed events last an hour and carry
+ * the user's own time zone, so "3pm" means 3pm where they are. All-day events
+ * end on the next date (Google's end date is exclusive).
+ */
+export function buildEventBody(ev: NewCalendarEvent, zone: string) {
+  const base = {
+    summary: ev.title,
+    description: "Added from your Mindreva journal.",
+  };
+  if (!ev.startTime) {
+    return {
+      ...base,
+      start: { date: ev.startDate },
+      end: { date: addDays(ev.startDate, 1) },
+    };
+  }
+  const [y, m, d] = ev.startDate.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const [h, min] = ev.startTime.split(":").map(Number) as [number, number];
+  const end = new Date(Date.UTC(y, m - 1, d, h + 1, min))
+    .toISOString()
+    .slice(0, 19);
+  return {
+    ...base,
+    start: { dateTime: `${ev.startDate}T${ev.startTime}:00`, timeZone: zone },
+    end: { dateTime: end, timeZone: zone },
+  };
+}
+
+/**
+ * Creates an event on the calendar. `eventId` is chosen by us (lowercase hex),
+ * so tapping twice, or a retry, can't create a duplicate: Google answers 409
+ * and that counts as already added.
+ */
+export async function insertEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+  body: ReturnType<typeof buildEventBody>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<"created" | "exists"> {
+  const res = await fetchImpl(
+    `${API}/calendars/${encodeURIComponent(calendarId)}/events`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id: eventId, ...body }),
+      cache: "no-store",
+    },
+  );
+  if (res.ok) return "created";
+  if (res.status === 409) return "exists";
+  if (res.status === 401) throw new GoogleUnauthorizedError();
+  if (res.status === 403) throw new GoogleForbiddenError();
+  throw new Error(`Google Calendar request failed (${res.status})`);
 }

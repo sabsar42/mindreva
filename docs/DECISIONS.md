@@ -11,6 +11,18 @@ rather than resolved.
 
 ---
 
+## 2026-11-11 — Calendar write access: events only, one tap, no settings toggle
+
+**What happened.** The owner asked for recordings that mention an event to reach Google Calendar, with a very simple flow.
+
+**Decision.**
+
+- Scope: `calendar.events` (create/edit events), not full `calendar`, so the app can't touch calendar settings or sharing. Kept `calendar.readonly` for the existing day view and the calendar list.
+- Suggest, don't auto-add. A model can misread a date, and a wrong event on someone's calendar is worse than one extra tap. Each event is shown with its date and time and added only when the user taps.
+- No settings toggle. The tap on "Add to calendar" is the opt-in; Google's own consent screen is the permission step. Anyone connected read-only before this just sees that screen once, on their first add.
+- The extraction rides the existing summary completion (like titles and tasks), not a second model call, so it costs no extra free-tier quota. No calendar data is sent to a model; only the entry text, as before.
+- Only the app ever creates events, with our own id for idempotency; it never edits or deletes existing events.
+
 ## 2026-11-11 — SupportKori tip widget: Account screen only, loaded and removed on demand
 
 **What happened.** The owner asked for the SupportKori tip widget (a Buy Me a Coffee alternative) as a stand-in until real payments exist. Its script appends a fixed floating button and a 350x550 payment iframe to `<body>` and never removes them, and it loads a panel from supportkori.com that runs its own third-party scripts (the browser showed it pulling Facebook tracking inside its own frame).

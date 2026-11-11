@@ -41,6 +41,7 @@ import {
 import { rememberEntryThumbnail, stablePhotoUrl } from "@/lib/photo-url-cache";
 import { AddVoiceSheet } from "../../_components/add-voice-sheet";
 import { ConfirmTrashDialog } from "../../_components/confirm-trash-dialog";
+import { EntryEvents } from "./entry-events";
 import { ShareSheet } from "./share-sheet";
 import { TranscriptSheet } from "./transcript-sheet";
 import { DayEventsInline } from "../../_components/calendar-events";
@@ -866,6 +867,8 @@ export function EntryDetail({
           className="mt-4"
         />
       )}
+
+      <EntryEvents entryId={entryId} refreshKey={summary ?? ""} />
 
       <div className="mt-6">
         {status === "pending" || status === "processing" ? (

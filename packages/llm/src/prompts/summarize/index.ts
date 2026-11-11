@@ -19,5 +19,6 @@ export function resolveSummaryPrompt(style: string): SummaryPromptTemplate {
   return SUMMARY_PROMPTS[style as SummaryStyle] ?? SUMMARY_PROMPTS.general;
 }
 
-export { parseTaskBlock, parseTitleLine } from "./types";
+export { parseTaskBlock, parseTitleLine, parseEventBlock } from "./types";
+export type { ParsedEvent } from "./types";
 export type { SummaryPromptTemplate } from "./types";
