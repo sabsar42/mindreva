@@ -34,7 +34,9 @@ export type CalendarStatus = "disconnected" | "connected" | "needs_reconnect";
 
 /** Short-lived OAuth handshake cookie: "<state>.<pkce verifier>". */
 const OAUTH_COOKIE = "mindreva_gcal_oauth";
-const OAUTH_COOKIE_PATH = "/api/integrations/google-calendar";
+/** Must cover both the connect call and the callback (/api/google-calendar/callback,
+ * the redirect registered with Google), so it is the shared /api prefix. */
+const OAUTH_COOKIE_PATH = "/api";
 /** Longest event window one request may ask for. */
 const MAX_RANGE_DAYS = 62;
 const EVENTS_TTL_MS = 5 * 60 * 1000;

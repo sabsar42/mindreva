@@ -59,3 +59,5 @@ docs/new-design-reference/Screenshot 2026-10-13 162312.png
 
 # Local secrets (Google OAuth client etc.)
 .secrets/
+
+.vercel

@@ -13,6 +13,7 @@ unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 - The OAuth client's registered redirect is `/api/google-calendar/callback`, so a route at that path now hands off to the shared callback handler (the old `/api/integrations/google-calendar/callback` still works). `.env.example` updated.
 - Verified locally: connect returns a Google sign-in URL with the right client and redirect; the Integrations screen offers Connect Google Calendar.
 - Logo files saved in `docs/brand/` (original SVG/PNG, green and white SVGs, 1000px green PNG).
+- Fix: connecting failed with "That sign-in took too long or came from another tab" because the OAuth handshake cookie was scoped to `/api/integrations/google-calendar` and the new callback path (`/api/google-calendar/callback`) never received it. The cookie path is now `/api`. Verified: matching state passes the check; a wrong one is rejected.
 
 ## 2026-11-11 — Voluntary SupportKori tip widget
 
