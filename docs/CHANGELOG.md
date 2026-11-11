@@ -7,6 +7,16 @@ adapted to phase-based entries (this project doesn't use semver releases).
 See also: [docs/DECISIONS.md](./DECISIONS.md) for the reasoning behind
 unplanned changes, and [docs/KNOWN-ISSUES.md](./KNOWN-ISSUES.md) for open items.
 
+## 2026-11-11 — Apple-style consistency pass, share cards, tighter to-do list
+
+- Re-live Me (list and conversation) no longer shows the mindmap panel; /river stays in the nav. Citation chips read "Based on these entries" with an icon; each still opens its entry.
+- Journal: today's calendar (max 2 rows, only when Google Calendar is connected) now sits directly under the activity strip, above the record bar.
+- Recorder: no blinking logo or pulsing ring; recording shows a steady ring and the live waveform.
+- All bottom sheets (Transcript, Share, others) use one iOS-style title; Share sheet renamed "Share".
+- Share as a photo card: `GET /api/entries/[id]/card?format=story|square` (next/og, owner-only) renders cover photo or default artwork + title + short blurb (`lib/share/card-text.ts`). Share sheet previews it; Share uses the system share sheet (Facebook, then Story, on a phone), Save downloads it.
+- To-do: summary prompts (`-v5`) ask for at most 6 tasks, verb-first, 8 words or fewer, not repeated in the summary and not duplicating dated events. TaskChecklist is now one grouped list with round check circles and "N of M done"; Events cards match.
+- Verified live with a throwaway user (deleted): events and tasks extracted, card PNG rendered, Share sheet and To-do list screenshotted. Not verified: real phone share sheet / Facebook Stories.
+
 ## 2026-11-11 — Add events from a recording to Google Calendar
 
 Owner asked: if a recording mentions an event, can it end up on the calendar, with a smooth, simple flow.

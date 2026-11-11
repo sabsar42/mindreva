@@ -1,7 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Check, Copy, Globe, Link2, Loader2, Lock, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  Globe,
+  ImageUp,
+  Link2,
+  Loader2,
+  Lock,
+  X,
+} from "lucide-react";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -202,6 +212,52 @@ export function ShareSheet({
     }
   }
 
+  const [cardBusy, setCardBusy] = React.useState(false);
+  const [cardReady, setCardReady] = React.useState(false);
+
+  async function cardFile(): Promise<File> {
+    const res = await fetch(`/api/entries/${entryId}/card?format=story`);
+    if (!res.ok) throw new Error("card failed");
+    return new File([await res.blob()], "mindreva-card.png", {
+      type: "image/png",
+    });
+  }
+
+  function download(file: File) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  // On a phone this opens the system share sheet, where Facebook (and its
+  // Story option), Instagram and the rest appear. Elsewhere it saves the image.
+  async function shareCard(saveOnly = false) {
+    if (cardBusy) return;
+    setCardBusy(true);
+    try {
+      const file = await cardFile();
+      if (
+        !saveOnly &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [file] })
+      ) {
+        await navigator.share({ files: [file] });
+      } else {
+        download(file);
+        toast.success("Card saved. Add it to your Story from your photos.");
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        toast.error("Couldn't make the card. Please try again.");
+      }
+    } finally {
+      setCardBusy(false);
+    }
+  }
+
   const link = share?.token && origin ? `${origin}/s/${share.token}` : "";
 
   async function copyLink() {
@@ -224,7 +280,7 @@ export function ShareSheet({
             <Link2 />
           </IconTile>
           <div className="min-w-0 flex-1">
-            <BottomSheetTitle>Share this journal</BottomSheetTitle>
+            <BottomSheetTitle>Share</BottomSheetTitle>
             <BottomSheetDescription className="text-muted-foreground text-sm">
               People you share with can read it, never change it.
             </BottomSheetDescription>
@@ -239,6 +295,58 @@ export function ShareSheet({
             </Badge>
           )}
         </div>
+
+        {open && (
+          <div className="border-border bg-card mt-5 flex items-center gap-4 rounded-2xl border p-3.5">
+            <div className="bg-secondary relative aspect-[9/16] h-32 shrink-0 overflow-hidden rounded-xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/entries/${entryId}/card?format=story`}
+                alt="Preview of your share card"
+                onLoad={() => setCardReady(true)}
+                className={cn(
+                  "size-full object-cover transition-opacity duration-300",
+                  cardReady ? "opacity-100" : "opacity-0",
+                )}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-foreground text-sm font-semibold">
+                Share as a photo card
+              </p>
+              <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+                A picture, a title and a short summary. Pick Facebook, then
+                Story, from the share sheet.
+              </p>
+              <div className="mt-2.5 flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={cardBusy || !cardReady}
+                  onClick={() => void shareCard()}
+                >
+                  {cardBusy ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <ImageUp />
+                  )}
+                  Share
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={cardBusy || !cardReady}
+                  onClick={() => void shareCard(true)}
+                  aria-label="Save card as image"
+                >
+                  <Download />
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loadError ? (
           <p

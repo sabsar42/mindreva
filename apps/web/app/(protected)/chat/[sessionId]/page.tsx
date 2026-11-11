@@ -6,7 +6,6 @@ import {
   SUGGESTED_MIN_ENTRIES,
 } from "@/lib/services/persona-chat.service";
 import { getMyCitationInfo } from "@/lib/services/entries.service";
-import { getMyRiver } from "@/lib/services/mindmap.service";
 import { describeChatSession } from "@/lib/services/persona-chat.service";
 import { ChatConversation } from "./chat-conversation";
 
@@ -19,17 +18,9 @@ export default async function ChatSessionPage({
   const session = await getMyChatSession(sessionId);
   if (!session) notFound();
 
-  const [messages, rangeContext, river] = await Promise.all([
+  const [messages, rangeContext] = await Promise.all([
     listMyChatMessages(sessionId),
     getSessionRangeContext(sessionId),
-    // Optional extra: the conversation works without the river.
-    getMyRiver().catch(() => ({
-      themes: [],
-      intersections: [],
-      insight: null,
-      monthsCovered: [],
-      computedAt: null,
-    })),
   ]);
 
   const allCitedIds = [
@@ -60,7 +51,6 @@ export default async function ChatSessionPage({
       monthRange={rangeContext.monthRange}
       isSingleYear={rangeContext.isSingleYear}
       openingLine={rangeContext.openingLine}
-      river={river}
     />
   );
 }

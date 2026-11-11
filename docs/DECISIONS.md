@@ -705,3 +705,7 @@ to a full sequential scan with no error. `EmbeddingsRepository.matchEntries`
 (the one place this matters today, used by the Phase 6 persona chat) already
 does this correctly — this note is for any future query added against the
 same column.
+
+## 2026-11-11 — Share cards rendered on the server; no direct Facebook Stories link
+
+What happened: the owner asked to share notes as photo cards, including to Facebook Stories. Decided: render the card server-side (next/og) so private signed photo URLs never need browser CORS, and hand it to the OS share sheet via the Web Share API. A web page cannot open Facebook Stories directly; on a phone the Facebook option in the share sheet offers Story. On desktop the card downloads. Chat still cites entries only (notes and voice); past conversations are not retrieved as sources.

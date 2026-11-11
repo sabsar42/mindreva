@@ -24,42 +24,42 @@ function TaskChecklist({ tasks, onToggle, className }: TaskChecklistProps) {
   const doneCount = tasks.filter((t) => t.isDone).length;
 
   return (
-    <div className={cn("", className)}>
-      <div className="mb-3 flex items-center justify-between">
+    <div className={className}>
+      <div className="mb-2 flex items-center justify-between px-1">
         <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
-          Tasks
+          To-do
         </p>
-        <p className="text-muted-foreground text-xs font-semibold">
-          {doneCount}/{tasks.length}
+        <p className="text-muted-foreground text-xs font-semibold tabular-nums">
+          {doneCount} of {tasks.length} done
         </p>
       </div>
-      <ul className="flex flex-col gap-2.5">
+      <ul className="bg-card border-border shadow-subtle divide-border divide-y overflow-hidden rounded-2xl border">
         {tasks.map((task) => (
           <li key={task.id}>
             <button
               type="button"
               onClick={() => onToggle(task.id, !task.isDone)}
               aria-pressed={task.isDone}
-              className="bg-card/92 border-card-edge hover:border-primary/40 group flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors"
+              className="active:bg-secondary flex min-h-12 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
             >
               <span
                 className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                  "flex size-6 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors",
                   task.isDone
                     ? "border-primary bg-primary"
-                    : "border-muted-foreground/40 group-hover:border-primary/60",
+                    : "border-muted-foreground/40",
                 )}
               >
                 {task.isDone && (
                   <Check
-                    className="text-primary-foreground size-3"
+                    className="text-primary-foreground size-3.5"
                     strokeWidth={3}
                   />
                 )}
               </span>
               <span
                 className={cn(
-                  "text-sm leading-snug",
+                  "text-[0.9375rem] leading-snug transition-colors",
                   task.isDone
                     ? "text-muted-foreground line-through"
                     : "text-foreground",

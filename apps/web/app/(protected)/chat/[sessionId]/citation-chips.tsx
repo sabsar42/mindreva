@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { FileText } from "lucide-react";
 import { PrefetchLink } from "../../_components/prefetch-link";
 
 export interface CitationInfo {
@@ -10,7 +11,7 @@ export interface CitationInfo {
 
 /** Chips shown before "+N" — enough to read at a glance on a phone. */
 const VISIBLE = 3;
-const TITLE_LENGTH = 22;
+const TITLE_LENGTH = 26;
 
 function shortDate(dateKey: string | null | undefined): string {
   if (!dateKey) return "Undated";
@@ -50,7 +51,7 @@ export function CitationChips({
     // instead of being clipped at the bubble's width.
     <div className="mt-1.5 w-full self-stretch">
       <p className="text-muted-foreground text-caption mb-1 px-1">
-        From your entries
+        Based on {entryIds.length === 1 ? "this entry" : "these entries"}
       </p>
       <div className="-mx-4 flex snap-x scroll-px-4 gap-1.5 overflow-x-auto px-4 py-1.5 [scrollbar-width:none]">
         {shown.map((id) => {
@@ -61,6 +62,7 @@ export function CitationChips({
               href={`/entries/${id}`}
               className="border-separator bg-card text-foreground text-footnote focus-visible:ring-ring press hit-44 inline-flex h-8 shrink-0 snap-start items-center gap-1 rounded-full border-[0.5px] px-3 font-medium focus-visible:outline-none focus-visible:ring-2"
             >
+              <FileText className="text-primary size-3.5" aria-hidden />
               <span>{shortDate(info[id]?.date)}</span>
               {title && (
                 <span className="text-muted-foreground font-normal">

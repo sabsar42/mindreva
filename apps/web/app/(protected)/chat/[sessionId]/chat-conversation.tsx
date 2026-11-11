@@ -12,8 +12,6 @@ import { buttonVariants, cn, toast } from "@mindreva/ui";
 import { isNoRecordReply } from "@mindreva/llm/persona-chat-prompt";
 import type { ChatRole } from "@mindreva/database";
 import { RangeContextPanel } from "./range-context-panel";
-import { RiverPanel } from "../../river/river-panel";
-import type { RiverData } from "@/lib/services/mindmap.service";
 import { CitationChips, type CitationInfo } from "./citation-chips";
 import { MessageBubble, type BubbleStatus } from "./message-bubble";
 import { ChatComposer } from "./chat-composer";
@@ -97,7 +95,6 @@ export function ChatConversation({
   monthRange,
   isSingleYear,
   openingLine,
-  river,
 }: {
   sessionId: string;
   title: string;
@@ -112,7 +109,6 @@ export function ChatConversation({
   monthRange: [number, number];
   isSingleYear: boolean;
   openingLine: OpeningLine | null;
-  river: RiverData;
 }) {
   const router = useRouter();
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
@@ -407,16 +403,6 @@ export function ChatConversation({
           <p className="text-muted-foreground text-caption">{rangeLabel}</p>
         </div>
       </header>
-
-      {/* Collapsed by default here: the conversation owns this screen, the
-          river is one tap away rather than competing for the space. */}
-      <RiverPanel
-        data={river}
-        collapsible
-        storageKey="mindreva:conversation-river"
-        defaultOpen={false}
-        className="mt-4"
-      />
 
       {isSingleYear && entryCountInRange < suggestedMinEntries && (
         <RangeContextPanel

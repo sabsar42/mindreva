@@ -184,7 +184,7 @@ export function EntryEvents({
           return (
             <li
               key={e.id}
-              className="bg-card/92 border-card-edge rounded-2xl border p-4"
+              className="bg-card border-border shadow-subtle rounded-2xl border p-4"
             >
               <div className="flex items-start gap-3">
                 <span className="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-full">

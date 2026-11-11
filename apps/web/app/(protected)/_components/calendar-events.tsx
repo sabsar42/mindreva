@@ -60,20 +60,24 @@ export function eventTime(e: CalendarEvent): string {
 export function TodayEvents({
   todayKey,
   className,
+  max = 4,
 }: {
   todayKey: string;
   className?: string;
+  max?: number;
 }) {
   const events = useCalendarEvents(todayKey);
   if (!events || events.length === 0) return null;
-  const shown = events.slice(0, 4);
+  const shown = events.slice(0, max);
   return (
     <section
       aria-label="Today's calendar"
       className={cn("motion-safe:animate-fade-in", className)}
     >
-      <h2 className="text-title-3 text-foreground px-1 font-bold">Today</h2>
-      <ul className="bg-card border-border shadow-subtle grouped-list mt-2 overflow-hidden rounded-2xl border [--row-inset:4.75rem]">
+      <h2 className="text-muted-foreground px-1 text-xs font-semibold uppercase tracking-widest">
+        Today
+      </h2>
+      <ul className="bg-card border-border shadow-subtle grouped-list mt-1.5 overflow-hidden rounded-2xl border [--row-inset:4.75rem]">
         {shown.map((e) => (
           <li
             key={`${e.calendarId}:${e.id}`}

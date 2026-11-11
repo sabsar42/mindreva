@@ -99,7 +99,7 @@ function StreakLine({ streak }: { streak: number }) {
 /**
  * The Journal screen's record bar. Tapping it starts recording right here: no
  * navigation, no review screen. The leaf logo on the right is the call to
- * action; it blinks, and sinks a little when pressed. Stopping uploads the
+ * action; it sinks a little when pressed. Stopping uploads the
  * audio (the bar shows "Saving…"), then hands the entry to the Journal, where
  * its memory card forms in the list while transcription and summarising carry
  * on. The bar is free for the next recording straight away.
@@ -198,12 +198,8 @@ export function InlineRecorder({
             <StreakLine streak={streak} />
           </span>
           <span className="relative flex size-14 shrink-0 items-center justify-center">
-            <span
-              aria-hidden
-              className="bg-primary/25 motion-safe:animate-mic-pulse absolute inset-0 rounded-full"
-            />
             <span className="bg-gradient-primary text-primary-foreground shadow-subtle relative flex size-14 items-center justify-center rounded-full transition-transform duration-150 group-active:scale-95">
-              <LeafMark className="size-9 motion-safe:animate-pulse" />
+              <LeafMark className="size-9" />
             </span>
           </span>
         </button>
@@ -265,13 +261,13 @@ export function InlineRecorder({
           </>
         ) : (
           <>
-            {/* The logo is the live indicator: it blinks and rings while
+            {/* The logo is the live indicator: it shows a steady ring while
                 recording, dims when paused, and is a spinner while busy. */}
             <span className="relative flex size-14 shrink-0 items-center justify-center">
               {rec.state === "recording" && (
                 <span
                   aria-hidden
-                  className="bg-primary/25 motion-safe:animate-mic-pulse absolute inset-0 rounded-full"
+                  className="bg-primary/20 absolute -inset-1 rounded-full"
                 />
               )}
               <span
@@ -286,12 +282,7 @@ export function InlineRecorder({
                 {busy ? (
                   <Loader2 className="size-6 animate-spin" />
                 ) : (
-                  <LeafMark
-                    className={cn(
-                      "size-8",
-                      rec.state === "recording" && "motion-safe:animate-pulse",
-                    )}
-                  />
+                  <LeafMark className="size-8" />
                 )}
               </span>
             </span>

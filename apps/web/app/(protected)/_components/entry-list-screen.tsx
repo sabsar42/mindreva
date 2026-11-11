@@ -272,6 +272,10 @@ export function EntryListScreen({
             onWeekChange={setWeek}
             onOpen={() => setSheetOpen(true)}
           />
+          {/* Today's calendar sits directly under the graph, above recording. */}
+          {!searchResults && calendarSlot && (
+            <div className="mt-3">{calendarSlot}</div>
+          )}
           {type === "journal" && (
             <InlineRecorder
               className="mt-4"
@@ -331,8 +335,6 @@ export function EntryListScreen({
           data-entry-list
           className="-mx-5 mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 pb-[calc(2.5rem+var(--safe-bottom))] pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_10px)]"
         >
-          {!searchResults && calendarSlot}
-
           {searching && (
             <p role="status" className="text-muted-foreground text-sm">
               Searching…

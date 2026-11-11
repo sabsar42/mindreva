@@ -19,8 +19,6 @@ import { TabHeaderActions } from "../_components/tab-header-actions";
 import { SwipeNav } from "../_components/swipe-nav";
 import { trashSwipeAction } from "../_components/swipe-actions";
 import { ConfirmTrashDialog } from "../_components/confirm-trash-dialog";
-import { RiverPanel } from "../river/river-panel";
-import type { RiverData } from "@/lib/services/mindmap.service";
 
 // Set when a conversation is created, consumed on this screen's next mount. A
 // flag rather than refresh-then-push: a navigation discards a pending refresh,
@@ -234,13 +232,7 @@ function SessionCard({
   );
 }
 
-export function PastSelfScreen({
-  years,
-  river,
-}: {
-  years: PastSelfYear[];
-  river: RiverData;
-}) {
+export function PastSelfScreen({ years }: { years: PastSelfYear[] }) {
   const router = useRouter();
 
   // This page can render from the Router Cache (prefetched by AppShell), so a
@@ -327,9 +319,6 @@ export function PastSelfScreen({
           Revisit what you wrote, then ask what you were thinking. Every answer
           is grounded only in what you actually wrote.
         </p>
-
-        {/* The river comes first: the shape of your thinking, then the details. */}
-        <RiverPanel data={river} className="mt-6" />
 
         {years.length === 0 ? (
           <div className="border-border bg-card shadow-subtle mt-6 flex flex-col items-center rounded-3xl border p-8 text-center">

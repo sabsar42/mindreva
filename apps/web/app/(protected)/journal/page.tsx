@@ -32,7 +32,7 @@ export default async function JournalPage() {
       entries={entries}
       calendarSlot={
         calendar?.status === "connected" && todayKey ? (
-          <TodayEvents todayKey={todayKey} />
+          <TodayEvents todayKey={todayKey} max={2} />
         ) : undefined
       }
       initialActivity={
